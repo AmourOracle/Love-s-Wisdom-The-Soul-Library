@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>靈魂藏書閣：你是哪一本愛情之書？</title>
+    <style>
+        :root {
+            --primary-color: #583e23;
+            --secondary-color: #a67c52;
+            --background-color: #f5f0e8;
+            --text-color: #333;
+            --highlight-color: #d4a373;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Noto Serif TC', serif, 'Times New Roman', Times, serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #fff;
+            box-shadow: 0 5px 15px var(--shadow-color);
+            border-radius: 8px;
+            min-height: 100vh;
+            position: relative; /* 确保容器定位正确 */
+        }
+        
+        header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--highlight-color);
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-style: italic;
+            color: var(--secondary-color);
+            margin-bottom: 20px;
+        }
+        
+        .intro {
+            margin-bottom: 30px;
+            padding: 15px;
+            background-color: rgba(212, 163, 115, 0.1);
+            border-left: 4px solid var(--highlight-color);
+            border-radius: 4px;
+        }
+        
+        /* 测验部分的样式 */
+        .test-container {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        
+        .test-container.active {
+            display: block;
+            opacity: 1;
+        }
+        
+        .question-container {
+            margin-bottom: 30px;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        .question {
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+        }
+        
+        .options {
+            list-style-type: none;
+        }
+        
+        .option {
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .option:hover {
+            background-color: rgba(212, 163, 115, 0.1);
+            border-color: var(--highlight-color);
+        }
+        
+        .option.selected {
+            background-color: var(--highlight-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .navigate-btns {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        button:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .start-btn {
+            display: block;
+            width: 200px;
+            margin: 20px auto;
+            font-size: 1.1rem;
+            padding: 12px 24px;
+        }
+        
+        /* 结果部分的样式 */
+        .result-container {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        
+        .result-container.active {
+            display: block !important;
+            opacity: 1;
+        }
+        
+        .result-title {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .result-description {
+            padding: 20px;
+            background-color: rgba(212, 163, 115, 0.1);
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .result-subtitle {
+            font-style: italic;
+            color: var(--secondary-color);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .book-traits {
+            margin: 20px 0;
+        }
+        
+        .trait-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .trait-name {
+            font-weight: bold;
+        }
+        
+        .trait-stars {
+            color: var(--highlight-color);
+        }
+        
+        .related-books, .share-section {
+            margin: 25px 0;
+        }
+        
+        h3 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+        
+        .share-text {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            margin: 15px 0;
+            white-space: pre-wrap;
+        }
+        
+        .copy-btn {
+            background-color: var(--secondary-color);
+            margin-right: 10px;
+        }
+        
+        .restart-btn {
+            margin-top: 20px;
+            display: block;
+            width: 200px;
+            margin: 20px auto;
+        }
+        
+        /* 动画效果 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* 进度指示器 */
+        .progress-container {
+            margin: 20px 0;
+        }
+        
+        .progress-bar {
+            background-color: #e0e0e0;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            background-color: var(--highlight-color);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        .progress-text {
+            text-align: right;
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+            margin-top: 5px;
+        }
+        
+        /* 强制显示结果容器的样式 */
+        .force-visible {
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+                width: 95%;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .question {
+                font-size: 1.1rem;
+            }
+            
+            .option {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>靈魂藏書閣</h1>
+            <div class="subtitle">你是哪一本愛情之書？</div>
+        </header>
+        
+        <!-- 介紹頁面 -->
+        <div id="intro-container" class="test-container active">
+            <div class="intro">
+                <p><i>每個人心中都有一座藏書閣，存放著未被言說的情感篇章。而你的那本，正等待被翻開...</i></p>
+                <p>在某個無人知曉的深夜，你突然收到一封神秘邀請，指引你前往一家名為「靈魂藏書閣」的古老書店。傳說中，每個人都能在那裡找到一本與自己靈魂共振的書籍，揭示你在愛情中最真實的模樣。現在，跟隨指引，踏上這場字裡行間的愛情探索吧。</p>
+            </div>
+            <button class="start-btn" id="start-test">開始測驗</button>
+        </div>
+        
+        <!-- 測驗頁面 -->
+        <div id="test-container" class="test-container">
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-text" id="progress-text">問題 1/11</div>
+            </div>
+            
+            <div class="question-container" id="question-container">
+                <!-- 問題將由JavaScript動態生成 -->
+            </div>
+            
+            <div class="navigate-btns">
+                <button id="prev-btn" disabled>上一題</button>
+                <button id="next-btn">下一題</button>
+            </div>
+        </div>
+        
+        <!-- 結果頁面 -->
+        <div id="result-container" class="result-container">
+            <h2 class="result-title" id="result-title">你的靈魂之書是：</h2>
+            <div class="result-subtitle" id="result-subtitle"></div>
+            
+            <div class="result-description" id="result-description">
+                <!-- 結果描述將由JavaScript動態生成 -->
+            </div>
+            
+            <div class="book-traits">
+                <h3>你的書本特質</h3>
+                <div id="traits-container">
+                    <!-- 特質將由JavaScript動態生成 -->
+                </div>
+            </div>
+            
+            <div class="related-books">
+                <h3>與你相似的書籍</h3>
+                <div id="similar-books">
+                    <!-- 相似書籍將由JavaScript動態生成 -->
+                </div>
+                
+                <h3>互補的閱讀視角</h3>
+                <div id="complementary-books">
+                    <!-- 互補書籍將由JavaScript動態生成 -->
+                </div>
+            </div>
+            
+            <div class="share-section">
+                <h3>分享你的結果</h3>
+                <p>複製以下文字，分享你的測驗結果：</p>
+                <div class="share-text" id="share-text">
+                    <!-- 分享文字將由JavaScript動態生成 -->
+                </div>
+                <button class="copy-btn" id="copy-btn">複製</button>
+                <button class="restart-btn" id="restart-btn">重新測驗</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 在頁面載入完成後運行
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("頁面已載入，測驗初始化中...");
+            
+            // 檢查DOM元素是否存在
+            const containers = {
+                intro: document.getElementById('intro-container'),
+                test: document.getElementById('test-container'),
+                result: document.getElementById('result-container')
+            };
+            
+            const buttons = {
+                start: document.getElementById('start-test'),
+                prev: document.getElementById('prev-btn'),
+                next: document.getElementById('next-btn'),
+                restart: document.getElementById('restart-btn')
+            };
+            
+            // 檢查核心元素
+            if (!containers.intro || !containers.test || !containers.result) {
+                console.error("關鍵容器元素缺失:", 
+                    !containers.intro ? "intro-container" : "",
+                    !containers.test ? "test-container" : "",
+                    !containers.result ? "result-container" : "");
+            }
+            
+            if (!buttons.start || !buttons.prev || !buttons.next || !buttons.restart) {
+                console.error("關鍵按鈕元素缺失:", 
+                    !buttons.start ? "start-test" : "",
+                    !buttons.prev ? "prev-btn" : "",
+                    !buttons.next ? "next-btn" : "",
+                    !buttons.restart ? "restart-btn" : "");
+            }
+        });
+        
+        // 保存元素引用，避免重複獲取
+        const DOM = {
+            containers: {
+                intro: document.getElementById('intro-container'),
+                test: document.getElementById('test-container'),
+                result: document.getElementById('result-container')
+            },
+            elements: {
+                questionContainer: document.getElementById('question-container'),
+                progressFill: document.getElementById('progress-fill'),
+                progressText: document.getElementById('progress-text'),
+                resultTitle: document.getElementById('result-title'),
+                resultSubtitle: document.getElementById('result-subtitle'),
+                resultDescription: document.getElementById('result-description'),
+                traitsContainer: document.getElementById('traits-container'),
+                similarBooks: document.getElementById('similar-books'),
+                complementaryBooks: document.getElementById('complementary-books'),
+                shareText: document.getElementById('share-text')
+            },
+            buttons: {
+                start: document.getElementById('start-test'),
+                prev: document.getElementById('prev-btn'),
+                next: document.getElementById('next-btn'),
+                copy: document.getElementById('copy-btn'),
+                restart: document.getElementById('restart-btn')
+            }
+        };
+        
+        // 測驗問題
+        const questions = [
+            {
+                question: "1. 推開「靈魂藏書閣」的門，你最希望看到的書店氛圍是：",
+                options: [
+                    { text: "半明半暗的閣樓書店，既能安靜閱讀，又能俯瞰街景的人來人往", type: "C" },
+                    { text: "燈光柔和的古典書店，每本書都被精心分類，空氣中飄散著舊書的墨香", type: "A" },
+                    { text: "沒有固定位置的流動書車，每天停在城市不同的角落，充滿驚喜", type: "E" },
+                    { text: "溫暖明亮的小書店，窗台上擺滿植物，牆上掛著手寫的書籍推薦", type: "B" },
+                    { text: "改建自廢棄工廠的藝術書店，裂開的牆面被巧妙修復成書架", type: "D" }
+                ]
+            },
+            {
+                question: "2. 在書店中漫步，你被哪一區的書架首先吸引：",
+                options: [
+                    { text: "旅行筆記與冒險故事區，充滿未知與可能性的篇章", type: "E" },
+                    { text: "城市觀察與人文隨筆區，那些既親近又保持距離的故事", type: "C" },
+                    { text: "日記與書信集區，記錄著平凡生活中的動人時刻", type: "B" },
+                    { text: "生命重建與心靈療癒區，關於如何在破碎中找到新生", type: "D" },
+                    { text: "文學評論與哲學思考區，那裡的書籍探討愛的本質與意義", type: "A" }
+                ]
+            },
+            {
+                question: "3. 店主遞給你一杯茶，問你喜歡什麼口味，你會選擇：",
+                options: [
+                    { text: "帶著花香的茉莉綠茶，溫暖而令人安心", type: "B" },
+                    { text: "經過歲月沉澱的普洱，苦澀中帶著深沉的回甘", type: "D" },
+                    { text: "複雜層次的烏龍茶，每一口都有不同的滋味等待品析", type: "A" },
+                    { text: "混合了各種花果香氣的花草茶，充滿surprises與變化", type: "E" },
+                    { text: "半發酵的青茶，介於紅茶與綠茶之間的微妙平衡", type: "C" }
+                ]
+            },
+            {
+                question: "4. 書店的一角有一台古老留聲機，你希望聽到的背景音樂是：",
+                options: [
+                    { text: "世界音樂融合，不同文化元素的碰撞與融合", type: "E" },
+                    { text: "巴赫的賦格曲，複雜精密的結構中藏著深刻的情感", type: "A" },
+                    { text: "城市爵士樂，既融入環境又保持自己獨特的節奏", type: "C" },
+                    { text: "輕柔的鋼琴曲，如同輕撫過日常生活的溫柔手指", type: "B" },
+                    { text: "大提琴獨奏，低沉而深刻，彷彿能觸碰心靈深處", type: "D" }
+                ]
+            },
+            {
+                question: "5. 在書籍的海洋中，你不經意發現一本封面吸引你的書，打開後的第一頁寫著：",
+                options: [
+                    { text: "\"唯有經歷破碎，才能重新拼湊出更完整的自己\"", type: "D" },
+                    { text: "\"生活中最平凡的時刻，往往隱藏著最動人的情詩\"", type: "B" },
+                    { text: "\"每一段關係都是一次旅行，重要的不是終點，而是沿途風景\"", type: "E" },
+                    { text: "\"保持距離，才能看清全景；靠近一點，才能感受溫度\"", type: "C" },
+                    { text: "\"愛是一種需要被解讀的語言，而我們都是彼此的譯者\"", type: "A" }
+                ]
+            },
+            {
+                question: "6. 書店的閱讀角落有幾張不同的座位，你最想坐在：",
+                options: [
+                    { text: "經過歲月洗禮、有些磨損但很舒適的皮沙發", type: "D" },
+                    { text: "可以隨意調整位置的懶人沙發，今天想坐這裡，明天換那裡", type: "E" },
+                    { text: "古典書桌前的高背椅，可以專注閱讀並做筆記", type: "A" },
+                    { text: "可以看到書店全景又有私密感的角落座位", type: "C" },
+                    { text: "靠窗的軟墊沙發，陽光灑在書頁上的感覺很美好", type: "B" }
+                ]
+            },
+            {
+                question: "7. 書店的牆上掛著幾幅畫，你最被哪一幅吸引：",
+                options: [
+                    { text: "城市夜景的攝影作品，燈火與黑暗形成鮮明對比", type: "C" },
+                    { text: "沒有框架的水彩畫，色彩在紙上自由流動，界限模糊", type: "E" },
+                    { text: "捕捉日常生活瞬間的溫暖插畫，充滿細節與情感", type: "B" },
+                    { text: "文字與圖像交織的抽象畫，需要駐足思考才能理解其中含義", type: "A" },
+                    { text: "金繕藝術作品，破碎的瓷器被金線重新連接，更顯珍貴", type: "D" }
+                ]
+            },
+            {
+                question: "8. 書店後院有一個小花園，你被邀請在那裡小憩片刻，你會選擇：",
+                options: [
+                    { text: "在種滿四季花卉的角落，記錄下花朵綻放的細微變化", type: "B" },
+                    { text: "在有裂痕但被藤蔓美化的老石桌旁，感受歲月的痕跡", type: "D" },
+                    { text: "不固定一處，隨著陽光移動位置，探索花園的每個角落", type: "E" },
+                    { text: "坐在棋盤旁的石凳上，思考每一步棋的可能性與後果", type: "A" },
+                    { text: "選擇既能看到全景又有私密感的涼亭，觀察來往的人們", type: "C" }
+                ]
+            },
+            {
+                question: "9. 書店舉辦了一場小型讀書會，主題是「愛的語言」，你最想分享的觀點是：",
+                options: [
+                    { text: "關於愛情中的詞語選擇如何影響彼此的理解與連結", type: "A" },
+                    { text: "在親密關係中保持適當距離的藝術與平衡", type: "C" },
+                    { text: "愛情需要不斷探索與創新，避免陷入固定模式", type: "E" },
+                    { text: "經歷心碎後如何重新學習去愛與被愛", type: "D" },
+                    { text: "如何通過日常的小儀式表達愛，不必依賴言語", type: "B" }
+                ]
+            },
+            {
+                question: "10. 當書店老闆請你在留言簿上寫下對愛的理解時，你會寫：",
+                options: [
+                    { text: "\"愛是修復的藝術，在傷痕中找到更深刻的連結\"", type: "D" },
+                    { text: "\"愛是兩座城市間的燈火，既能照亮對方，又保持各自的光芒\"", type: "C" },
+                    { text: "\"愛是不斷探索的旅程，每一天都是新的起點\"", type: "E" },
+                    { text: "\"愛是一種需要不斷解析才能理解的複雜語言\"", type: "A" },
+                    { text: "\"愛藏在清晨的一杯茶，夜晚的一句晚安，指尖相觸的溫度裡\"", type: "B" }
+                ]
+            },
+            {
+                question: "11. 最後，書店老闆從書架深處取出五本書，請你憑直覺選擇一本：",
+                options: [
+                    { text: "沒有固定裝幀的活頁書，可以不斷添加新的內容", type: "E" },
+                    { text: "裝幀精美的筆記本，書頁間夾著花瓣與票根等生活碎片", type: "B" },
+                    { text: "看得出歲月痕跡但經過修復的古書，每道裂痕都有故事", type: "D" },
+                    { text: "半透明書衣包裹的平裝書，若隱若現的內容引人遐想", type: "C" },
+                    { text: "燙金燙銀的精裝書，厚重而需要時間細細品味", type: "A" }
+                ]
+            }
+        ];
+        
+        // 測驗結果
+        const results = {
+            "A": {
+                title: "《情感的修辭學》",
+                subtitle: "*愛是一種語言，而你是它最優雅的詮釋者*",
+                description: "你總是站在情感的邊緣，以一種近乎學術的態度觀察愛情的流動。在你的世界裡，每一段關係都是一篇等待解析的文本，每一次心動都值得被反覆推敲。你不輕易沉溺，卻在字句間找到最深的共鳴；你看似冷靜，實則在靈魂深處記錄著每一個微小的情感波動。愛對你而言不僅是感受，更是一種需要被理解的語言——你用理性編織情感的網，卻常在意料之外的瞬間被自己的情感擊中。",
+                similar: [
+                    "《城市觀察手記》- 同樣細膩地觀察愛情，卻比你更願意沉浸其中",
+                    "《日常的溫度》- 在日常的細節裡尋找意義，但比你更偏向感性"
+                ],
+                complementary: [
+                    "《破碎與重生》- 勇於直面情感的創傷，而你偏好在理性的距離中觀察",
+                    "《夜空的螢火》- 隨性而自由的愛情探險家，與你的思辨結構形成美麗對比"
+                ],
+                shareText: `📚 **我在《靈魂藏書閣》中發現自己是《情感的修辭學》，一本解讀愛情語言的思辨之書。我用理性編織情感的網，卻常在意料之外的瞬間被自己的心意擊中。**
+
+想與同樣細讀情感文本的靈魂對談嗎？在留言中標記 #情感修辭學讀者會，分享你如何在字句間解讀愛的密碼。
+
+👉 你也來探索自己的內心書架吧！#靈魂藏書閣 #AmourOracle`
+            },
+            "B": {
+                title: "《日常的溫度》",
+                subtitle: "*每一頁都是未完成的情書，隨手可得，卻珍貴如金*",
+                description: "你的愛情如同一摞輕盈的紙鳥信箋，隨性而真誠，不加修飾卻句句動人。生活中的小事在你手中都能變成愛的證明——一杯準時泡好的茶，一條深夜傳來的訊息，一個無意間的對視。你不需要宏大的表白，因為你懂得愛最真實的樣子藏在日常的縫隙中。即使在最平凡的時刻，你也能發現愛情的奇妙脈動，像是用微光信箋記錄下整個宇宙的溫柔密碼。",
+                similar: [
+                    "《夜空的螢火》- 同樣珍視當下的美好，卻比你更加結構化",
+                    "《破碎與重生》- 在深刻的情感體驗中尋找意義，但你更加輕盈靈動"
+                ],
+                complementary: [
+                    "《情感的修辭學》- 在思辨的高塔中觀察愛情，而你則沉浸其中",
+                    "《城市觀察手記》- 保持著觀察者的距離，而你選擇全然投入"
+                ],
+                shareText: `📚 **我在《靈魂藏書閣》中發現自己是《日常的溫度》，一本記錄生活細微溫暖的情感之書。我在平凡時刻裡尋找愛的痕跡，每一杯茶、每一句晚安都是我珍藏的詩行。**
+
+想與同樣珍視日常溫度的靈魂交流嗎？在留言中標記 #日常溫度讀者會，分享你捕捉到的生活中那些最動人的瞬間。
+
+👉 你也來探索自己的內心書架吧！#靈魂藏書閣 #AmourOracle`
+            },
+            "C": {
+                title: "《城市觀察手記》",
+                subtitle: "*在喧囂與寂靜的交界處，你收集著無人聽見的心事*",
+                description: "你的靈魂棲息在城市的邊緣，既融入人群，又保持著一定的距離。你善於聆聽別人的故事，卻很少訴說自己的感受；你能輕易走進他人的情感世界，卻總在最後一刻輕輕後退。愛對你而言是一種奇妙的平衡藝術——既親密又保持距離，既投入又略帶觀察。你的情感如同夜晚的路燈，不刺眼卻足以照亮前行的道路，溫柔而持久，像是時間凝固成的琥珀。",
+                similar: [
+                    "《情感的修辭學》- 同樣善於觀察與分析，但你更願意親近情感",
+                    "《日常的溫度》- 同樣珍視生活中的細節，但你更傾向沉思"
+                ],
+                complementary: [
+                    "《破碎與重生》- 直接面對情感的傷痕，而你選擇在安全距離觀察",
+                    "《夜空的螢火》- 追尋自由與變化，而你更珍視穩定與深度"
+                ],
+                shareText: `📚 **我在《靈魂藏書閣》中發現自己是《城市觀察手記》，一本既親近又保持距離的人文隨筆。我站在城市的邊緣，既能感受人群的溫度，又能保持自己獨立的視角。**
+
+想與同樣擅長觀察人間百態的靈魂對話嗎？在留言中標記 #城市觀察讀者會，分享你如何在親密與獨立間尋找平衡。
+
+👉 你也來探索自己的內心書架吧！#靈魂藏書閣 #AmourOracle`
+            },
+            "D": {
+                title: "《破碎與重生》",
+                subtitle: "*每一道裂痕都是光照進來的路徑，每一次碎裂都是重組的開始*",
+                description: "你的心曾經破碎，卻從未停止愛的勇氣。那些傷痕並未使你封閉自己，反而成為了你理解他人的橋樑。你相信真正的連結發生在脆弱與真實的交匯處，因此你不懼怕展示自己的不完美。愛對你而言是一種修復的藝術——不是回到從前，而是創造全新的自我。你的情感如同金繕修復的陶器，因為破碎而更加珍貴，那些金色的痕跡訴說著你的堅韌與溫柔。",
+                similar: [
+                    "《城市觀察手記》- 同樣深刻地感受情感的波動，但你選擇直面而非觀望",
+                    "《夜空的螢火》- 同樣熱愛自由與探索，但你在傷痕中尋找意義"
+                ],
+                complementary: [
+                    "《情感的修辭學》- 在思辨的距離中分析愛情，而你選擇沉浸其中",
+                    "《日常的溫度》- 在日常細節中尋找溫暖，而你在破碎中發現美麗"
+                ],
+                shareText: `📚 **我在《靈魂藏書閣》中發現自己是《破碎與重生》，一本從傷痕中尋找新生的自傳。我相信每一次碎裂都是重組的契機，每一道裂痕都是光照進來的路徑。**
+
+想與同樣經歷過破碎又找到重生的靈魂相遇嗎？在留言中標記 #破碎重生讀者會，分享你如何將傷痕轉化為連結的橋樑。
+
+👉 你也來探索自己的內心書架吧！#靈魂藏書閣 #AmourOracle`
+            },
+            "E": {
+                title: "《夜空的螢火》",
+                subtitle: "*每一次閃爍都是一場冒險，短暫卻足以照亮整個夜晚*",
+                description: "你的愛情如同夜空中的螢火，不求永恆，只在乎當下的真實與美麗。你相信情感應該是自由的，像風一樣不可捉摸卻能帶來驚喜。每一段關係對你而言都是一次探索——探索他人的內心，也探索自己未知的可能。你不執著於結果，而是珍視過程中的每一次心動與成長。你的情感輕盈卻不淺薄，如同螢火蟲的光，短暫卻能在黑暗中留下永恆的印記。",
+                similar: [
+                    "《破碎與重生》- 同樣勇於冒險，但你更加輕盈與自由",
+                    "《日常的溫度》- 同樣珍視當下的美好，但你更願意擁抱變化"
+                ],
+                complementary: [
+                    "《情感的修辭學》- 在理性的框架中解析愛情，而你追求感性的流動",
+                    "《城市觀察手記》- 以觀察者姿態保持距離，而你選擇全然投入"
+                ],
+                shareText: `📚 **我在《靈魂藏書閣》中發現自己是《夜空的螢火》，一本關於自由探索的旅行詩集。我珍視當下的真實與美麗，相信每一段關係都是一次探索未知的旅程。**
+
+想與同樣熱愛自由與探索的靈魂一起漫遊嗎？在留言中標記 #夜空螢火讀者會，分享你在愛的旅途中遇見的最美風景。
+
+👉 你也來探索自己的內心書架吧！#靈魂藏書閣 #AmourOracle`
+            }
+        };
+        
+        // 跟踪當前問題索引和用戶選擇
+        let currentQuestionIndex = 0;
+        const userAnswers = [];
+        
+        // 使用全域DOM引用替代直接獲取元素
+        
+        // 開始測驗
+        DOM.buttons.start.addEventListener('click', () => {
+            DOM.containers.intro.classList.remove('active');
+            DOM.containers.test.classList.add('active');
+            renderQuestion();
+        });
+        
+        // 重新開始測驗
+        DOM.buttons.restart.addEventListener('click', () => {
+            currentQuestionIndex = 0;
+            userAnswers.length = 0;
+            DOM.containers.result.classList.remove('active');
+            DOM.containers.test.classList.add('active');
+            renderQuestion();
+            updateNavigationButtons();
+            updateProgressBar();
+        });
+        
+        // 渲染當前問題
+        function renderQuestion() {
+            const question = questions[currentQuestionIndex];
+            
+            let optionsHTML = '';
+            question.options.forEach((option, index) => {
+                const isSelected = userAnswers[currentQuestionIndex] === index;
+                optionsHTML += `
+                <div class="option ${isSelected ? 'selected' : ''}" data-index="${index}">
+                    ${option.text}
+                </div>`;
+            });
+            
+            DOM.elements.questionContainer.innerHTML = `
+                <div class="question">${question.question}</div>
+                <div class="options">${optionsHTML}</div>
+            `;
+            
+            // 為選項添加事件監聽器
+            document.querySelectorAll('.option').forEach(option => {
+                option.addEventListener('click', (e) => {
+                    // 確保點擊的是選項元素本身，而不是子元素
+                    const targetElement = e.target.closest('.option');
+                    if (!targetElement) return;
+                    
+                    const optionIndex = parseInt(targetElement.dataset.index);
+                    userAnswers[currentQuestionIndex] = optionIndex;
+                    
+                    console.log(`問題 ${currentQuestionIndex+1} 選擇了選項 ${optionIndex+1}, 類型: ${questions[currentQuestionIndex].options[optionIndex].type}`);
+                    
+                    // 更新選項樣式
+                    document.querySelectorAll('.option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    targetElement.classList.add('selected');
+                    
+                    // 啟用下一步按鈕
+                    DOM.buttons.next.disabled = false;
+                });
+            });
+            
+            updateProgressBar();
+        }
+        
+        // 更新進度條
+        function updateProgressBar() {
+            const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+            DOM.elements.progressFill.style.width = `${progress}%`;
+            DOM.elements.progressText.textContent = `問題 ${currentQuestionIndex + 1}/${questions.length}`;
+        }
+        
+        // 更新導航按鈕狀態
+        function updateNavigationButtons() {
+            DOM.buttons.prev.disabled = currentQuestionIndex === 0;
+            
+            if (currentQuestionIndex === questions.length - 1) {
+                DOM.buttons.next.textContent = '查看結果';
+            } else {
+                DOM.buttons.next.textContent = '下一題';
+            }
+            
+            // 如果當前問題已經回答過，則啟用下一步按鈕
+            DOM.buttons.next.disabled = userAnswers[currentQuestionIndex] === undefined;
+        }
+        
+        // 上一題
+        DOM.buttons.prev.addEventListener('click', () => {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                renderQuestion();
+                updateNavigationButtons();
+            }
+        });
+        
+        // 下一題或顯示結果
+        DOM.buttons.next.addEventListener('click', () => {
+            if (currentQuestionIndex < questions.length - 1) {
+                currentQuestionIndex++;
+                renderQuestion();
+                updateNavigationButtons();
+            } else {
+                console.log("已完成所有問題，準備顯示結果");
+                // 計算結果並顯示
+                try {
+                    console.log("用戶選擇總覽:", userAnswers);
+                    showResult();
+                } catch (error) {
+                    console.error("顯示結果時發生錯誤:", error.message, error.stack);
+                    alert("顯示結果時出錯，請重新嘗試測驗或聯繫開發者");
+                }
+            }
+        });
+        
+        // 计算结果
+        function calculateResult() {
+            try {
+                // 初始化各类型的得分
+                const typeScores = {
+                    'A': 0, // 思辨抽离
+                    'B': 0, // 情感共鸣
+                    'C': 0, // 人文观察
+                    'D': 0, // 自我叙事
+                    'E': 0  // 即兴演出
+                };
+                
+                // 记录日志
+                console.log("计算结果 - 用户选择:", userAnswers);
+                
+                // 计算每种类型的得分
+                userAnswers.forEach((answerIndex, questionIndex) => {
+                    if (answerIndex !== undefined && questionIndex < questions.length) {
+                        const question = questions[questionIndex];
+                        if (question && question.options && question.options[answerIndex]) {
+                            const selectedType = question.options[answerIndex].type;
+                            if (typeScores.hasOwnProperty(selectedType)) {
+                                typeScores[selectedType]++;
+                                console.log(`问题 ${questionIndex+1}: 选择 ${selectedType} 类型，得分 +1`);
+                            }
+                        }
+                    }
+                });
+                
+                // 计算总得分（应该是11分）
+                const totalScore = Object.values(typeScores).reduce((sum, score) => sum + score, 0);
+                console.log("特质得分统计:", typeScores, "总分:", totalScore);
+                
+                // 将得分保存，以便在结果页面显示
+                window.finalTypeScores = typeScores;
+
+                // ========== 增强的同分检测逻辑 ==========
+                
+                // 1. 检查是否有四种类型得分相同
+                // 统计每个分数出现的次数
+                const scoreFrequency = {};
+                for (const type in typeScores) {
+                    const score = typeScores[type];
+                    scoreFrequency[score] = (scoreFrequency[score] || 0) + 1;
+                }
+                
+                console.log("分数频率分布:", scoreFrequency);
+                
+                // 检查是否有四种类型得分相同（无论是否为最高分）
+                for (const score in scoreFrequency) {
+                    if (scoreFrequency[score] === 4) {
+                        console.log(`检测到四种类型得分相同(${score}分)，触发特殊结果`);
+                        return {
+                            title: "《灵魂图书管理员》",
+                            subtitle: "*你不只是阅读者，更是连结灵魂的桥梁*",
+                            description: "你是那位在书架间穿梭的神秘守护者，能够理解每一本情感之书的语言。在《灵魂藏书阁》中，你既是访客也是主人，能够欣赏每一种情感表达的独特之美。你的心灵如同这座藏书阁本身，容纳着各种可能性。你既拥有思考的深度，也有感受的敏锐；既能观察他人，也善于叙述自己；既珍视日常的细节，也热爱自由的探索。因为这种多面性，你能够成为不同灵魂之间的翻译者和桥梁。在情感的世界里，你不被单一的模式所定义。你知道爱有时需要理性的解析，有时需要感性的表达；有时需要保持距离，有时需要勇敢面对伤痕；有时又需要自由地探索未知。这种包容不同可能性的特质，使你成为珍贵的情感连结者。",
+                            similar: [
+                                "你能理解每一种情感类型的独特魅力",
+                                "你是情感世界的翻译者和桥梁"
+                            ],
+                            complementary: [
+                                "尝试更深入地探索某一种特定的情感表达方式",
+                                "在多元理解的基础上，发展你自己独特的情感语言"
+                            ],
+                            shareText: `📚 **我在《灵魂藏书阁》中发现自己是「灵魂图书管理员」，一位能理解每种情感语言的守护者。我不只阅读情感，更连结不同的心灵，在爱的字典中找到多种表达方式。**
+
+想与同样能够穿梭于不同情感世界的灵魂交流吗？在留言中标记 #灵魂图书管理员，分享你如何在多元的情感语言间自由切换。
+
+👉 你也来探索自己的内心书架吧！#灵魂藏书阁 #AmourOracle`
+                        };
+                    }
+                }
+                
+                // 2. 寻找得分最高的类型(可能有多个)
+                let maxScore = 0;
+                let highestTypes = [];
+                
+                for (const type in typeScores) {
+                    if (typeScores[type] > maxScore) {
+                        maxScore = typeScores[type];
+                        highestTypes = [type];
+                    } else if (typeScores[type] === maxScore) {
+                        highestTypes.push(type);
+                    }
+                }
+                
+                console.log("最高分类型:", highestTypes, "分数:", maxScore);
+                
+                // 3. 如果有三个或更多类型得分相同且为最高分，返回特殊结果
+                if (highestTypes.length >= 3) {
+                    console.log(`${highestTypes.length}种最高分类型同分，返回特殊结果: 灵魂图书管理员`);
+                    return {
+                        title: "《灵魂图书管理员》",
+                        subtitle: "*你不只是阅读者，更是连结灵魂的桥梁*",
+                        description: "你是那位在书架间穿梭的神秘守护者，能够理解每一本情感之书的语言。在《灵魂藏书阁》中，你既是访客也是主人，能够欣赏每一种情感表达的独特之美。你的心灵如同这座藏书阁本身，容纳着各种可能性。你既拥有思考的深度，也有感受的敏锐；既能观察他人，也善于叙述自己；既珍视日常的细节，也热爱自由的探索。因为这种多面性，你能够成为不同灵魂之间的翻译者和桥梁。在情感的世界里，你不被单一的模式所定义。你知道爱有时需要理性的解析，有时需要感性的表达；有时需要保持距离，有时需要勇敢面对伤痕；有时又需要自由地探索未知。这种包容不同可能性的特质，使你成为珍贵的情感连结者。",
+                        similar: [
+                            "你能理解每一种情感类型的独特魅力",
+                            "你是情感世界的翻译者和桥梁"
+                        ],
+                        complementary: [
+                            "尝试更深入地探索某一种特定的情感表达方式",
+                            "在多元理解的基础上，发展你自己独特的情感语言"
+                        ],
+                        shareText: `📚 **我在《灵魂藏书阁》中发现自己是「灵魂图书管理员」，一位能理解每种情感语言的守护者。我不只阅读情感，更连结不同的心灵，在爱的字典中找到多种表达方式。**
+
+想与同样能够穿梭于不同情感世界的灵魂交流吗？在留言中标记 #灵魂图书管理员，分享你如何在多元的情感语言间自由切换。
+
+👉 你也来探索自己的内心书架吧！#灵魂藏书阁 #AmourOracle`
+                    };
+                }
+                
+                // 4. 如果有两个类型同分且为最高分，使用单一决胜题（问题10）
+                if (highestTypes.length === 2) {
+                    console.log("两种类型同分，启动简化决胜机制（问题10+2分）");
+                    
+                    // 仅使用问题10作为决胜题
+                    const tiebreakQuestionIndex = 9; // 问题10的索引
+                    const tiebreakAnswer = userAnswers[tiebreakQuestionIndex];
+                    
+                    if (tiebreakAnswer !== undefined) {
+                        const tiebreakType = questions[tiebreakQuestionIndex].options[tiebreakAnswer].type;
+                        console.log(`决胜题 问题10 选择: ${tiebreakType}`);
+                        
+                        // 创建分数副本，用于决胜加分
+                        const tiebreakScores = { ...typeScores };
+                        
+                        // 为决胜题选择的类型加2分
+                        tiebreakScores[tiebreakType] += 2;
+                        console.log(`决胜加分: 类型 ${tiebreakType} +2分`);
+                        console.log("决胜加分后分数:", tiebreakScores);
+                        
+                        // 重新寻找最高分类型
+                        let newMaxScore = 0;
+                        let newHighestTypes = [];
+                        
+                        for (const type in tiebreakScores) {
+                            if (tiebreakScores[type] > newMaxScore) {
+                                newMaxScore = tiebreakScores[type];
+                                newHighestTypes = [type];
+                            } else if (tiebreakScores[type] === newMaxScore) {
+                                newHighestTypes.push(type);
+                            }
+                        }
+                        
+                        console.log("决胜后最高分类型:", newHighestTypes, "分数:", newMaxScore);
+                        
+                        // 如果决胜后仍有多个类型同分，且都是原来同分的类型，则选择第一个
+                        // 如果决胜后只有一个最高分类型，不管是否为原同分类型，都选择它
+                        if (newHighestTypes.length === 1) {
+                            const resultType = newHighestTypes[0];
+                            console.log(`决胜成功! 最终结果类型: ${resultType}`);
+                            return results[resultType];
+                        } else {
+                            // 如果所有最高分类型中包含原同分类型，选择第一个原同分类型
+                            for (const type of newHighestTypes) {
+                                if (highestTypes.includes(type)) {
+                                    console.log(`决胜后仍有同分，选择原同分类型中的第一个: ${type}`);
+                                    return results[type];
+                                }
+                            }
+                            // 如果最高分类型都不在原同分类型中，选择原第一个最高分类型
+                            console.log(`决胜后出现新的同分情况，选择原同分类型中的第一个: ${highestTypes[0]}`);
+                            return results[highestTypes[0]];
+                        }
+                    }
+                }
+                
+                // 5. 如果没有同分或决胜题没有解决同分，选择第一个最高分类型
+                const resultType = highestTypes[0];
+                console.log("最终结果类型:", resultType);
+                
+                // 确保返回有效结果
+                if (!results[resultType]) {
+                    console.error("未找到匹配的结果类型:", resultType);
+                    return results['A']; // 返回默认结果
+                }
+                
+                return results[resultType];
+            } catch (error) {
+                console.error("计算结果时发生错误:", error);
+                return results['A']; // 发生错误时返回默认结果
+            }
+        }
+        
+        // 显示结果
+        function showResult() {
+            try {
+                console.log("准备显示结果...");
+                
+                // 确保结果容器可见性
+                document.body.style.overflow = 'auto'; // 确保滚动条正常
+                
+                const result = calculateResult();
+                console.log("计算得到的结果:", result);
+                
+                if (!result) {
+                    console.error("结果未定义");
+                    alert("计算结果时出错，请重新尝试测验");
+                    return;
+                }
+                
+                // 强制DOM刷新和显示
+                window.setTimeout(() => {
+                    try {
+                        // 设置结果标题和副标题
+                        if (DOM.elements.resultTitle) {
+                            // 特殊处理《灵魂图书管理员》类型的标题
+                            if (result.title.includes('灵魂图书管理员')) {
+                                DOM.elements.resultTitle.textContent = `你是：${result.title}`;
+                            } else {
+                                DOM.elements.resultTitle.textContent = `你的灵魂之书是：${result.title}`;
+                            }
+                            console.log("已设置结果标题:", DOM.elements.resultTitle.textContent);
+                        } else {
+                            console.error("result-title 元素不存在");
+                        }
+                        
+                        if (DOM.elements.resultSubtitle) {
+                            DOM.elements.resultSubtitle.textContent = result.subtitle || '';
+                            console.log("已设置副标题");
+                        } else {
+                            console.error("result-subtitle 元素不存在");
+                        }
+                        
+                        // 设置结果描述
+                        if (DOM.elements.resultDescription) {
+                            DOM.elements.resultDescription.textContent = result.description || '';
+                            console.log("已设置描述");
+                        } else {
+                            console.error("result-description 元素不存在");
+                        }
+                        
+                        // 设置书本特质（根据所有选择的特质评分）
+                        if (DOM.elements.traitsContainer) {
+                            DOM.elements.traitsContainer.innerHTML = '';
+                            
+                            // 使用刚刚存储的特质得分
+                            const typeScores = window.finalTypeScores || {
+                                'A': 0, // 思辨抽离
+                                'B': 0, // 情感共鸣
+                                'C': 0, // 人文观察
+                                'D': 0, // 自我叙事
+                                'E': 0  // 即兴演出
+                            };
+                            
+                            // 建立特质对应表
+                            const traitNames = {
+                                'A': '思辨抽离',
+                                'B': '情感共鸣',
+                                'C': '人文观察',
+                                'D': '自我叙事',
+                                'E': '即兴演出'
+                            };
+                            
+                            console.log("构建特质星级显示，原始分数:", typeScores);
+                            
+                            // 特殊处理《灵魂图书管理员》的特质显示
+                            if (result.title.includes('灵魂图书管理员')) {
+                                Object.keys(traitNames).forEach(type => {
+                                    const traitElement = document.createElement('div');
+                                    traitElement.className = 'trait-item';
+                                    
+                                    const traitName = document.createElement('span');
+                                    traitName.className = 'trait-name';
+                                    traitName.textContent = traitNames[type];
+                                    
+                                    const traitStars = document.createElement('span');
+                                    traitStars.className = 'trait-stars';
+                                    traitStars.textContent = '★'.repeat(3) + '☆'.repeat(2); // 所有特质均为3星
+                                    
+                                    traitElement.appendChild(traitName);
+                                    traitElement.appendChild(traitStars);
+                                    DOM.elements.traitsContainer.appendChild(traitElement);
+                                });
+                                console.log("已设置特殊结果特质");
+                            } else {
+                                // 为每种特质创建评分显示
+                                Object.keys(traitNames).forEach(type => {
+                                    const score = typeScores[type] || 0;
+                                    
+                                    // 根据得分计算星星数
+                                    // 使用更合理的方式计算星级：最高分11题，映射到1-5星
+                                    let normalizedScore;
+                                    if (score === 0) {
+                                        normalizedScore = 1; // 0分设为1星
+                                    } else if (score >= 1 && score <= 2) {
+                                        normalizedScore = 2; // 1-2分设为2星
+                                    } else if (score >= 3 && score <= 4) {
+                                        normalizedScore = 3; // 3-4分设为3星
+                                    } else if (score >= 5 && score <= 6) {
+                                        normalizedScore = 4; // 5-6分设为4星
+                                    } else {
+                                        normalizedScore = 5; // 7分及以上设为5星
+                                    }
+                                    
+                                    console.log(`${traitNames[type]} 原始分数: ${score}, 转换为 ${normalizedScore} 星`);
+                                    
+                                    const traitElement = document.createElement('div');
+                                    traitElement.className = 'trait-item';
+                                    
+                                    const traitName = document.createElement('span');
+                                    traitName.className = 'trait-name';
+                                    traitName.textContent = traitNames[type];
+                                    
+                                    const traitStars = document.createElement('span');
+                                    traitStars.className = 'trait-stars';
+                                    traitStars.textContent = '★'.repeat(normalizedScore) + '☆'.repeat(5 - normalizedScore);
+                                    
+                                    traitElement.appendChild(traitName);
+                                    traitElement.appendChild(traitStars);
+                                    DOM.elements.traitsContainer.appendChild(traitElement);
+                                });
+                                console.log("已设置正常结果特质");
+                            }
+                        } else {
+                            console.error("traits-container 元素不存在");
+                        }
+                        
+                        // 设置相似和互补书籍
+                        if (DOM.elements.similarBooks) {
+                            if (result.similar && Array.isArray(result.similar)) {
+                                DOM.elements.similarBooks.innerHTML = result.similar.map(book => `<p>${book}</p>`).join('');
+                                console.log("已设置相似书籍");
+                            } else {
+                                DOM.elements.similarBooks.innerHTML = '<p>无相似书籍资料</p>';
+                            }
+                        } else {
+                            console.error("similar-books 元素不存在");
+                        }
+                        
+                        if (DOM.elements.complementaryBooks) {
+                            if (result.complementary && Array.isArray(result.complementary)) {
+                                DOM.elements.complementaryBooks.innerHTML = result.complementary.map(book => `<p>${book}</p>`).join('');
+                                console.log("已设置互补书籍");
+                            } else {
+                                DOM.elements.complementaryBooks.innerHTML = '<p>无互补书籍资料</p>';
+                            }
+                        } else {
+                            console.error("complementary-books 元素不存在");
+                        }
+                        
+                        // 设置分享文字
+                        if (DOM.elements.shareText) {
+                            DOM.elements.shareText.textContent = result.shareText || '';
+                            console.log("已设置分享文字");
+                        } else {
+                            console.error("share-text 元素不存在");
+                        }
+                        
+                        // 显示结果容器 - 强制处理
+                        if (DOM.containers.test) {
+                            DOM.containers.test.style.display = 'none';
+                            DOM.containers.test.classList.remove('active');
+                            console.log("已隐藏测验容器");
+                        } else {
+                            console.error("test-container 元素不存在");
+                        }
+                        
+                        if (DOM.containers.result) {
+                            DOM.containers.result.style.display = 'block';
+                            DOM.containers.result.classList.add('active');
+                            console.log("已显示结果容器");
+                        } else {
+                            console.error("result-container 元素不存在");
+                        }
+                        
+                        // 强制重绘
+                        DOM.containers.result.offsetHeight;
+                        
+                        console.log("结果显示完成，强制页面重绘");
+                        
+                        // 滚动到顶部
+                        window.scrollTo(0, 0);
+                    } catch (innerError) {
+                        console.error("DOM操作过程中发生错误:", innerError.message, innerError.stack);
+                        alert("显示结果时出错，请刷新页面重试");
+                    }
+                }, 100); // 延迟100ms确保DOM更新
+            } catch (error) {
+                console.error("显示结果时发生错误:", error.message, error.stack);
+                alert("显示结果时出错，请重新尝试测验");
+            }
+        }
+        
+        // 複製分享文字
+        DOM.buttons.copy.addEventListener('click', () => {
+            const shareText = DOM.elements.shareText.textContent;
+            navigator.clipboard.writeText(shareText).then(() => {
+                DOM.buttons.copy.textContent = '已複製!';
+                setTimeout(() => {
+                    DOM.buttons.copy.textContent = '複製';
+                }, 2000);
+            }).catch(err => {
+                console.error('無法複製: ', err);
+            });
+        });
+        
+        // 初始化
+        updateNavigationButtons();
+    </script>
+</body>
+</html>
