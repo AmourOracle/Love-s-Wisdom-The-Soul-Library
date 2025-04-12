@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>靈魂藏書閣：你是哪一本愛情之書？</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>靈魂藏書閣</h1>
+            <div class="subtitle">你是哪一本愛情之書？</div>
+        </header>
+        
+        <!-- 介紹頁面 -->
+        <div id="intro-container" class="test-container active">
+            <div class="intro">
+                <p><i>每個人心中都有一座藏書閣，存放著未被言說的情感篇章。而你的那本，正等待被翻開...</i></p>
+                <p>在某個無人知曉的深夜，你突然收到一封神秘邀請，指引你前往一家名為「靈魂藏書閣」的古老書店。傳說中，每個人都能在那裡找到一本與自己靈魂共振的書籍，揭示你在愛情中最真實的模樣。現在，跟隨指引，踏上這場字裡行間的愛情探索吧。</p>
+            </div>
+            <button class="start-btn" id="start-test">開始測驗</button>
+        </div>
+        
+        <!-- 測驗頁面 -->
+        <div id="test-container" class="test-container">
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-text" id="progress-text">問題 1/11</div>
+            </div>
+            
+            <div class="question-container" id="question-container">
+                <!-- 問題將由JavaScript動態生成 -->
+            </div>
+            
+            <div class="navigate-btns">
+                <button id="prev-btn" disabled>上一題</button>
+                <button id="next-btn">下一題</button>
+            </div>
+        </div>
+        
+        <!-- 結果頁面 -->
+        <div id="result-container" class="result-container">
+            <h2 class="result-title" id="result-title">你的靈魂之書是：</h2>
+            <div class="result-subtitle" id="result-subtitle"></div>
+            
+            <div class="result-description" id="result-description">
+                <!-- 結果描述將由JavaScript動態生成 -->
+            </div>
+            
+            <div class="book-traits">
+                <h3>你的書本特質</h3>
+                <div id="traits-container">
+                    <!-- 特質將由JavaScript動態生成 -->
+                </div>
+            </div>
+            
+            <div class="related-books">
+                <h3>與你相似的書籍</h3>
+                <div id="similar-books">
+                    <!-- 相似書籍將由JavaScript動態生成 -->
+                </div>
+                
+                <h3>互補的閱讀視角</h3>
+                <div id="complementary-books">
+                    <!-- 互補書籍將由JavaScript動態生成 -->
+                </div>
+            </div>
+            
+            <div class="share-section">
+                <h3>分享你的結果</h3>
+                <p>複製以下文字，分享你的測驗結果：</p>
+                <div class="share-text" id="share-text">
+                    <!-- 分享文字將由JavaScript動態生成 -->
+                </div>
+                <button class="copy-btn" id="copy-btn">複製</button>
+                <button class="restart-btn" id="restart-btn">重新測驗</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="data.json"></script>
+    <script src="script.js"></script>
+</body>
+</html>
