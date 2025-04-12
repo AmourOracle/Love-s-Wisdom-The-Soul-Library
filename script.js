@@ -180,155 +180,233 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // 计算结果
-    function calculateResult() {
-        try {
-            // 初始化各类型的得分
-            const typeScores = {
-                'A': 0, // 思辨抽离
-                'B': 0, // 情感共鸣
-                'C': 0, // 人文观察
-                'D': 0, // 自我叙事
-                'E': 0  // 即兴演出
-            };
-            
-            // 记录日志
-            console.log("计算结果 - 用户选择:", userAnswers);
-            
-            // 计算每种类型的得分
-            userAnswers.forEach((answerIndex, questionIndex) => {
-                if (answerIndex !== undefined && questionIndex < questions.length) {
-                    const question = questions[questionIndex];
-                    if (question && question.options && question.options[answerIndex]) {
-                        const selectedType = question.options[answerIndex].type;
-                        if (typeScores.hasOwnProperty(selectedType)) {
-                            typeScores[selectedType]++;
-                            console.log(`问题 ${questionIndex+1}: 选择 ${selectedType} 类型，得分 +1`);
-                        }
+// 計算結果函數
+function calculateResult() {
+    try {
+        // 初始化各類型的得分
+        const typeScores = {
+            'A': 0, // 思辨抽離
+            'B': 0, // 情感共鳴
+            'C': 0, // 人文觀察
+            'D': 0, // 自我敘事
+            'E': 0  // 即興演出
+        };
+        
+        console.log("計算結果 - 用戶選擇:", userAnswers);
+        
+        // 計算每種類型的得分
+        userAnswers.forEach((answerIndex, questionIndex) => {
+            if (answerIndex !== undefined && questionIndex < questions.length) {
+                const question = questions[questionIndex];
+                if (question && question.options && question.options[answerIndex]) {
+                    const selectedType = question.options[answerIndex].type;
+                    if (typeScores.hasOwnProperty(selectedType)) {
+                        typeScores[selectedType]++;
+                        console.log(`問題 ${questionIndex+1}: 選擇 ${selectedType} 類型，得分 +1`);
                     }
                 }
-            });
+            }
+        });
+        
+        // 計算總得分（應該是11分）
+        const totalScore = Object.values(typeScores).reduce((sum, score) => sum + score, 0);
+        console.log("特質得分統計:", typeScores, "總分:", totalScore);
+        
+        // 將得分保存，以便在結果頁面顯示
+        window.finalTypeScores = typeScores;
+        
+        // 1. 檢查是否有四種類型得分相同（無論是否為最高分）
+        const scoreFrequency = {};
+        for (const type in typeScores) {
+            const score = typeScores[type];
+            scoreFrequency[score] = (scoreFrequency[score] || 0) + 1;
+        }
+        
+        console.log("分數頻率分布:", scoreFrequency);
+        
+        for (const score in scoreFrequency) {
+            if (scoreFrequency[score] === 4) {
+                console.log(`檢測到四種類型得分相同(${score}分)，觸發特殊結果`);
+                return results["SPECIAL"];
+            }
+        }
+        
+        // 2. 尋找得分最高的類型(可能有多個)
+        let maxScore = 0;
+        let highestTypes = [];
+        
+        for (const type in typeScores) {
+            if (typeScores[type] > maxScore) {
+                maxScore = typeScores[type];
+                highestTypes = [type];
+            } else if (typeScores[type] === maxScore) {
+                highestTypes.push(type);
+            }
+        }
+        
+        console.log("最高分類型:", highestTypes, "分數:", maxScore);
+        
+        // 3. 如果有三個或更多類型得分相同且為最高分，返回特殊結果
+        if (highestTypes.length >= 3) {
+            console.log(`${highestTypes.length}種最高分類型同分，返回特殊結果: 靈魂圖書管理員`);
+            return results["SPECIAL"];
+        }
+        
+        // 4. 如果只有一個最高分類型，直接返回結果
+        if (highestTypes.length === 1) {
+            const resultType = highestTypes[0];
+            console.log("單一最高分類型:", resultType);
+            return results[resultType];
+        }
+        
+        // 5. 如果有兩個類型同分且為最高分，使用雙決勝題機制
+        if (highestTypes.length === 2) {
+            console.log("兩種類型同分，啟動雙決勝機制（問題10和問題11各+3分）");
             
-            // 计算总得分（应该是11分）
-            const totalScore = Object.values(typeScores).reduce((sum, score) => sum + score, 0);
-            console.log("特质得分统计:", typeScores, "总分:", totalScore);
+            // 創建分數副本，用於決勝加分
+            const tiebreakScores = { ...typeScores };
             
-            // 将得分保存，以便在结果页面显示
-            window.finalTypeScores = typeScores;
-
-            // ========== 增强的同分检测逻辑 ==========
+            // 第一決勝題（問題10）
+            const tiebreakQuestion1Index = 9; // 問題10的索引
+            const tiebreakAnswer1 = userAnswers[tiebreakQuestion1Index];
             
-            // 1. 检查是否有四种类型得分相同
-            // 统计每个分数出现的次数
-            const scoreFrequency = {};
-            for (const type in typeScores) {
-                const score = typeScores[type];
-                scoreFrequency[score] = (scoreFrequency[score] || 0) + 1;
+            if (tiebreakAnswer1 !== undefined) {
+                const tiebreakType1 = questions[tiebreakQuestion1Index].options[tiebreakAnswer1].type;
+                tiebreakScores[tiebreakType1] += 3;
+                console.log(`第一決勝題（問題10）選擇: ${tiebreakType1} +3分`);
             }
             
-            console.log("分数频率分布:", scoreFrequency);
+            // 第二決勝題（問題11）
+            const tiebreakQuestion2Index = 10; // 問題11的索引
+            const tiebreakAnswer2 = userAnswers[tiebreakQuestion2Index];
             
-            // 检查是否有四种类型得分相同（无论是否为最高分）
-            for (const score in scoreFrequency) {
-                if (scoreFrequency[score] === 4) {
-                    console.log(`检测到四种类型得分相同(${score}分)，触发特殊结果`);
-                    return results["SPECIAL"];
+            if (tiebreakAnswer2 !== undefined) {
+                const tiebreakType2 = questions[tiebreakQuestion2Index].options[tiebreakAnswer2].type;
+                tiebreakScores[tiebreakType2] += 3;
+                console.log(`第二決勝題（問題11）選擇: ${tiebreakType2} +3分`);
+            }
+            
+            console.log("雙決勝加分後分數:", tiebreakScores);
+            
+            // 重新尋找最高分類型
+            let newMaxScore = 0;
+            let newHighestTypes = [];
+            
+            for (const type in tiebreakScores) {
+                if (tiebreakScores[type] > newMaxScore) {
+                    newMaxScore = tiebreakScores[type];
+                    newHighestTypes = [type];
+                } else if (tiebreakScores[type] === newMaxScore) {
+                    newHighestTypes.push(type);
                 }
             }
             
-            // 2. 寻找得分最高的类型(可能有多个)
-            let maxScore = 0;
-            let highestTypes = [];
+            console.log("雙決勝後最高分類型:", newHighestTypes, "分數:", newMaxScore);
             
-            for (const type in typeScores) {
-                if (typeScores[type] > maxScore) {
-                    maxScore = typeScores[type];
-                    highestTypes = [type];
-                } else if (typeScores[type] === maxScore) {
-                    highestTypes.push(type);
-                }
-            }
-            
-            console.log("最高分类型:", highestTypes, "分数:", maxScore);
-            
-            // 3. 如果有三个或更多类型得分相同且为最高分，返回特殊结果
-            if (highestTypes.length >= 3) {
-                console.log(`${highestTypes.length}种最高分类型同分，返回特殊结果: 灵魂图书管理员`);
+            // 6. 決勝後結果處理
+            // 檢查是否有三種或以上類型同為最高分
+            if (newHighestTypes.length >= 3) {
+                console.log(`決勝後有${newHighestTypes.length}種類型同為最高分，觸發特殊結果`);
                 return results["SPECIAL"];
             }
             
-            // 4. 如果有两个类型同分且为最高分，使用单一决胜题（问题10）
-            if (highestTypes.length === 2) {
-                console.log("两种类型同分，启动简化决胜机制（问题10+2分）");
+            // 如果決勝後只有一個最高分類型
+            if (newHighestTypes.length === 1) {
+                const resultType = newHighestTypes[0];
+                console.log(`決勝成功! 最終結果類型: ${resultType}`);
+                return results[resultType];
+            }
+            
+            // 7. 如果決勝後仍有兩種類型同分，使用多維度綜合決勝法
+            if (newHighestTypes.length === 2) {
+                console.log("雙決勝後仍有兩種類型同分，啟用多維度綜合決勝法");
                 
-                // 仅使用问题10作为决胜题
-                const tiebreakQuestionIndex = 9; // 问题10的索引
-                const tiebreakAnswer = userAnswers[tiebreakQuestionIndex];
+                // 關鍵問題分析（使用問題1、5、8作為關鍵問題）
+                const keyQuestions = [0, 4, 7]; // 問題1、5、8的索引
+                const patternScore = {};
                 
-                if (tiebreakAnswer !== undefined) {
-                    const tiebreakType = questions[tiebreakQuestionIndex].options[tiebreakAnswer].type;
-                    console.log(`决胜题 问题10 选择: ${tiebreakType}`);
-                    
-                    // 创建分数副本，用于决胜加分
-                    const tiebreakScores = { ...typeScores };
-                    
-                    // 为决胜题选择的类型加2分
-                    tiebreakScores[tiebreakType] += 2;
-                    console.log(`决胜加分: 类型 ${tiebreakType} +2分`);
-                    console.log("决胜加分后分数:", tiebreakScores);
-                    
-                    // 重新寻找最高分类型
-                    let newMaxScore = 0;
-                    let newHighestTypes = [];
-                    
-                    for (const type in tiebreakScores) {
-                        if (tiebreakScores[type] > newMaxScore) {
-                            newMaxScore = tiebreakScores[type];
-                            newHighestTypes = [type];
-                        } else if (tiebreakScores[type] === newMaxScore) {
-                            newHighestTypes.push(type);
+                newHighestTypes.forEach(type => {
+                    patternScore[type] = 0;
+                    keyQuestions.forEach(qIndex => {
+                        if (userAnswers[qIndex] !== undefined && 
+                            questions[qIndex].options[userAnswers[qIndex]].type === type) {
+                            patternScore[type] += 1;
+                            console.log(`關鍵問題${qIndex+1}選擇了${type}類型，模式得分+1`);
                         }
-                    }
+                    });
+                });
+                
+                console.log("關鍵問題模式分析:", patternScore);
+                
+                // 檢查是否有明確的模式偏好
+                const maxPatternScore = Math.max(...Object.values(patternScore));
+                const hasPatternPreference = maxPatternScore > 0;
+                
+                if (hasPatternPreference) {
+                    const patternWinners = newHighestTypes.filter(
+                        type => patternScore[type] === maxPatternScore
+                    );
                     
-                    console.log("决胜后最高分类型:", newHighestTypes, "分数:", newMaxScore);
-                    
-                    // 如果决胜后仍有多个类型同分，且都是原来同分的类型，则选择第一个
-                    // 如果决胜后只有一个最高分类型，不管是否为原同分类型，都选择它
-                    if (newHighestTypes.length === 1) {
-                        const resultType = newHighestTypes[0];
-                        console.log(`决胜成功! 最终结果类型: ${resultType}`);
+                    if (patternWinners.length === 1) {
+                        const resultType = patternWinners[0];
+                        console.log(`根據關鍵問題模式選擇: ${resultType} (關鍵問題得分: ${maxPatternScore})`);
                         return results[resultType];
-                    } else {
-                        // 如果所有最高分类型中包含原同分类型，选择第一个原同分类型
-                        for (const type of newHighestTypes) {
-                            if (highestTypes.includes(type)) {
-                                console.log(`决胜后仍有同分，选择原同分类型中的第一个: ${type}`);
-                                return results[type];
-                            }
-                        }
-                        // 如果最高分类型都不在原同分类型中，选择原第一个最高分类型
-                        console.log(`决胜后出现新的同分情况，选择原同分类型中的第一个: ${highestTypes[0]}`);
-                        return results[highestTypes[0]];
                     }
+                    
+                    // 如果模式分析也同分，進行特質平衡分析
+                    console.log("關鍵問題模式分析也同分，進行特質平衡分析");
                 }
+                
+                // 特質平衡分析
+                const balanceScores = {};
+                
+                newHighestTypes.forEach(type => {
+                    let diffSum = 0;
+                    Object.keys(typeScores).forEach(otherType => {
+                        if (type !== otherType) {
+                            diffSum += Math.abs(typeScores[type] - typeScores[otherType]);
+                        }
+                    });
+                    balanceScores[type] = diffSum;
+                });
+                
+                console.log("特質平衡分析:", balanceScores);
+                
+                // 選擇特質分佈最均衡的類型（差異和最小）
+                const minBalanceScore = Math.min(...Object.values(balanceScores));
+                const balanceWinners = newHighestTypes.filter(
+                    type => balanceScores[type] === minBalanceScore
+                );
+                
+                if (balanceWinners.length === 1) {
+                    const resultType = balanceWinners[0];
+                    console.log(`根據特質平衡度選擇: ${resultType} (平衡得分: ${minBalanceScore})`);
+                    return results[resultType];
+                }
+                
+                // 如果特質平衡分析也無法決出勝負，選擇第一個
+                const resultType = balanceWinners[0];
+                console.log(`所有決策方法均無法區分，選擇第一個: ${resultType}`);
+                return results[resultType];
             }
-            
-            // 5. 如果没有同分或决胜题没有解决同分，选择第一个最高分类型
-            const resultType = highestTypes[0];
-            console.log("最终结果类型:", resultType);
-            
-            // 确保返回有效结果
-            if (!results[resultType]) {
-                console.error("未找到匹配的结果类型:", resultType);
-                return results['A']; // 返回默认结果
-            }
-            
-            return results[resultType];
-        } catch (error) {
-            console.error("计算结果时发生错误:", error);
-            return results['A']; // 发生错误时返回默认结果
         }
+        
+        // 保險處理：如果上述所有邏輯都未返回結果，選擇第一個最高分類型
+        const resultType = highestTypes[0];
+        console.log("使用默認處理，選擇第一個最高分類型:", resultType);
+        
+        // 確保返回有效結果
+        if (!results[resultType]) {
+            console.error("未找到匹配的結果類型:", resultType);
+            return results['A']; // 返回默認結果
+        }
+        
+        return results[resultType];
+    } catch (error) {
+        console.error("計算結果時發生錯誤:", error);
+        return results['A']; // 發生錯誤時返回默認結果
     }
+}
     
     // 显示结果
     function showResult() {
