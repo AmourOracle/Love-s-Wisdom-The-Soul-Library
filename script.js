@@ -2,6 +2,12 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log("頁面已載入，測驗初始化中...");
     
+    // 立即隱藏導航按鈕
+    const navigateButtons = document.querySelector('.navigate-btns');
+    if (navigateButtons) {
+        navigateButtons.style.display = 'none';
+    }
+    
     // 檢查DOM元素是否存在
     const containers = {
         intro: document.getElementById('intro-container'),
@@ -83,8 +89,6 @@ document.addEventListener('DOMContentLoaded', function() {
         DOM.containers.result.classList.remove('active');
         DOM.containers.test.classList.add('active');
         renderQuestion();
-        updateNavigationButtons();
-        updateProgressBar();
     });
     
     // 渲染當前問題
@@ -105,7 +109,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="options">${optionsHTML}</div>
         `;
         
-        // 為選項添加事件監聽器
+        // 為選項添加事件監聽器 - 修改此部分以自動進入下一題
         document.querySelectorAll('.option').forEach(option => {
             option.addEventListener('click', (e) => {
                 // 確保點擊的是選項元素本身，而不是子元素
@@ -123,8 +127,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 targetElement.classList.add('selected');
                 
-                // 啟用下一步按鈕
-                DOM.buttons.next.disabled = false;
+                // 添加延遲，讓用戶能看到選中效果
+                setTimeout(() => {
+                    // 判斷是否為最後一題
+                    if (currentQuestionIndex < questions.length - 1) {
+                        // 如果不是最後一題，自動前進到下一題
+                        currentQuestionIndex++;
+                        renderQuestion();
+                        updateProgressBar();
+                    } else {
+                        // 如果是最後一題，則顯示結果
+                        console.log("已完成所有問題，準備顯示結果");
+                        try {
+                            console.log("用戶選擇總覽:", userAnswers);
+                            showResult();
+                        } catch (error) {
+                            console.error("顯示結果時發生錯誤:", error.message, error.stack);
+                            alert("顯示結果時出錯，請重新嘗試測驗或聯繫開發者");
+                        }
+                    }
+                }, 300); // 延遲300毫秒
             });
         });
         
@@ -137,48 +159,6 @@ document.addEventListener('DOMContentLoaded', function() {
         DOM.elements.progressFill.style.width = `${progress}%`;
         DOM.elements.progressText.textContent = `問題 ${currentQuestionIndex + 1}/${questions.length}`;
     }
-    
-    // 更新導航按鈕狀態
-    function updateNavigationButtons() {
-        DOM.buttons.prev.disabled = currentQuestionIndex === 0;
-        
-        if (currentQuestionIndex === questions.length - 1) {
-            DOM.buttons.next.textContent = '查看結果';
-        } else {
-            DOM.buttons.next.textContent = '下一題';
-        }
-        
-        // 如果當前問題已經回答過，則啟用下一步按鈕
-        DOM.buttons.next.disabled = userAnswers[currentQuestionIndex] === undefined;
-    }
-    
-    // 上一題
-    DOM.buttons.prev.addEventListener('click', () => {
-        if (currentQuestionIndex > 0) {
-            currentQuestionIndex--;
-            renderQuestion();
-            updateNavigationButtons();
-        }
-    });
-    
-    // 下一題或顯示結果
-    DOM.buttons.next.addEventListener('click', () => {
-        if (currentQuestionIndex < questions.length - 1) {
-            currentQuestionIndex++;
-            renderQuestion();
-            updateNavigationButtons();
-        } else {
-            console.log("已完成所有問題，準備顯示結果");
-            // 計算結果並顯示
-            try {
-                console.log("用戶選擇總覽:", userAnswers);
-                showResult();
-            } catch (error) {
-                console.error("顯示結果時發生錯誤:", error.message, error.stack);
-                alert("顯示結果時出錯，請重新嘗試測驗或聯繫開發者");
-            }
-        }
-    });
     
 // 計算結果函數
 function calculateResult() {
@@ -408,71 +388,71 @@ function calculateResult() {
     }
 }
     
-    // 显示结果
+    // 顯示結果
     function showResult() {
         try {
-            console.log("准备显示结果...");
+            console.log("準備顯示結果...");
             
-            // 确保结果容器可见性
-            document.body.style.overflow = 'auto'; // 确保滚动条正常
+            // 確保結果容器可見性
+            document.body.style.overflow = 'auto'; // 確保滾動條正常
             
             const result = calculateResult();
-            console.log("计算得到的结果:", result);
+            console.log("計算得到的結果:", result);
             
             if (!result) {
-                console.error("结果未定义");
-                alert("计算结果时出错，请重新尝试测验");
+                console.error("結果未定義");
+                alert("計算結果時出錯，請重新嘗試測驗");
                 return;
             }
             
-            // 强制DOM刷新和显示
+            // 強制DOM刷新和顯示
             window.setTimeout(() => {
                 try {
-                    // 设置结果标题和副标题
+                    // 設置結果標題和副標題
                     if (DOM.elements.resultTitle) {
-                        // 特殊处理《灵魂图书管理员》类型的标题
+                        // 特殊處理《靈魂圖書管理員》類型的標題
                         if (result.title.includes('靈魂圖書管理員')) {
                             DOM.elements.resultTitle.textContent = `你是：${result.title}`;
                         } else {
                             DOM.elements.resultTitle.textContent = `你的靈魂之書是：${result.title}`;
                         }
-                        console.log("已设置结果标题:", DOM.elements.resultTitle.textContent);
+                        console.log("已設置結果標題:", DOM.elements.resultTitle.textContent);
                     } else {
                         console.error("result-title 元素不存在");
                     }
                     
                     if (DOM.elements.resultSubtitle) {
                         DOM.elements.resultSubtitle.textContent = result.subtitle || '';
-                        console.log("已设置副标题");
+                        console.log("已設置副標題");
                     } else {
                         console.error("result-subtitle 元素不存在");
                     }
                     
-                    // 设置结果描述
+                    // 設置結果描述
                     if (DOM.elements.resultDescription) {
                         DOM.elements.resultDescription.textContent = result.description || '';
-                        console.log("已设置描述");
+                        console.log("已設置描述");
                     } else {
                         console.error("result-description 元素不存在");
                     }
                     
-                    // 设置书本特质（根据所有选择的特质评分）
+                    // 設置書本特質（根據所有選擇的特質評分）
                     if (DOM.elements.traitsContainer) {
                         DOM.elements.traitsContainer.innerHTML = '';
                         
-                        // 使用刚刚存储的特质得分
+                        // 使用剛剛存儲的特質得分
                         const typeScores = window.finalTypeScores || {
-                            'A': 0, // 思辨抽离
-                            'B': 0, // 情感共鸣
-                            'C': 0, // 人文观察
-                            'D': 0, // 自我叙事
-                            'E': 0  // 即兴演出
+                            'A': 0, // 思辨抽離
+                            'B': 0, // 情感共鳴
+                            'C': 0, // 人文觀察
+                            'D': 0, // 自我敘事
+                            'E': 0  // 即興演出
                         };
                         
                         // 使用從data.json加載的特質名稱
-                        console.log("构建特质星级显示，原始分数:", typeScores);
+                        console.log("構建特質星級顯示，原始分數:", typeScores);
                         
-                        // 特殊处理《灵魂图书管理员》的特质显示
+                        // 特殊處理《靈魂圖書管理員》的特質顯示
                         if (result.title.includes('靈魂圖書管理員')) {
                             Object.keys(traitNames).forEach(type => {
                                 const traitElement = document.createElement('div');
@@ -484,34 +464,34 @@ function calculateResult() {
                                 
                                 const traitStars = document.createElement('span');
                                 traitStars.className = 'trait-stars';
-                                traitStars.textContent = '★'.repeat(3) + '☆'.repeat(2); // 所有特质均为3星
+                                traitStars.textContent = '★'.repeat(3) + '☆'.repeat(2); // 所有特質均為3星
                                 
                                 traitElement.appendChild(traitName);
                                 traitElement.appendChild(traitStars);
                                 DOM.elements.traitsContainer.appendChild(traitElement);
                             });
-                            console.log("已设置特殊结果特质");
+                            console.log("已設置特殊結果特質");
                         } else {
-                            // 为每种特质创建评分显示
+                            // 為每種特質創建評分顯示
                             Object.keys(traitNames).forEach(type => {
                                 const score = typeScores[type] || 0;
                                 
-                                // 根据得分计算星星数
-                                // 使用更合理的方式计算星级：最高分11题，映射到1-5星
+                                // 根據得分計算星星數
+                                // 使用更合理的方式計算星級：最高分11題，映射到1-5星
                                 let normalizedScore;
                                 if (score === 0) {
-                                    normalizedScore = 1; // 0分设为1星
+                                    normalizedScore = 1; // 0分設為1星
                                 } else if (score >= 1 && score <= 2) {
-                                    normalizedScore = 2; // 1-2分设为2星
+                                    normalizedScore = 2; // 1-2分設為2星
                                 } else if (score >= 3 && score <= 4) {
-                                    normalizedScore = 3; // 3-4分设为3星
+                                    normalizedScore = 3; // 3-4分設為3星
                                 } else if (score >= 5 && score <= 6) {
-                                    normalizedScore = 4; // 5-6分设为4星
+                                    normalizedScore = 4; // 5-6分設為4星
                                 } else {
-                                    normalizedScore = 5; // 7分及以上设为5星
+                                    normalizedScore = 5; // 7分及以上設為5星
                                 }
                                 
-                                console.log(`${traitNames[type]} 原始分数: ${score}, 转换为 ${normalizedScore} 星`);
+                                console.log(`${traitNames[type]} 原始分數: ${score}, 轉換為 ${normalizedScore} 星`);
                                 
                                 const traitElement = document.createElement('div');
                                 traitElement.className = 'trait-item';
@@ -528,17 +508,17 @@ function calculateResult() {
                                 traitElement.appendChild(traitStars);
                                 DOM.elements.traitsContainer.appendChild(traitElement);
                             });
-                            console.log("已设置正常结果特质");
+                            console.log("已設置正常結果特質");
                         }
                     } else {
                         console.error("traits-container 元素不存在");
                     }
                     
-                    // 设置相似和互补书籍
+                    // 設置相似和互補書籍
                     if (DOM.elements.similarBooks) {
                         if (result.similar && Array.isArray(result.similar)) {
                             DOM.elements.similarBooks.innerHTML = result.similar.map(book => `<p>${book}</p>`).join('');
-                            console.log("已设置相似书籍");
+                            console.log("已設置相似書籍");
                         } else {
                             DOM.elements.similarBooks.innerHTML = '<p>無相似書籍資料</p>';
                         }
@@ -549,7 +529,7 @@ function calculateResult() {
                     if (DOM.elements.complementaryBooks) {
                         if (result.complementary && Array.isArray(result.complementary)) {
                             DOM.elements.complementaryBooks.innerHTML = result.complementary.map(book => `<p>${book}</p>`).join('');
-                            console.log("已设置互补书籍");
+                            console.log("已設置互補書籍");
                         } else {
                             DOM.elements.complementaryBooks.innerHTML = '<p>無互補書籍資料</p>';
                         }
@@ -557,19 +537,19 @@ function calculateResult() {
                         console.error("complementary-books 元素不存在");
                     }
                     
-                    // 设置分享文字
+                    // 設置分享文字
                     if (DOM.elements.shareText) {
                         DOM.elements.shareText.textContent = result.shareText || '';
-                        console.log("已设置分享文字");
+                        console.log("已設置分享文字");
                     } else {
                         console.error("share-text 元素不存在");
                     }
                     
-                    // 显示结果容器 - 强制处理
+                    // 顯示結果容器 - 強制處理
                     if (DOM.containers.test) {
                         DOM.containers.test.style.display = 'none';
                         DOM.containers.test.classList.remove('active');
-                        console.log("已隐藏测验容器");
+                        console.log("已隱藏測驗容器");
                     } else {
                         console.error("test-container 元素不存在");
                     }
@@ -577,26 +557,26 @@ function calculateResult() {
                     if (DOM.containers.result) {
                         DOM.containers.result.style.display = 'block';
                         DOM.containers.result.classList.add('active');
-                        console.log("已显示结果容器");
+                        console.log("已顯示結果容器");
                     } else {
                         console.error("result-container 元素不存在");
                     }
                     
-                    // 强制重绘
+                    // 強制重繪
                     DOM.containers.result.offsetHeight;
                     
-                    console.log("结果显示完成，强制页面重绘");
+                    console.log("結果顯示完成，強制頁面重繪");
                     
-                    // 滚动到顶部
+                    // 滾動到頂部
                     window.scrollTo(0, 0);
                 } catch (innerError) {
-                    console.error("DOM操作过程中发生错误:", innerError.message, innerError.stack);
-                    alert("显示结果时出错，请刷新页面重试");
+                    console.error("DOM操作過程中發生錯誤:", innerError.message, innerError.stack);
+                    alert("顯示結果時出錯，請刷新頁面重試");
                 }
-            }, 100); // 延迟100ms确保DOM更新
+            }, 100); // 延遲100ms確保DOM更新
         } catch (error) {
-            console.error("显示结果时发生错误:", error.message, error.stack);
-            alert("显示结果时出错，请重新尝试测验");
+            console.error("顯示結果時發生錯誤:", error.message, error.stack);
+            alert("顯示結果時出錯，請重新嘗試測驗");
         }
     }
     
@@ -612,7 +592,4 @@ function calculateResult() {
             console.error('無法複製: ', err);
         });
     });
-    
-    // 初始化
-    updateNavigationButtons();
 });

@@ -30,7 +30,7 @@ body {
     box-shadow: 0 5px 15px var(--shadow-color);
     border-radius: 8px;
     min-height: 100vh;
-    position: relative; /* 确保容器定位正确 */
+    position: relative; /* 確保容器定位正確 */
 }
 
 header {
@@ -60,7 +60,7 @@ h1 {
     border-radius: 4px;
 }
 
-/* 测验部分的样式 */
+/* 測驗部分的樣式 */
 .test-container {
     display: none;
     opacity: 0;
@@ -109,10 +109,9 @@ h1 {
     border-color: var(--primary-color);
 }
 
+/* 隱藏導航按鈕 */
 .navigate-btns {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 30px;
+    display: none !important;
 }
 
 button {
@@ -142,7 +141,7 @@ button:disabled {
     padding: 12px 24px;
 }
 
-/* 结果部分的样式 */
+/* 結果部分的樣式 */
 .result-container {
     display: none;
     opacity: 0;
@@ -223,13 +222,13 @@ h3 {
     margin: 20px auto;
 }
 
-/* 动画效果 */
+/* 動畫效果 */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* 进度指示器 */
+/* 進度指示器 */
 .progress-container {
     margin: 20px 0;
 }
@@ -255,14 +254,37 @@ h3 {
     margin-top: 5px;
 }
 
-/* 强制显示结果容器的样式 */
+/* 選項增強樣式 - 提升點擊區域的可見性 */
+.option {
+    position: relative;
+    overflow: hidden;
+}
+
+.option::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background-color: var(--highlight-color);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+
+.option:active::after {
+    opacity: 0.2;
+}
+
+/* 強制顯示結果容器的樣式 */
 .force-visible {
     display: block !important;
     opacity: 1 !important;
     visibility: visible !important;
 }
 
-/* 响应式设计 */
+/* 響應式設計 */
 @media (max-width: 768px) {
     .container {
         padding: 15px;
