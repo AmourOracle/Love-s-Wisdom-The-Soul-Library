@@ -46,7 +46,9 @@ document.addEventListener('DOMContentLoaded', function() {
             result: document.getElementById('result-container')
         },
         elements: {
-            questionContainer: document.getElementById('question-container'),
+            questionImageContainer: document.getElementById('question-image-container'),
+            questionText: document.getElementById('question-text'),
+            optionsContainer: document.getElementById('options-container'),
             progressFill: document.getElementById('progress-fill'),
             progressText: document.getElementById('progress-text'),
             resultTitle: document.getElementById('result-title'),
@@ -70,6 +72,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const questions = testData.questions;
     const results = testData.results;
     const traitNames = testData.traitNames;
+    
+    // 問題背景圖片 (與問題類型對應)
+    const backgroundImages = {
+        'A': 'https://images.unsplash.com/photo-1507842217343-583bb7270b66?q=80&w=2030', // 思辨抽離
+        'B': 'https://images.unsplash.com/photo-1476275466078-4007374efbbe?q=80&w=2029', // 情感共鳴
+        'C': 'https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=1998', // 人文觀察
+        'D': 'https://images.unsplash.com/photo-1533669955142-6a73332af4db?q=80&w=2074', // 自我敘事
+        'E': 'https://images.unsplash.com/photo-1513185041617-8ab03f83d6c5?q=80&w=2070', // 即興演出
+        'default': 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?q=80&w=2070'
+    };
     
     // 跟踪當前問題索引和用戶選擇
     let currentQuestionIndex = 0;
@@ -95,6 +107,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderQuestion() {
         const question = questions[currentQuestionIndex];
         
+        // 設置問題文本
+        DOM.elements.questionText.textContent = question.question;
+        
+        // 設置背景圖片 (根據問題類型選擇圖片)
+        const dominantType = getDominantType(question.options);
+        const backgroundImage = backgroundImages[dominantType] || backgroundImages.default;
+        DOM.elements.questionImageContainer.style.backgroundImage = `url('${backgroundImage}')`;
+        
+        // 渲染選項
         let optionsHTML = '';
         question.options.forEach((option, index) => {
             const isSelected = userAnswers[currentQuestionIndex] === index;
@@ -103,13 +124,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${option.text}
             </div>`;
         });
+        DOM.elements.optionsContainer.innerHTML = optionsHTML;
         
-        DOM.elements.questionContainer.innerHTML = `
-            <div class="question">${question.question}</div>
-            <div class="options">${optionsHTML}</div>
-        `;
-        
-        // 為選項添加事件監聽器 - 修改此部分以自動進入下一題
+        // 為選項添加事件監聽器
         document.querySelectorAll('.option').forEach(option => {
             option.addEventListener('click', (e) => {
                 // 確保點擊的是選項元素本身，而不是子元素
@@ -151,6 +168,30 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         updateProgressBar();
+    }
+    
+    // 獲取問題選項中的主導類型
+    function getDominantType(options) {
+        const typeCounts = {};
+        
+        // 計算每種類型的數量
+        options.forEach(option => {
+            const type = option.type;
+            typeCounts[type] = (typeCounts[type] || 0) + 1;
+        });
+        
+        // 找出出現最多的類型
+        let maxCount = 0;
+        let dominantType = 'default';
+        
+        for (const type in typeCounts) {
+            if (typeCounts[type] > maxCount) {
+                maxCount = typeCounts[type];
+                dominantType = type;
+            }
+        }
+        
+        return dominantType;
     }
     
     // 更新進度條

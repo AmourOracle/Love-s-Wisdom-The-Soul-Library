@@ -8,6 +8,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <div class="page-background"></div>
+    
     <div class="container">
         <header>
             <h1>靈魂藏書閣</h1>
@@ -32,8 +34,17 @@
                 <div class="progress-text" id="progress-text">問題 1/11</div>
             </div>
             
-            <div class="question-container" id="question-container">
-                <!-- 問題將由JavaScript動態生成 -->
+            <!-- 新增：上半部分圖片區域 -->
+            <div class="question-image-container" id="question-image-container">
+                <!-- 圖片將由JavaScript動態生成 -->
+                <div class="question-overlay">
+                    <div class="question" id="question-text"></div>
+                </div>
+            </div>
+            
+            <!-- 下半部分選項區域 -->
+            <div class="options-container" id="options-container">
+                <!-- 選項將由JavaScript動態生成 -->
             </div>
             
             <!-- 導航按鈕區塊 - 已設置為隱藏 -->
