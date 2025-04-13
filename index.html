@@ -11,11 +11,6 @@
     <div class="page-background"></div>
     
     <div class="container">
-        <header>
-            <h1>靈魂藏書閣</h1>
-            <div class="subtitle">藏在字裡行間的秘密</div>
-        </header>
-        
         <!-- 介紹頁面 -->
         <div id="intro-container" class="test-container active">
             <div class="intro">
@@ -25,8 +20,8 @@
             <button class="start-btn" id="start-test">開始測驗</button>
         </div>
         
-        <!-- 測驗頁面 -->
-        <div id="test-container" class="test-container">
+        <!-- 測驗頁面 - 沉浸式設計 -->
+        <div id="test-container" class="test-container fullscreen">
             <div class="progress-container">
                 <div class="progress-bar">
                     <div class="progress-fill" id="progress-fill"></div>
@@ -34,23 +29,16 @@
                 <div class="progress-text" id="progress-text">問題 1/11</div>
             </div>
             
-            <!-- 新增：上半部分圖片區域 -->
+            <!-- 問題圖片區域 -->
             <div class="question-image-container" id="question-image-container">
-                <!-- 圖片將由JavaScript動態生成 -->
                 <div class="question-overlay">
                     <div class="question" id="question-text"></div>
                 </div>
             </div>
             
-            <!-- 下半部分選項區域 -->
+            <!-- 選項區域 -->
             <div class="options-container" id="options-container">
                 <!-- 選項將由JavaScript動態生成 -->
-            </div>
-            
-            <!-- 導航按鈕區塊 - 已設置為隱藏 -->
-            <div class="navigate-btns" style="display: none;">
-                <button id="prev-btn" disabled>上一題</button>
-                <button id="next-btn">下一題</button>
             </div>
         </div>
         
