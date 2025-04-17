@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 計算每種類型的數量
         options.forEach(option => {
-            const type = option.type;
+            const type = option.primary; // 使用主要type(primary)
             typeCounts[type] = (typeCounts[type] || 0) + 1;
         });
         
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const optionIndex = parseInt(targetElement.dataset.index);
         userAnswers[currentQuestionIndex] = optionIndex;
         
-        console.log(`問題 ${currentQuestionIndex+1} 選擇了選項 ${optionIndex+1}, 類型: ${questions[currentQuestionIndex].options[optionIndex].type}`);
+        console.log(`問題 ${currentQuestionIndex+1} 選擇了選項 ${optionIndex+1}, 主要類型: ${questions[currentQuestionIndex].options[optionIndex].primary}`);
         
         // 更新選項樣式
         document.querySelectorAll('.option').forEach(opt => {
@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
         DOM.elements.progressText.textContent = `問題 ${currentQuestionIndex + 1}/${questions.length}`;
     }
     
-    // 計算結果函數
+    // 計算結果函數 - 使用新的多特質比例計分邏輯
     function calculateResult() {
         try {
             // 初始化各類型的得分
@@ -224,15 +224,22 @@ document.addEventListener('DOMContentLoaded', function() {
             
             console.log("計算結果 - 用戶選擇:", userAnswers);
             
-            // 計算每種類型的得分
+            // 計算每種類型的得分 - 多特質比例計分
             userAnswers.forEach((answerIndex, questionIndex) => {
                 if (answerIndex !== undefined && questionIndex < questions.length) {
                     const question = questions[questionIndex];
                     if (question && question.options && question.options[answerIndex]) {
-                        const selectedType = question.options[answerIndex].type;
-                        if (typeScores.hasOwnProperty(selectedType)) {
-                            typeScores[selectedType]++;
-                            console.log(`問題 ${questionIndex+1}: 選擇 ${selectedType} 類型，得分 +1`);
+                        const selectedOption = question.options[answerIndex];
+                        
+                        // 獲取該選項的得分分配
+                        const scores = selectedOption.scores;
+                        
+                        // 將得分分配加入總分中
+                        for (const type in scores) {
+                            if (typeScores.hasOwnProperty(type)) {
+                                typeScores[type] += scores[type];
+                                console.log(`問題 ${questionIndex+1}: ${type} 類型得分 +${scores[type]}`);
+                            }
                         }
                     }
                 }
@@ -244,7 +251,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // 檢查是否有四種類型得分相同
             const scoreFrequency = {};
             for (const type in typeScores) {
-                const score = typeScores[type];
+                // 四捨五入到小數點後一位，避免浮點數比較問題
+                const score = Math.round(typeScores[type] * 10) / 10;
                 scoreFrequency[score] = (scoreFrequency[score] || 0) + 1;
             }
             
@@ -262,7 +270,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (typeScores[type] > maxScore) {
                     maxScore = typeScores[type];
                     highestTypes = [type];
-                } else if (typeScores[type] === maxScore) {
+                } else if (Math.abs(typeScores[type] - maxScore) < 0.1) { // 考慮浮點數誤差，差異小於0.1視為相同
                     highestTypes.push(type);
                 }
             }
@@ -277,90 +285,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 return results[highestTypes[0]];
             }
             
-            // 如果有兩個類型同分且為最高分，使用決勝題機制
+            // 如果有兩個類型同分且為最高分，使用新的決勝題機制 (僅第9題)
             if (highestTypes.length === 2) {
-                // 創建分數副本，用於決勝加分
-                const tiebreakScores = { ...typeScores };
+                const tiebreakQuestionIndex = 8; // 第9題的索引是8
+                const tiebreakAnswer = userAnswers[tiebreakQuestionIndex];
                 
-                // 決勝題（問題10和問題11）
-                [9, 10].forEach(tiebreakIndex => {
-                    const tiebreakAnswer = userAnswers[tiebreakIndex];
-                    if (tiebreakAnswer !== undefined) {
-                        const tiebreakType = questions[tiebreakIndex].options[tiebreakAnswer].type;
-                        tiebreakScores[tiebreakType] += 3;
+                if (tiebreakAnswer !== undefined) {
+                    const tiebreakPrimaryType = questions[tiebreakQuestionIndex].options[tiebreakAnswer].primary;
+                    
+                    // 檢查決勝題的主要類型是否在最高分類型中
+                    if (highestTypes.includes(tiebreakPrimaryType)) {
+                        return results[tiebreakPrimaryType];
                     }
+                }
+                
+                // 如果決勝題不能決勝，使用各類型分佈的差異性作為決勝依據
+                const balanceScores = {};
+                highestTypes.forEach(type => {
+                    let diffSum = 0;
+                    Object.keys(typeScores).forEach(otherType => {
+                        if (type !== otherType) {
+                            diffSum += Math.abs(typeScores[type] - typeScores[otherType]);
+                        }
+                    });
+                    balanceScores[type] = diffSum;
                 });
                 
-                // 重新尋找最高分類型
-                let newMaxScore = 0;
-                let newHighestTypes = [];
+                // 選擇特質分佈最均衡的類型
+                const minBalanceScore = Math.min(...Object.values(balanceScores));
+                const balanceWinners = highestTypes.filter(
+                    type => balanceScores[type] === minBalanceScore
+                );
                 
-                for (const type in tiebreakScores) {
-                    if (tiebreakScores[type] > newMaxScore) {
-                        newMaxScore = tiebreakScores[type];
-                        newHighestTypes = [type];
-                    } else if (tiebreakScores[type] === newMaxScore) {
-                        newHighestTypes.push(type);
-                    }
-                }
-                
-                // 決勝後結果處理
-                if (newHighestTypes.length >= 3) {
-                    return results["SPECIAL"];
-                }
-                
-                if (newHighestTypes.length === 1) {
-                    return results[newHighestTypes[0]];
-                }
-                
-                // 如果決勝後仍有兩種類型同分，使用多維度綜合決勝法
-                if (newHighestTypes.length === 2) {
-                    // 關鍵問題分析（問題1、5、8）
-                    const keyQuestions = [0, 4, 7]; 
-                    const patternScore = {};
-                    
-                    newHighestTypes.forEach(type => {
-                        patternScore[type] = 0;
-                        keyQuestions.forEach(qIndex => {
-                            if (userAnswers[qIndex] !== undefined && 
-                                questions[qIndex].options[userAnswers[qIndex]].type === type) {
-                                patternScore[type] += 1;
-                            }
-                        });
-                    });
-                    
-                    // 檢查模式偏好
-                    const maxPatternScore = Math.max(...Object.values(patternScore));
-                    if (maxPatternScore > 0) {
-                        const patternWinners = newHighestTypes.filter(
-                            type => patternScore[type] === maxPatternScore
-                        );
-                        
-                        if (patternWinners.length === 1) {
-                            return results[patternWinners[0]];
-                        }
-                    }
-                    
-                    // 特質平衡分析
-                    const balanceScores = {};
-                    newHighestTypes.forEach(type => {
-                        let diffSum = 0;
-                        Object.keys(typeScores).forEach(otherType => {
-                            if (type !== otherType) {
-                                diffSum += Math.abs(typeScores[type] - typeScores[otherType]);
-                            }
-                        });
-                        balanceScores[type] = diffSum;
-                    });
-                    
-                    // 選擇特質分佈最均衡的類型
-                    const minBalanceScore = Math.min(...Object.values(balanceScores));
-                    const balanceWinners = newHighestTypes.filter(
-                        type => balanceScores[type] === minBalanceScore
-                    );
-                    
-                    return results[balanceWinners[0]];
-                }
+                return results[balanceWinners[0]];
             }
             
             // 保險處理：如果上述所有邏輯都未返回結果，選擇第一個最高分類型
@@ -400,17 +357,19 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 // 為每種特質創建評分顯示
                 Object.keys(traitNames).forEach(type => {
+                    // 獲取原始分數
                     const score = typeScores[type] || 0;
                     
                     // 根據得分計算星星數 (0-11分映射到1-5星)
+                    // 考慮到新的計分方式會有小數，調整映射規則
                     let normalizedScore;
-                    if (score === 0) {
+                    if (score < 1) {
                         normalizedScore = 1; 
-                    } else if (score >= 1 && score <= 2) {
+                    } else if (score >= 1 && score < 3) {
                         normalizedScore = 2; 
-                    } else if (score >= 3 && score <= 4) {
+                    } else if (score >= 3 && score < 5) {
                         normalizedScore = 3; 
-                    } else if (score >= 5 && score <= 6) {
+                    } else if (score >= 5 && score < 7) {
                         normalizedScore = 4; 
                     } else {
                         normalizedScore = 5; 
