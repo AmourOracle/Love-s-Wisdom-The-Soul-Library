@@ -69,20 +69,22 @@ document.addEventListener('DOMContentLoaded', function() {
         renderQuestion();
     });
     
-    // 重新開始測驗
-    DOM.buttons.restart.addEventListener('click', () => {
-        currentQuestionIndex = 0;
-        userAnswers.length = 0;
-        
-        // 重置DOM元素
-        DOM.elements.progressFill.style.width = '0%';
-        
-        switchScreen(DOM.containers.result, DOM.containers.test);
-        renderQuestion();
-        
-        // 滾動到頂部
-        window.scrollTo(0, 0);
-    });
+ 
+// 重新開始測驗 - 修改为导航回首页
+DOM.buttons.restart.addEventListener('click', () => {
+    // 重置测验状态
+    currentQuestionIndex = 0;
+    userAnswers.length = 0;
+    
+    // 重置DOM元素
+    DOM.elements.progressFill.style.width = '0%';
+    
+    // 切换到首页，而不是测验页面
+    switchScreen(DOM.containers.result, DOM.containers.intro);
+    
+    // 滾動到頂部
+    window.scrollTo(0, 0);
+});
     
     // 切换屏幕的通用函数
     function switchScreen(fromScreen, toScreen) {

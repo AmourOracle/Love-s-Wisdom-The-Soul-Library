@@ -267,7 +267,20 @@ body {
 #result-container {
     background-color: var(--background-color);
     padding: 20px;
-    overflow-y: auto;
+    overflow-y: auto; /* 保留滚动功能 */
+    
+    /* 隐藏滚动条 - WebKit浏览器（Chrome、Safari等） */
+    &::-webkit-scrollbar {
+        width: 0;
+        display: none;
+        background: transparent;
+    }
+    
+    /* 隐藏滚动条 - Firefox */
+    scrollbar-width: none;
+    
+    /* 隐藏滚动条 - IE和Edge */
+    -ms-overflow-style: none;
 }
 
 .result-card {
@@ -276,7 +289,7 @@ body {
     box-shadow: 0 5px 15px var(--shadow-color);
     padding: var(--card-padding);
     max-width: 800px;
-    margin: 0 auto;
+    margin: 0 auto 40px auto; /* 添加底部边距确保内容完全可见 */
     color: var(--text-color-dark);
 }
 
