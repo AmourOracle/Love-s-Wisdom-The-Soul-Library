@@ -2,10 +2,12 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log("頁面已載入，測驗初始化中...");
     
-    // 創建圖片緩存和動畫狀態管理
+    // 圖片緩存 - 簡化圖片管理
     const imageCache = {};
+    
+    // 狀態標記 - 防止並發動畫和操作
     let isAnimating = false;
-    let previousProgress = 0;
+    let contentRendered = false;
     
     // 保存元素引用，避免重複獲取
     const DOM = {
@@ -44,111 +46,24 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentQuestionIndex = 0;
     const userAnswers = [];
     
-    // 動畫狀態管理函數
-    function beginAnimation(container, direction = '') {
-        // 防止動畫重疊
-        if (isAnimating) {
-            console.log("動畫進行中，忽略請求");
-            return false;
-        }
-        
-        isAnimating = true;
-        
-        // 添加動畫狀態類
-        document.querySelector('.container').classList.add('animating');
-        if (direction) {
-            document.querySelector('.container').classList.add(direction);
-        }
-        
-        // 設置超時保護，防止動畫狀態鎖死
-        setTimeout(() => {
-            endAnimation();
-        }, 1000); // 保護性超時
-        
-        return true;
-    }
-    
-    function endAnimation() {
-        isAnimating = false;
-        const container = document.querySelector('.container');
-        if (container) {
-            container.classList.remove('animating', 'slide-up', 'slide-down');
-        }
-    }
-    
-    // 優化的圖片預加載函數
-    function preloadImage(src) {
-        return new Promise((resolve, reject) => {
-            // 檢查緩存
-            if (imageCache[src]) {
-                resolve(imageCache[src]);
-                return;
-            }
-            
-            // 加載新圖片
-            const img = new Image();
-            img.onload = () => {
-                // 緩存並返回圖片
-                imageCache[src] = img;
-                console.log(`圖片預加載成功: ${src}`);
-                resolve(img);
-            };
-            img.onerror = (err) => {
-                console.error(`圖片加載失敗: ${src}`, err);
-                reject(err);
-            };
-            img.src = src;
-        });
-    }
-    
-    // 預加載首頁和第一題圖片
+    // 預加載首頁和第一題圖片 - 確保關鍵圖片可用
     function preloadInitialImages() {
+        console.log("開始預加載關鍵圖片...");
         try {
-            console.log("預加載初始圖片...");
-            Promise.all([
-                preloadImage('./images/Intro.webp'),
-                preloadImage('./images/Q1.webp')
-            ]).then(() => {
-                console.log("初始圖片加載完成");
-                
-                // 在空閒時預加載其他圖片
-                if (window.requestIdleCallback) {
-                    requestIdleCallback(() => {
-                        preloadRemainingImages();
-                    });
-                } else {
-                    setTimeout(preloadRemainingImages, 1000);
-                }
-            }).catch(err => {
-                console.error("初始圖片預加載錯誤:", err);
-            });
-        } catch(error) {
-            console.error("預加載函數錯誤:", error);
-            // 出錯不阻止應用繼續運行
+            const img1 = new Image();
+            img1.src = './images/Intro.webp';
+            
+            const img2 = new Image();
+            img2.src = './images/Q1.webp';
+            
+            console.log("關鍵圖片預加載請求完成");
+        } catch (error) {
+            console.warn("圖片預加載錯誤:", error);
+            // 預加載錯誤不影響應用運行
         }
     }
     
-    // 預加載剩餘問題圖片
-    function preloadRemainingImages() {
-        console.log("開始預加載剩餘圖片...");
-        
-        // 分批加載，每批2-3張圖片，減少並發請求
-        for (let batch = 0; batch < 4; batch++) {
-            setTimeout(() => {
-                const startIdx = batch * 3 + 2; // 從Q2開始，每批3張
-                const endIdx = Math.min(startIdx + 2, 11);
-                
-                for (let i = startIdx; i <= endIdx; i++) {
-                    preloadImage(`./images/Q${i}.webp`).catch(err => {
-                        // 錯誤處理，但不阻止應用繼續運行
-                        console.warn(`加載Q${i}圖片失敗，將在需要時重試`, err);
-                    });
-                }
-            }, batch * 300); // 每批延遲300ms
-        }
-    }
-    
-    // 立即開始預加載初始圖片
+    // 立即開始預加載關鍵圖片
     preloadInitialImages();
     
     // 設置視口高度 - 確保移動設備上正確顯示100vh
@@ -157,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', `${vh}px`);
         } catch (error) {
-            console.error("設置視口高度時出錯:", error);
+            console.warn("設置視口高度錯誤:", error);
         }
     }
     
@@ -165,80 +80,81 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('resize', setViewportHeight);
     setViewportHeight();
     
-    // 提供觸覺反饋（如果設備支持）
-    function provideFeedback() {
-        try {
-            if (navigator && navigator.vibrate) {
-                navigator.vibrate(30); // 短暫振動30ms
-            }
-        } catch (error) {
-            // 不阻止應用繼續運行
-            console.warn("觸覺反饋不可用:", error);
-        }
-    }
-    
-    // 優化的屏幕切換函數
+    // 優化的屏幕切換函數 - 穩健可靠的實現
     function switchScreen(fromScreen, toScreen) {
+        console.log(`切換屏幕從 ${fromScreen.id} 到 ${toScreen.id}...`);
+        
+        // 防止重複觸發
+        if (isAnimating) {
+            console.log("動畫進行中，忽略切換請求");
+            return;
+        }
+        
+        // 設置動畫狀態
+        isAnimating = true;
+        
         try {
-            // 檢查動畫狀態
-            if (!beginAnimation(document.querySelector('.container'), 'slide-up')) {
-                return;
-            }
-            
-            // 添加離開動畫
+            // 添加淡出動畫類
             fromScreen.classList.add('fade-out');
             
-            // 設置適當延遲以確保動畫流暢
+            // 使用較長的延遲確保動畫完成
             setTimeout(() => {
-                // 切換屏幕顯示狀態
+                // 切換屏幕
                 fromScreen.classList.remove('active', 'fade-out');
                 
-                // 強制重排以確保動畫效果
+                // 強制重排，確保渲染更新
                 void toScreen.offsetWidth;
                 
-                // 添加進入動畫
+                // 顯示目標屏幕
                 toScreen.classList.add('active', 'fade-in');
                 
-                // 動畫完成後清理類
+                // 如果是切換到測驗頁面，延遲渲染問題內容以確保過渡動畫流暢
+                if (toScreen.id === 'test-container') {
+                    contentRendered = false;
+                    console.log("準備渲染問題內容...");
+                    
+                    // 確保DOM更新後再渲染內容
+                    setTimeout(() => {
+                        renderQuestion();
+                        console.log("問題內容渲染完成");
+                    }, 100);
+                }
+                
+                // 動畫完成後清理狀態
                 setTimeout(() => {
                     toScreen.classList.remove('fade-in');
-                    endAnimation();
+                    isAnimating = false;
+                    console.log("屏幕切換完成");
                 }, 600);
-            }, 500);
+            }, 600); // 確保有足夠時間完成淡出動畫
         } catch (error) {
             console.error("屏幕切換出錯:", error);
-            // 出錯時確保基本功能正常
-            fromScreen.classList.remove('active');
+            
+            // 出錯時確保基本功能可用
+            fromScreen.classList.remove('active', 'fade-out');
             toScreen.classList.add('active');
-            endAnimation();
+            isAnimating = false;
+            
+            // 如果是測驗頁面，確保內容顯示
+            if (toScreen.id === 'test-container' && !contentRendered) {
+                renderQuestion();
+            }
         }
     }
     
     // 開始測驗
     DOM.buttons.start.addEventListener('click', function() {
-        try {
-            console.log("點擊開始測驗");
-            provideFeedback();
-            switchScreen(DOM.containers.intro, DOM.containers.test);
-            setTimeout(() => {
-                renderQuestion();
-            }, 100);
-        } catch (error) {
-            console.error("開始測驗時出錯:", error);
-            alert("開始測驗時出錯，請刷新頁面重試");
-        }
+        console.log("點擊開始測驗按鈕");
+        switchScreen(DOM.containers.intro, DOM.containers.test);
     });
     
     // 重新開始測驗 - 導航回首頁
     DOM.buttons.restart.addEventListener('click', function() {
         try {
-            // 提供觸覺反饋
-            provideFeedback();
-            
+            console.log("點擊重新測驗按鈕");
             // 重置測驗狀態
             currentQuestionIndex = 0;
             userAnswers.length = 0;
-            previousProgress = 0;
             
             // 重置DOM元素
             DOM.elements.progressFill.style.width = '0%';
@@ -249,150 +165,98 @@ document.addEventListener('DOMContentLoaded', function() {
             // 滾動到頂部
             window.scrollTo(0, 0);
         } catch (error) {
-            console.error("重新開始測驗時出錯:", error);
-            alert("重新開始測驗時出錯，請刷新頁面重試");
+            console.error("重新開始測驗出錯:", error);
+            // 出錯時嘗試直接切換
+            DOM.containers.result.classList.remove('active');
+            DOM.containers.intro.classList.add('active');
         }
     });
     
-    // 優化的問題渲染函數
+    // 簡化的問題渲染函數 - 更可靠的實現
     function renderQuestion() {
         try {
-            // 防止動畫重疊
-            if (isAnimating) {
-                console.log("動畫進行中，忽略渲染請求");
-                return;
-            }
-            
-            beginAnimation(DOM.elements.questionContainer, 'slide-down');
+            console.log(`渲染問題 ${currentQuestionIndex + 1}...`);
+            contentRendered = true;
             
             const question = questions[currentQuestionIndex];
             const questionNumber = currentQuestionIndex + 1;
-            const bgImageUrl = `./images/Q${questionNumber}.webp`;
             
-            // 舊內容淡出
-            DOM.elements.questionText.classList.add('fade-out');
-            DOM.elements.optionsContainer.classList.add('fade-out');
+            // 設置問題文本
+            const questionTextWithoutNumber = question.question.replace(/^\d+\.\s*/, '');
+            DOM.elements.questionText.textContent = questionTextWithoutNumber;
             
-            // 添加背景加載狀態
+            // 設置背景圖片和加載狀態
             DOM.elements.questionContainer.classList.add('loading-bg');
             
-            // 使用定時器確保動畫順序
-            setTimeout(() => {
-                // 更新問題文本
-                const questionTextWithoutNumber = question.question.replace(/^\d+\.\s*/, '');
-                DOM.elements.questionText.textContent = questionTextWithoutNumber;
-                
-                // 構建選項HTML
-                let optionsHTML = '';
-                question.options.forEach((option, index) => {
-                    const isSelected = userAnswers[currentQuestionIndex] === index;
-                    optionsHTML += `
-                    <div class="option ${isSelected ? 'selected' : ''}" data-index="${index}">
-                        ${option.text}
-                    </div>`;
-                });
-                DOM.elements.optionsContainer.innerHTML = optionsHTML;
-                
-                // 預加載並設置背景圖片
-                loadBackgroundImage(bgImageUrl).then(() => {
-                    // 移除淡出類和添加淡入類
-                    DOM.elements.questionText.classList.remove('fade-out');
-                    DOM.elements.optionsContainer.classList.remove('fade-out');
-                    DOM.elements.questionText.classList.add('fade-in');
-                    DOM.elements.optionsContainer.classList.add('fade-in');
-                    
-                    // 為選項添加事件監聽器
-                    document.querySelectorAll('.option').forEach(option => {
-                        option.addEventListener('click', handleOptionClick);
-                    });
-                    
-                    // 更新進度條
-                    updateProgressBar();
-                    
-                    // 清理動畫類
-                    setTimeout(() => {
-                        DOM.elements.questionText.classList.remove('fade-in');
-                        DOM.elements.optionsContainer.classList.remove('fade-in');
-                        endAnimation();
-                    }, 600);
-                });
-            }, 300);
-        } catch (error) {
-            console.error("渲染問題時出錯:", error);
-            // 確保動畫狀態重置
-            DOM.elements.questionContainer.classList.remove('loading-bg');
-            endAnimation();
-        }
-    }
-    
-    // 加載背景圖片並處理過渡效果
-    function loadBackgroundImage(url) {
-        return new Promise((resolve, reject) => {
-            try {
-                // 先嘗試使用緩存
-                if (imageCache[url]) {
-                    console.log(`使用緩存圖片: ${url}`);
-                    DOM.elements.questionContainer.style.backgroundImage = `url('${url}')`;
-                    
-                    // 短暫延遲以確保CSS過渡效果
-                    setTimeout(() => {
-                        DOM.elements.questionContainer.classList.remove('loading-bg');
-                        DOM.elements.questionContainer.classList.add('bg-loaded');
-                        
-                        // 動畫完成後移除加載類
-                        setTimeout(() => {
-                            DOM.elements.questionContainer.classList.remove('bg-loaded');
-                            resolve();
-                        }, 500);
-                    }, 50);
-                    return;
-                }
-                
-                // 如果沒有緩存，加載新圖片
-                preloadImage(url)
-                    .then(img => {
-                        DOM.elements.questionContainer.style.backgroundImage = `url('${url}')`;
-                        
-                        // 短暫延遲以確保CSS過渡效果
-                        setTimeout(() => {
-                            DOM.elements.questionContainer.classList.remove('loading-bg');
-                            DOM.elements.questionContainer.classList.add('bg-loaded');
-                            
-                            // 動畫完成後移除加載類
-                            setTimeout(() => {
-                                DOM.elements.questionContainer.classList.remove('bg-loaded');
-                                resolve();
-                            }, 500);
-                        }, 50);
-                    })
-                    .catch(err => {
-                        console.error("背景圖片加載錯誤:", err);
-                        // 即使圖片加載失敗，也要繼續
-                        DOM.elements.questionContainer.classList.remove('loading-bg');
-                        resolve();
-                    });
-            } catch (error) {
-                console.error("加載背景圖片時出錯:", error);
+            // 直接設置背景圖片，不等待加載完成
+            DOM.elements.questionContainer.style.backgroundImage = `url('./images/Q${questionNumber}.webp')`;
+            
+            // 構建選項HTML - 一次性更新DOM
+            let optionsHTML = '';
+            question.options.forEach((option, index) => {
+                const isSelected = userAnswers[currentQuestionIndex] === index;
+                optionsHTML += `
+                <div class="option ${isSelected ? 'selected' : ''}" data-index="${index}">
+                    ${option.text}
+                </div>`;
+            });
+            DOM.elements.optionsContainer.innerHTML = optionsHTML;
+            
+            // 為選項添加事件監聽器
+            document.querySelectorAll('.option').forEach(option => {
+                option.addEventListener('click', handleOptionClick);
+            });
+            
+            // 更新進度條
+            updateProgressBar();
+            
+            // 監聽背景圖片加載
+            const img = new Image();
+            img.onload = () => {
+                // 圖片加載完成後移除加載狀態
                 DOM.elements.questionContainer.classList.remove('loading-bg');
-                resolve(); // 即使出錯也繼續
-            }
-        });
+                DOM.elements.questionContainer.classList.add('bg-loaded');
+                
+                // 短暫延遲後移除加載完成狀態
+                setTimeout(() => {
+                    DOM.elements.questionContainer.classList.remove('bg-loaded');
+                }, 500);
+            };
+            
+            // 設置圖片路徑觸發加載，使用相對路徑
+            img.src = `./images/Q${questionNumber}.webp`;
+            
+            // 安全措施：即使圖片未加載也不會永久卡在加載狀態
+            setTimeout(() => {
+                DOM.elements.questionContainer.classList.remove('loading-bg');
+            }, 3000); // 3秒後強制移除加載狀態
+            
+        } catch (error) {
+            console.error("渲染問題出錯:", error);
+            // 出錯時確保加載狀態被移除
+            DOM.elements.questionContainer.classList.remove('loading-bg');
+        }
     }
     
     // 處理選項點擊
     function handleOptionClick(e) {
         try {
-            // 防止動畫重疊或選項重複點擊
-            if (isAnimating) {
+            // 防止動畫進行時或內容未渲染時的點擊
+            if (isAnimating || !contentRendered) {
                 return;
             }
             
+            console.log("選項被點擊");
+            
             // 設置動畫狀態
-            beginAnimation(DOM.elements.questionContainer, 'slide-up');
+            isAnimating = true;
             
             // 確保點擊的是選項元素本身，而不是子元素
             const targetElement = e.target.closest('.option');
-            if (!targetElement) return;
+            if (!targetElement) {
+                isAnimating = false;
+                return;
+            }
             
             // 防止連續點擊
             document.querySelectorAll('.option').forEach(option => {
@@ -402,10 +266,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const optionIndex = parseInt(targetElement.dataset.index);
             userAnswers[currentQuestionIndex] = optionIndex;
             
-            console.log(`問題 ${currentQuestionIndex+1} 選擇了選項 ${optionIndex+1}, 主要類型: ${questions[currentQuestionIndex].options[optionIndex].primary}`);
-            
-            // 提供觸覺反饋
-            provideFeedback();
+            console.log(`問題 ${currentQuestionIndex+1} 選擇了選項 ${optionIndex+1}`);
             
             // 更新選項樣式
             document.querySelectorAll('.option').forEach(opt => {
@@ -413,17 +274,15 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             targetElement.classList.add('selected');
             
-            // 淡出當前內容
-            DOM.elements.questionText.classList.add('fade-out');
-            DOM.elements.optionsContainer.classList.add('fade-out');
-            
             // 添加延遲，讓用戶能看到選中效果
             setTimeout(() => {
                 // 判斷是否為最後一題
                 if (currentQuestionIndex < questions.length - 1) {
                     // 如果不是最後一題，自動前進到下一題
                     currentQuestionIndex++;
+                    contentRendered = false;
                     renderQuestion();
+                    isAnimating = false;
                 } else {
                     // 如果是最後一題，則顯示結果
                     console.log("已完成所有問題，準備顯示結果");
@@ -433,43 +292,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     } catch (error) {
                         console.error("顯示結果時發生錯誤:", error);
                         alert("顯示結果時出錯，請重新嘗試測驗");
-                        endAnimation(); // 重置動畫狀態
+                        isAnimating = false;
                     }
                 }
-            }, 600);
+            }, 500);
         } catch (error) {
-            console.error("處理選項點擊時出錯:", error);
-            endAnimation(); // 確保動畫狀態重置
+            console.error("處理選項點擊出錯:", error);
+            isAnimating = false;
         }
     }
     
     // 更新進度條
     function updateProgressBar() {
         try {
-            const currentProgress = ((currentQuestionIndex + 1) / questions.length) * 100;
-            
-            // 設置CSS變量以供動畫使用
-            DOM.elements.progressFill.style.setProperty('--progress-from', `${previousProgress}%`);
-            DOM.elements.progressFill.style.setProperty('--progress-to', `${currentProgress}%`);
-            
-            // 添加動畫類
-            DOM.elements.progressFill.classList.add('animate');
-            
-            // 設置當前進度
-            DOM.elements.progressFill.style.width = `${currentProgress}%`;
-            
-            // 更新進度文本
+            const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+            DOM.elements.progressFill.style.width = `${progress}%`;
             DOM.elements.progressText.textContent = `問題 ${currentQuestionIndex + 1}/${questions.length}`;
-            
-            // 保存當前進度以供下次動畫使用
-            previousProgress = currentProgress;
-            
-            // 動畫完成後移除動畫類
-            setTimeout(() => {
-                DOM.elements.progressFill.classList.remove('animate');
-            }, 500);
         } catch (error) {
-            console.error("更新進度條時出錯:", error);
+            console.error("更新進度條出錯:", error);
         }
     }
     
@@ -594,10 +434,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // 顯示結果
     function showResult() {
         try {
-            // 計算結果
             const result = calculateResult();
             
-            // 準備結果內容
+            // 設置結果標題和副標題
             if (result.title.includes('靈魂圖書管理員')) {
                 DOM.elements.resultTitle.textContent = `你是：${result.title}`;
             } else {
@@ -669,7 +508,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error("顯示結果時發生錯誤:", error);
             alert("顯示結果時出錯，請重新嘗試測驗");
-            endAnimation(); // 重置動畫狀態
+            isAnimating = false;
         }
     }
     
@@ -698,9 +537,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 複製分享文字
     DOM.buttons.copy.addEventListener('click', function() {
         try {
-            // 提供觸覺反饋
-            provideFeedback();
-            
             const shareText = DOM.elements.shareText.textContent;
             navigator.clipboard.writeText(shareText).then(() => {
                 DOM.buttons.copy.textContent = '已複製!';
