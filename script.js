@@ -2,6 +2,19 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log("頁面已載入，測驗初始化中...");
     
+    // 頁面動畫控制函數
+    // 為容器添加動畫狀態
+    function addAnimatingClass() {
+        document.querySelector('.container').classList.add('animating');
+    }
+    
+    // 移除動畫狀態類
+    function removeAnimatingClass() {
+        setTimeout(() => {
+            document.querySelector('.container').classList.remove('animating');
+        }, 100); // 短暫延遲確保CSS過渡開始
+    }
+    
     // 预加载所有问题图片
     preloadQuestionImages();
     
@@ -63,43 +76,55 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('resize', setViewportHeight);
     setViewportHeight();
     
+    // 切换屏幕的通用函数 - 添加动画控制
+    function switchScreen(fromScreen, toScreen) {
+        // 添加動畫狀態
+        addAnimatingClass();
+        
+        // 先隱藏fromScreen
+        fromScreen.classList.remove('active');
+        
+        // 強制重排
+        void toScreen.offsetWidth;
+        
+        // 短暫延遲後顯示toScreen，讓動畫效果能夠顯示
+        setTimeout(() => {
+            toScreen.classList.add('active');
+            
+            // 延遲移除動畫狀態，讓動畫能夠執行
+            setTimeout(() => {
+                removeAnimatingClass();
+            }, 100);
+        }, 50);
+    }
+    
     // 開始測驗
     DOM.buttons.start.addEventListener('click', () => {
         switchScreen(DOM.containers.intro, DOM.containers.test);
         renderQuestion();
     });
     
- 
-// 重新開始測驗 - 修改为导航回首页
-DOM.buttons.restart.addEventListener('click', () => {
-    // 重置测验状态
-    currentQuestionIndex = 0;
-    userAnswers.length = 0;
-    
-    // 重置DOM元素
-    DOM.elements.progressFill.style.width = '0%';
-    
-    // 切换到首页，而不是测验页面
-    switchScreen(DOM.containers.result, DOM.containers.intro);
-    
-    // 滾動到頂部
-    window.scrollTo(0, 0);
-});
-    
-    // 切换屏幕的通用函数
-    function switchScreen(fromScreen, toScreen) {
-        fromScreen.classList.remove('active');
+    // 重新開始測驗 - 導航回首頁
+    DOM.buttons.restart.addEventListener('click', () => {
+        // 重置測驗狀態
+        currentQuestionIndex = 0;
+        userAnswers.length = 0;
         
-        // 强制页面重排
-        void toScreen.offsetWidth;
+        // 重置DOM元素
+        DOM.elements.progressFill.style.width = '0%';
         
-        setTimeout(() => {
-            toScreen.classList.add('active');
-        }, 50);
-    }
+        // 切換到首頁，而不是測驗頁面
+        switchScreen(DOM.containers.result, DOM.containers.intro);
+        
+        // 滾動到頂部
+        window.scrollTo(0, 0);
+    });
     
-    // 渲染當前問題
+    // 渲染當前問題 - 添加动画控制
     function renderQuestion() {
+        // 添加動畫狀態
+        addAnimatingClass();
+        
         const question = questions[currentQuestionIndex];
         
         // 設置問題文本 - 移除標號以增加沉浸感
@@ -127,6 +152,11 @@ DOM.buttons.restart.addEventListener('click', () => {
         });
         
         updateProgressBar();
+        
+        // 延遲移除動畫狀態，讓動畫能夠執行
+        setTimeout(() => {
+            removeAnimatingClass();
+        }, 100);
     }
     
     // 獲取問題選項中的主導類型
@@ -153,7 +183,7 @@ DOM.buttons.restart.addEventListener('click', () => {
         return dominantType;
     }
     
-    // 處理選項點擊
+    // 處理選項點擊 - 添加动画控制
     function handleOptionClick(e) {
         // 確保點擊的是選項元素本身，而不是子元素
         const targetElement = e.target.closest('.option');
@@ -175,6 +205,9 @@ DOM.buttons.restart.addEventListener('click', () => {
         });
         targetElement.classList.add('selected');
         
+        // 添加動畫狀態
+        addAnimatingClass();
+        
         // 添加延遲，讓用戶能看到選中效果
         setTimeout(() => {
             // 判斷是否為最後一題
@@ -193,7 +226,7 @@ DOM.buttons.restart.addEventListener('click', () => {
                     alert("顯示結果時出錯，請重新嘗試測驗");
                 }
             }
-        }, 500); // 延長延遲以使體驗更流暢
+        }, 600); // 延長延遲以使體驗更流暢
     }
     
     // 更新進度條
@@ -431,4 +464,13 @@ DOM.buttons.restart.addEventListener('click', () => {
             console.error('無法複製: ', err);
         });
     });
+    
+    // 初始化時為首頁元素添加動畫
+    // 初次加載時添加動畫狀態
+    addAnimatingClass();
+    
+    // 延遲移除動畫狀態，觸發動畫
+    setTimeout(() => {
+        removeAnimatingClass();
+    }, 300);
 });
