@@ -3,17 +3,22 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("頁面已載入，測驗初始化中...");
     
     // 頁面動畫控制函數
-    // 為容器添加動畫狀態
-    function addAnimatingClass() {
+    // 為容器添加動畫狀態，並指定動畫方向
+    function addAnimatingClass(direction = 'out') {
         document.querySelector('.container').classList.add('animating');
+        document.querySelector('.container').setAttribute('data-direction', direction);
     }
     
     // 移除動畫狀態類
     function removeAnimatingClass() {
         setTimeout(() => {
             document.querySelector('.container').classList.remove('animating');
+            document.querySelector('.container').removeAttribute('data-direction');
         }, 100); // 短暫延遲確保CSS過渡開始
     }
+    
+    // 标记页面是否首次加载
+    const isFirstLoad = true;
     
     // 预加载所有问题图片
     preloadQuestionImages();
@@ -76,10 +81,10 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('resize', setViewportHeight);
     setViewportHeight();
     
-    // 切换屏幕的通用函数 - 添加动画控制
+    // 切换屏幕的通用函数 - 添加视差滚动效果
     function switchScreen(fromScreen, toScreen) {
-        // 添加動畫狀態
-        addAnimatingClass();
+        // 添加動畫狀態 - 为退出屏幕设置向上滑出效果
+        addAnimatingClass('out');
         
         // 先隱藏fromScreen
         fromScreen.classList.remove('active');
@@ -89,13 +94,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 短暫延遲後顯示toScreen，讓動畫效果能夠顯示
         setTimeout(() => {
+            // 为进入屏幕设置从下向上滑入效果
+            document.querySelector('.container').setAttribute('data-direction', 'in');
             toScreen.classList.add('active');
             
             // 延遲移除動畫狀態，讓動畫能夠執行
             setTimeout(() => {
                 removeAnimatingClass();
             }, 100);
-        }, 50);
+        }, 400); // 增加延时，确保前一个动画有足够时间显示
     }
     
     // 開始測驗
@@ -120,10 +127,10 @@ document.addEventListener('DOMContentLoaded', function() {
         window.scrollTo(0, 0);
     });
     
-    // 渲染當前問題 - 添加动画控制
+    // 渲染當前問題 - 添加视差滚动效果
     function renderQuestion() {
-        // 添加動畫狀態
-        addAnimatingClass();
+        // 添加動畫狀態 - 使用视差效果
+        addAnimatingClass('transition');
         
         const question = questions[currentQuestionIndex];
         
@@ -183,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return dominantType;
     }
     
-    // 處理選項點擊 - 添加动画控制
+    // 處理選項點擊 - 添加视差滚动效果
     function handleOptionClick(e) {
         // 確保點擊的是選項元素本身，而不是子元素
         const targetElement = e.target.closest('.option');
@@ -205,8 +212,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         targetElement.classList.add('selected');
         
-        // 添加動畫狀態
-        addAnimatingClass();
+        // 添加動畫狀態 - 使用视差效果
+        addAnimatingClass('slide-up');
         
         // 添加延遲，讓用戶能看到選中效果
         setTimeout(() => {
@@ -465,12 +472,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // 初始化時為首頁元素添加動畫
-    // 初次加載時添加動畫狀態
-    addAnimatingClass();
-    
-    // 延遲移除動畫狀態，觸發動畫
-    setTimeout(() => {
-        removeAnimatingClass();
-    }, 300);
+    // 初始化時不添加首頁動畫，避免重復效果
+    // 只在用戶操作時才添加動畫效果
+    console.log("初始化完成，等待用戶操作...");
 });

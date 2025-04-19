@@ -1,46 +1,20 @@
-:root {
-    --primary-color: #f64740;
-    --secondary-color: #333333;
-    --background-color: #f5f5f5;
-    --text-color: #ffffff;
-    --text-color-dark: #333333;
-    --shadow-color: rgba(0, 0, 0, 0.2);
-    --overlay-color: rgba(0, 0, 0, 0.45);
-    --card-padding: 24px;
-    --border-radius: 12px;
+/* 添加到 style.css 文件中的新樣式，實現視差滾動效果 */
+
+/* 視差滾動動畫關鍵幀定義 */
+@keyframes slideOutUp {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
 }
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-body {
-    font-family: 'Noto Serif TC', serif, 'Times New Roman', Times, serif;
-    line-height: 1.6;
-    background-color: var(--background-color);
-    color: var(--text-color);
-    height: 100vh;
-    width: 100vw;
-    overflow: hidden;
-    margin: 0;
-    padding: 0;
-    transition: background-color 0.8s ease; /* 添加背景色平滑过渡 */
-}
-
-.container {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    overflow: hidden;
-    transition: background-color 0.5s ease; /* 添加背景色过渡效果 */
-}
-
-/* 动画关键帧定义 */
 @keyframes slideInUp {
   from {
-    transform: translateY(30px);
+    transform: translateY(50px);
     opacity: 0;
   }
   to {
@@ -49,502 +23,106 @@ body {
   }
 }
 
-@keyframes fadeIn {
+@keyframes parallaxBgOut {
   from {
-    opacity: 0;
+    transform: translateY(0);
   }
   to {
-    opacity: 1;
+    transform: translateY(-20px); /* 背景移動速度較慢，產生視差效果 */
   }
 }
 
-/* 通用屏幕容器样式 */
-.screen-container {
-    display: none;
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0;
-    transition: opacity 0.6s ease-in-out;
-    overflow: hidden;
-}
-
-.screen-container.active {
-    display: block;
-    opacity: 1;
-}
-
-/* 卡片式设计 - 首页 */
-.card-background {
-    width: 100%;
-    height: 100%;
-    background-size: cover;
-    background-position: center;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    position: relative;
-    transition: transform 0.8s ease-out, opacity 0.8s ease;
-}
-
-.container.animating .card-background {
-    transform: translateY(30px);
-    opacity: 0;
-}
-
-.card-background::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(to bottom, 
-                              rgba(0,0,0,0.7) 0%, 
-                              rgba(0,0,0,0.3) 30%, 
-                              rgba(0,0,0,0.3) 70%, 
-                              rgba(0,0,0,0.7) 100%);
-    z-index: 1;
-}
-
-.card-content {
-    position: relative;
-    z-index: 2;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 40px 30px;
-}
-
-.card-header {
-    margin-bottom: 20px;
-    transition: transform 0.6s ease-out, opacity 0.6s ease;
+@keyframes parallaxBgIn {
+  from {
+    transform: translateY(20px); /* 背景移動速度較慢，產生視差效果 */
+  }
+  to {
     transform: translateY(0);
-    opacity: 1;
+  }
 }
 
-.container.animating .card-header {
-    transform: translateY(30px);
-    opacity: 0;
-    transition-delay: 0.4s;
+/* 淡出時的視差效果 */
+.container.animating[data-direction="out"] .card-background,
+.container.animating[data-direction="out"] .question-container {
+  animation: parallaxBgOut 0.6s ease-out forwards;
 }
 
-.card-header .label {
-    font-size: 14px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 10px;
-    opacity: 0.8;
-    text-align: center;
+.container.animating[data-direction="out"] .card-header,
+.container.animating[data-direction="out"] .question {
+  animation: slideOutUp 0.5s ease-out forwards;
 }
 
-.card-header .title {
-    font-size: 36px;
-    font-weight: 700;
-    margin-bottom: 10px;
-    text-align: center;
+.container.animating[data-direction="out"] .card-body,
+.container.animating[data-direction="out"] .options-container {
+  animation: slideOutUp 0.55s ease-out forwards;
 }
 
-.card-body {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    transition: transform 0.6s ease-out, opacity 0.6s ease;
-    transform: translateY(0);
-    opacity: 1;
+.container.animating[data-direction="out"] .card-footer {
+  animation: slideOutUp 0.6s ease-out forwards;
 }
 
-.container.animating .card-body {
-    transform: translateY(30px);
-    opacity: 0;
-    transition-delay: 0.5s;
+/* 淡入時的視差效果 */
+.container.animating[data-direction="in"] .card-background,
+.container.animating[data-direction="in"] .question-container {
+  animation: parallaxBgIn 0.6s ease-out forwards;
 }
 
-.card-body .description {
-    font-size: 18px;
-    line-height: 1.6;
-    margin-bottom: 20px;
-    max-width: 90%;
-    text-align: center;
-    margin-left: auto;
-    margin-right: auto;
+.container.animating[data-direction="in"] .card-header,
+.container.animating[data-direction="in"] .question {
+  animation: slideInUp 0.5s ease-out forwards;
 }
 
-.card-footer {
-    margin-top: 20px;
-    text-align: center;
-    transition: transform 0.6s ease-out, opacity 0.6s ease;
-    transform: translateY(0);
-    opacity: 1;
+.container.animating[data-direction="in"] .card-body,
+.container.animating[data-direction="in"] .options-container {
+  animation: slideInUp 0.55s ease-out forwards;
 }
 
-.container.animating .card-footer {
-    transform: translateY(30px);
-    opacity: 0;
-    transition-delay: 0.6s;
+.container.animating[data-direction="in"] .card-footer {
+  animation: slideInUp 0.6s ease-out forwards;
 }
 
-.card-meta {
-    margin-top: 20px;
-    font-size: 12px;
-    opacity: 0.7;
-    text-align: center;
+/* 選項點擊時的視差效果 */
+.container.animating[data-direction="slide-up"] .question {
+  animation: slideOutUp 0.4s ease-out forwards;
 }
 
-/* 按钮样式 */
-.btn {
-    display: inline-block;
-    padding: 14px 28px;
-    border-radius: 50px;
-    border: none;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-family: 'Noto Serif TC', serif;
-    text-align: center;
-    margin: 0 auto;
+.container.animating[data-direction="slide-up"] .options-container {
+  animation: slideOutUp 0.5s ease-out forwards;
 }
 
-.primary-btn {
-    background-color: var(--primary-color);
-    color: white;
+.container.animating[data-direction="slide-up"] .option {
+  animation: slideOutUp calc(0.4s + var(--option-index, 0) * 0.05s) ease-out forwards;
 }
 
-.primary-btn:hover {
-    background-color: #e53935;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+.container.animating[data-direction="slide-up"] .question-container {
+  animation: parallaxBgOut 0.6s ease-out forwards;
 }
 
-.secondary-btn {
-    background-color: transparent;
-    color: white;
-    border: 1px solid white;
+/* 問題切換時的視差效果 */
+.container.animating[data-direction="transition"] .question-container {
+  animation: parallaxBgOut 0.4s ease-out, parallaxBgIn 0.4s ease-out 0.4s;
 }
 
-.secondary-btn:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+.container.animating[data-direction="transition"] .question {
+  animation: slideOutUp 0.3s ease-out, slideInUp 0.3s ease-out 0.4s;
 }
 
-/* 测验页面样式 */
-.progress-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    padding: 12px 15px 5px;
-    background-color: rgba(0, 0, 0, 0.4);
-    z-index: 10;
+.container.animating[data-direction="transition"] .options-container {
+  animation: slideOutUp 0.4s ease-out, slideInUp 0.4s ease-out 0.4s;
 }
 
-.progress-bar {
-    background-color: rgba(255, 255, 255, 0.2);
-    height: 4px;
-    border-radius: 2px;
-    overflow: hidden;
-}
+/* 移除選項的延遲動畫，改為根據索引設置動態延遲 */
+.container.animating .option:nth-child(1) { --option-index: 0; }
+.container.animating .option:nth-child(2) { --option-index: 1; }
+.container.animating .option:nth-child(3) { --option-index: 2; }
+.container.animating .option:nth-child(4) { --option-index: 3; }
+.container.animating .option:nth-child(5) { --option-index: 4; }
 
-.progress-fill {
-    background-color: var(--primary-color);
-    height: 100%;
-    width: 0%;
-    transition: width 0.5s ease;
-}
-
-.progress-text {
-    text-align: right;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.8);
-    margin-top: 5px;
-    padding-right: 5px;
-}
-
-/* 问题容器 - 全屏背景 */
-.question-container {
-    width: 100%;
-    height: 100%;
-    background-size: cover;
-    background-position: center;
-    position: relative;
-    transition: transform 0.8s ease-out, opacity 0.8s ease;
-}
-
-.container.animating .question-container {
-    transform: translateY(30px);
-    opacity: 0;
-}
-
-.overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: var(--overlay-color);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 80px 20px 40px;
-}
-
-.question {
-    font-size: 24px;
-    font-weight: 500;
-    line-height: 1.5;
-    text-align: center;
-    margin-bottom: 30px;
-    padding: 0 20px;
-    margin-top: 40px; /* 增加上边距，解决选项贴近底部问题 */
-    transition: transform 0.5s ease-out 0.4s, opacity 0.5s ease 0.4s; /* 添加延迟 */
-    transform: translateY(0);
-    opacity: 1;
-}
-
-.container.animating .question {
-    transform: translateY(30px);
-    opacity: 0;
-}
-
-/* 选项样式 */
-.options-container {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    width: 100%;
-    max-width: 500px;
-    margin: 0 auto;
-    padding: 0 10px 20px; /* 增加底部内边距 */
-    transition: transform 0.5s ease-out 0.5s, opacity 0.5s ease 0.5s; /* 添加延迟，比问题晚一点 */
-    transform: translateY(0);
-    opacity: 1;
-}
-
-.container.animating .options-container {
-    transform: translateY(30px);
-    opacity: 0;
-}
-
-.option {
-    background-color: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(5px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 10px;
-    padding: 15px 20px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    text-align: center; /* 文本居中 */
-    opacity: 1;
-    transform: translateY(0);
-}
-
-/* 为每个选项添加不同的动画延迟 */
-.container.animating .option:nth-child(1) { 
-    transform: translateY(30px);
-    opacity: 0;
-    transition-delay: 0.5s;
-}
-.container.animating .option:nth-child(2) { 
-    transform: translateY(30px);
-    opacity: 0;
-    transition-delay: 0.55s;
-}
-.container.animating .option:nth-child(3) { 
-    transform: translateY(30px);
-    opacity: 0;
-    transition-delay: 0.6s;
-}
-.container.animating .option:nth-child(4) { 
-    transform: translateY(30px);
-    opacity: 0;
-    transition-delay: 0.65s;
-}
-.container.animating .option:nth-child(5) { 
-    transform: translateY(30px);
-    opacity: 0;
-    transition-delay: 0.7s;
-}
-
-.option:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
-}
-
-.option.selected {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-}
-
-/* 结果页面样式 */
-#result-container {
-    background-color: var(--background-color);
-    padding: 20px;
-    overflow-y: auto; /* 保留滚动功能 */
-    
-    /* 隐藏滚动条 - WebKit浏览器（Chrome、Safari等） */
-    &::-webkit-scrollbar {
-        width: 0;
-        display: none;
-        background: transparent;
-    }
-    
-    /* 隐藏滚动条 - Firefox */
-    scrollbar-width: none;
-    
-    /* 隐藏滚动条 - IE和Edge */
-    -ms-overflow-style: none;
-}
-
-.result-card {
-    background-color: white;
-    border-radius: var(--border-radius);
-    box-shadow: 0 5px 15px var(--shadow-color);
-    padding: var(--card-padding);
-    max-width: 800px;
-    margin: 0 auto 40px auto; /* 添加底部边距确保内容完全可见 */
-    color: var(--text-color-dark);
-    text-align: center;
-}
-
-.result-title {
-    font-size: 24px;
-    color: var(--primary-color);
-    margin-bottom: 15px;
-    text-align: center;
-}
-
-.result-subtitle {
-    font-style: italic;
-    color: var(--secondary-color);
-    margin-bottom: 20px;
-    text-align: center;
-}
-
-.result-description {
-    padding: 20px;
-    background-color: rgba(0, 0, 0, 0.03);
-    border-radius: 8px;
-    margin-bottom: 25px;
-    text-align: left;
-}
-
-.book-traits, .related-books {
-    margin: 25px 0;
-}
-
-h3 {
-    color: var(--secondary-color);
-    margin-bottom: 15px;
-    font-size: 18px;
-    text-align: center;
-}
-
-.trait-item {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 10px;
-}
-
-.trait-stars {
-    color: var(--primary-color);
-}
-
-.share-text {
-    background-color: #f9f9f9;
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid #ddd;
-    margin: 15px 0;
-    white-space: pre-wrap;
-    text-align: left;
-}
-
-.action-buttons {
-    display: flex;
-    gap: 15px;
-    margin-top: 20px;
-    justify-content: center;
-}
-
-.action-buttons .btn {
-    flex: 1;
-}
-
-/* 结果页面按钮 */
-#result-container .primary-btn {
-    background-color: var(--primary-color);
-    color: white;
-}
-
-#result-container .secondary-btn {
-    background-color: transparent;
-    color: var(--secondary-color);
-    border: 1px solid var(--secondary-color);
-}
-
-/* 响应式设计 - 确保9:16比例 */
-@media (max-width: 768px) {
-    .card-content {
-        padding: 30px 20px;
-    }
-    
-    .card-header .title {
-        font-size: 28px;
-    }
-    
-    .card-body .description {
-        font-size: 16px;
-    }
-    
-    .question {
-        font-size: 20px;
-        padding: 0 10px;
-        margin-top: 30px; /* 在小屏幕上适当减少上边距 */
-    }
-    
-    .option {
-        padding: 12px 15px;
-        font-size: 15px;
-    }
-    
-    .btn {
-        padding: 12px 24px;
-        font-size: 15px;
-    }
-
-    .options-container {
-        padding-bottom: 15px;
-    }
-}
-
-/* 确保9:16比例的容器 */
-@media (orientation: landscape) {
-    .container {
-        max-width: calc(100vh * 9/16);
-        margin: 0 auto;
-        height: 100vh;
-        box-shadow: 0 0 30px rgba(0, 0, 0, 0.3); /* 添加阴影增强立体感 */
-    }
-}
-
-/* 横屏模式优化 */
-@media (max-width: 768px) and (orientation: landscape) {
-    .options-container {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-        max-width: 90%;
-    }
-    
-    .overlay {
-        padding: 70px 20px 20px;
-    }
-    
-    .question {
-        margin-bottom: 15px;
-    }
+/* 確保所有元素在動畫前設置正確的初始狀態 */
+.screen-container:not(.active) .card-header,
+.screen-container:not(.active) .card-body,
+.screen-container:not(.active) .card-footer,
+.screen-container:not(.active) .question,
+.screen-container:not(.active) .options-container {
+  opacity: 0;
 }
