@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 狀態標記 - 防止並發動畫和操作
     let isAnimating = false;
     let contentRendered = false;
+    let resultShowing = false; // 添加结果页面状态标记
     
     // 保存元素引用，避免重複獲取
     const DOM = {
@@ -80,7 +81,14 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('resize', setViewportHeight);
     setViewportHeight();
     
-    // 優化的屏幕切換函數 - 穩健可靠的實現
+    // 重置动画和状态标记的辅助函数
+    function resetAnimationState() {
+        console.log("重置动画状态...");
+        isAnimating = false;
+        // 不重置contentRendered，因为它与特定页面相关
+    }
+    
+    // 优化的屏幕切换函数 - 穩健可靠的實現
     function switchScreen(fromScreen, toScreen) {
         console.log(`切換屏幕從 ${fromScreen.id} 到 ${toScreen.id}...`);
         
@@ -120,11 +128,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     }, 100);
                 }
                 
+                // 如果是切換到結果頁面，設置相應狀態
+                if (toScreen.id === 'result-container') {
+                    resultShowing = true;
+                    // 結果頁面需要滾動
+                    document.body.style.overflow = 'auto';
+                } else {
+                    resultShowing = false;
+                    // 其他頁面禁止滾動
+                    document.body.style.overflow = 'hidden';
+                }
+                
                 // 動畫完成後清理狀態
                 setTimeout(() => {
                     toScreen.classList.remove('fade-in');
-                    isAnimating = false;
-                    console.log("屏幕切換完成");
+                    resetAnimationState();
+                    console.log("屏幕切換完成，狀態已重置");
                 }, 600);
             }, 600); // 確保有足夠時間完成淡出動畫
         } catch (error) {
@@ -133,11 +152,17 @@ document.addEventListener('DOMContentLoaded', function() {
             // 出錯時確保基本功能可用
             fromScreen.classList.remove('active', 'fade-out');
             toScreen.classList.add('active');
-            isAnimating = false;
+            resetAnimationState();
             
             // 如果是測驗頁面，確保內容顯示
             if (toScreen.id === 'test-container' && !contentRendered) {
                 renderQuestion();
+            }
+            
+            // 如果是結果頁面，確保正確設置
+            if (toScreen.id === 'result-container') {
+                resultShowing = true;
+                document.body.style.overflow = 'auto';
             }
         }
     }
@@ -155,6 +180,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 重置測驗狀態
             currentQuestionIndex = 0;
             userAnswers.length = 0;
+            resultShowing = false;
             
             // 重置DOM元素
             DOM.elements.progressFill.style.width = '0%';
@@ -169,6 +195,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 出錯時嘗試直接切換
             DOM.containers.result.classList.remove('active');
             DOM.containers.intro.classList.add('active');
+            resetAnimationState();
         }
     });
     
@@ -235,26 +262,24 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error("渲染問題出錯:", error);
             // 出錯時確保加載狀態被移除
             DOM.elements.questionContainer.classList.remove('loading-bg');
+            resetAnimationState();
         }
     }
     
-    // 處理選項點擊
+    // 處理選項點擊 - 优化最后一题处理逻辑
     function handleOptionClick(e) {
         try {
             // 防止動畫進行時或內容未渲染時的點擊
             if (isAnimating || !contentRendered) {
+                console.log("忽略點擊：動畫進行中或內容未渲染");
                 return;
             }
             
             console.log("選項被點擊");
             
-            // 設置動畫狀態
-            isAnimating = true;
-            
             // 確保點擊的是選項元素本身，而不是子元素
             const targetElement = e.target.closest('.option');
             if (!targetElement) {
-                isAnimating = false;
                 return;
             }
             
@@ -274,6 +299,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             targetElement.classList.add('selected');
             
+            // 設置動畫狀態
+            isAnimating = true;
+            
             // 添加延遲，讓用戶能看到選中效果
             setTimeout(() => {
                 // 判斷是否為最後一題
@@ -282,23 +310,169 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentQuestionIndex++;
                     contentRendered = false;
                     renderQuestion();
-                    isAnimating = false;
+                    resetAnimationState();
                 } else {
                     // 如果是最後一題，則顯示結果
                     console.log("已完成所有問題，準備顯示結果");
                     
                     try {
-                        showResult();
+                        // 直接调用显示结果函数，特殊处理最后一题
+                        processAndShowResult();
                     } catch (error) {
-                        console.error("顯示結果時發生錯誤:", error);
-                        alert("顯示結果時出錯，請重新嘗試測驗");
-                        isAnimating = false;
+                        console.error("處理最後一題結果時出錯:", error);
+                        // 出错时尝试直接切换到结果页面
+                        emergencyShowResult();
                     }
                 }
             }, 500);
         } catch (error) {
             console.error("處理選項點擊出錯:", error);
-            isAnimating = false;
+            resetAnimationState();
+            
+            // 如果是最后一题出错，确保能够看到结果
+            if (currentQuestionIndex >= questions.length - 1) {
+                emergencyShowResult();
+            }
+        }
+    }
+    
+    // 应急显示结果函数 - 确保即使出错也能显示结果
+    function emergencyShowResult() {
+        console.log("启动应急结果显示...");
+        try {
+            // 重置所有状态
+            resetAnimationState();
+            
+            // 计算结果并准备数据
+            const result = calculateResult();
+            prepareResultData(result);
+            
+            // 强制切换到结果页面
+            DOM.containers.test.classList.remove('active');
+            DOM.containers.result.classList.add('active');
+            
+            // 设置结果页面状态
+            resultShowing = true;
+            document.body.style.overflow = 'auto';
+            
+            // 滚动到顶部
+            window.scrollTo(0, 0);
+            
+            console.log("应急结果显示完成");
+        } catch (error) {
+            console.error("应急显示结果失败:", error);
+            alert("显示结果时出错，请刷新页面重试");
+        }
+    }
+    
+    // 处理并显示结果 - 专门处理最后一题到结果页面的过渡
+    function processAndShowResult() {
+        console.log("开始处理并显示结果...");
+        
+        // 重置动画状态以确保流程不被阻塞
+        resetAnimationState();
+        
+        // 计算结果
+        const result = calculateResult();
+        
+        // 准备结果数据但不切换页面
+        prepareResultData(result);
+        
+        // 显示前重置状态
+        resultShowing = false;
+        
+        // 使用较长的延迟确保选择效果可见
+        setTimeout(() => {
+            // 切换到结果页面
+            switchScreen(DOM.containers.test, DOM.containers.result);
+            console.log("结果页面显示完成");
+        }, 300);
+    }
+    
+    // 准备结果数据 - 从showResult抽取的数据准备逻辑
+    function prepareResultData(result) {
+        try {
+            // 設置結果標題和副標題
+            if (result.title.includes('靈魂圖書管理員')) {
+                DOM.elements.resultTitle.textContent = `你是：${result.title}`;
+            } else {
+                DOM.elements.resultTitle.textContent = `你的靈魂之書是：${result.title}`;
+            }
+            
+            DOM.elements.resultSubtitle.textContent = result.subtitle || '';
+            DOM.elements.resultDescription.textContent = result.description || '';
+            
+            // 設置書本特質
+            DOM.elements.traitsContainer.innerHTML = '';
+            const typeScores = window.finalTypeScores || {
+                'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0
+            };
+            
+            // 特殊處理《靈魂圖書管理員》的特質顯示
+            if (result.title.includes('靈魂圖書管理員')) {
+                Object.keys(traitNames).forEach(type => {
+                    addTraitElement(type, 3);
+                });
+            } else {
+                // 為每種特質創建評分顯示
+                Object.keys(traitNames).forEach(type => {
+                    // 獲取原始分數
+                    const score = typeScores[type] || 0;
+                    
+                    // 根據得分計算星星數 (0-11分映射到1-5星)
+                    let normalizedScore;
+                    if (score < 1) {
+                        normalizedScore = 1; 
+                    } else if (score >= 1 && score < 3) {
+                        normalizedScore = 2; 
+                    } else if (score >= 3 && score < 5) {
+                        normalizedScore = 3; 
+                    } else if (score >= 5 && score < 7) {
+                        normalizedScore = 4; 
+                    } else {
+                        normalizedScore = 5; 
+                    }
+                    
+                    addTraitElement(type, normalizedScore);
+                });
+            }
+            
+            // 設置相似和互補書籍
+            if (result.similar && Array.isArray(result.similar)) {
+                DOM.elements.similarBooks.innerHTML = result.similar.map(book => `<p>${book}</p>`).join('');
+            } else {
+                DOM.elements.similarBooks.innerHTML = '<p>無相似書籍資料</p>';
+            }
+            
+            if (result.complementary && Array.isArray(result.complementary)) {
+                DOM.elements.complementaryBooks.innerHTML = result.complementary.map(book => `<p>${book}</p>`).join('');
+            } else {
+                DOM.elements.complementaryBooks.innerHTML = '<p>無互補書籍資料</p>';
+            }
+            
+            // 設置分享文字
+            DOM.elements.shareText.textContent = result.shareText || '';
+            
+            console.log("結果數據準備完成");
+        } catch (error) {
+            console.error("準備結果數據時出錯:", error);
+        }
+    }
+    
+    // 顯示結果 - 重构以支持多种调用方式
+    function showResult() {
+        try {
+            console.log("显示结果页面...");
+            
+            // 采用更可靠的处理方法
+            processAndShowResult();
+        } catch (error) {
+            console.error("顯示結果時發生錯誤:", error);
+            alert("顯示結果時出錯，請重新嘗試測驗");
+            resetAnimationState();
+            
+            // 错误时尝试应急显示
+            emergencyShowResult();
         }
     }
     
@@ -427,88 +601,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return results[highestTypes[0]];
         } catch (error) {
             console.error("計算結果時發生錯誤:", error);
-            return results['A']; // 發生錯誤時返回默認結果
-        }
-    }
-    
-    // 顯示結果
-    function showResult() {
-        try {
-            const result = calculateResult();
-            
-            // 設置結果標題和副標題
-            if (result.title.includes('靈魂圖書管理員')) {
-                DOM.elements.resultTitle.textContent = `你是：${result.title}`;
-            } else {
-                DOM.elements.resultTitle.textContent = `你的靈魂之書是：${result.title}`;
-            }
-            
-            DOM.elements.resultSubtitle.textContent = result.subtitle || '';
-            DOM.elements.resultDescription.textContent = result.description || '';
-            
-            // 設置書本特質
-            DOM.elements.traitsContainer.innerHTML = '';
-            const typeScores = window.finalTypeScores || {
-                'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0
-            };
-            
-            // 特殊處理《靈魂圖書管理員》的特質顯示
-            if (result.title.includes('靈魂圖書管理員')) {
-                Object.keys(traitNames).forEach(type => {
-                    addTraitElement(type, 3);
-                });
-            } else {
-                // 為每種特質創建評分顯示
-                Object.keys(traitNames).forEach(type => {
-                    // 獲取原始分數
-                    const score = typeScores[type] || 0;
-                    
-                    // 根據得分計算星星數 (0-11分映射到1-5星)
-                    let normalizedScore;
-                    if (score < 1) {
-                        normalizedScore = 1; 
-                    } else if (score >= 1 && score < 3) {
-                        normalizedScore = 2; 
-                    } else if (score >= 3 && score < 5) {
-                        normalizedScore = 3; 
-                    } else if (score >= 5 && score < 7) {
-                        normalizedScore = 4; 
-                    } else {
-                        normalizedScore = 5; 
-                    }
-                    
-                    addTraitElement(type, normalizedScore);
-                });
-            }
-            
-            // 設置相似和互補書籍
-            if (result.similar && Array.isArray(result.similar)) {
-                DOM.elements.similarBooks.innerHTML = result.similar.map(book => `<p>${book}</p>`).join('');
-            } else {
-                DOM.elements.similarBooks.innerHTML = '<p>無相似書籍資料</p>';
-            }
-            
-            if (result.complementary && Array.isArray(result.complementary)) {
-                DOM.elements.complementaryBooks.innerHTML = result.complementary.map(book => `<p>${book}</p>`).join('');
-            } else {
-                DOM.elements.complementaryBooks.innerHTML = '<p>無互補書籍資料</p>';
-            }
-            
-            // 設置分享文字
-            DOM.elements.shareText.textContent = result.shareText || '';
-            
-            // 切換到結果頁面
-            switchScreen(DOM.containers.test, DOM.containers.result);
-            
-            // 確保結果容器可滾動
-            document.body.style.overflow = 'auto';
-            
-            // 滾動到頂部
-            window.scrollTo(0, 0);
-        } catch (error) {
-            console.error("顯示結果時發生錯誤:", error);
-            alert("顯示結果時出錯，請重新嘗試測驗");
-            isAnimating = false;
+            // 出錯時返回默認結果，確保流程不中斷
+            return results['A']; 
         }
     }
     
@@ -552,4 +646,23 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('複製失敗，請手動選擇文字並複製');
         }
     });
+    
+    // 添加全局错误保护 - 防止页面完全卡死
+    window.addEventListener('error', function(event) {
+        console.error("捕获到全局错误:", event.error);
+        
+        // 如果测验已经开始但卡在中间状态，尝试恢复
+        if (currentQuestionIndex > 0 && !resultShowing) {
+            resetAnimationState();
+            
+            // 如果已经完成全部问题但未显示结果，尝试显示结果
+            if (currentQuestionIndex >= questions.length - 1 && userAnswers.length >= questions.length) {
+                console.log("检测到测验已完成但结果未显示，尝试恢复...");
+                emergencyShowResult();
+            }
+        }
+    });
+    
+    // 页面加载完成后初始化的其他逻辑...
+    console.log("初始化完成，等待用户开始测验");
 });
