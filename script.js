@@ -2,6 +2,11 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log("頁面已載入，測驗初始化中...");
     
+    // 創建圖片緩存和動畫狀態管理
+    const imageCache = {};
+    let isAnimating = false;
+    let previousProgress = 0;
+    
     // 保存元素引用，避免重複獲取
     const DOM = {
         containers: {
@@ -39,21 +44,112 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentQuestionIndex = 0;
     const userAnswers = [];
     
-    // 基本的圖片預加載 - 簡化版，避免阻塞主線程
-    function preloadQuestionImages() {
-        try {
-            console.log("开始预加载问题图片...");
-            // 仅加载第一题图片，其余图片按需加载
-            const firstImage = new Image();
-            firstImage.src = './images/Q1.webp';
-        } catch (error) {
-            console.error("预加载图片时出错：", error);
-            // 错误不会阻止应用继续运行
+    // 動畫狀態管理函數
+    function beginAnimation(container, direction = '') {
+        // 防止動畫重疊
+        if (isAnimating) {
+            console.log("動畫進行中，忽略請求");
+            return false;
+        }
+        
+        isAnimating = true;
+        
+        // 添加動畫狀態類
+        document.querySelector('.container').classList.add('animating');
+        if (direction) {
+            document.querySelector('.container').classList.add(direction);
+        }
+        
+        // 設置超時保護，防止動畫狀態鎖死
+        setTimeout(() => {
+            endAnimation();
+        }, 1000); // 保護性超時
+        
+        return true;
+    }
+    
+    function endAnimation() {
+        isAnimating = false;
+        const container = document.querySelector('.container');
+        if (container) {
+            container.classList.remove('animating', 'slide-up', 'slide-down');
         }
     }
     
-    // 尝试预加载图片，但不阻止测验进行
-    preloadQuestionImages();
+    // 優化的圖片預加載函數
+    function preloadImage(src) {
+        return new Promise((resolve, reject) => {
+            // 檢查緩存
+            if (imageCache[src]) {
+                resolve(imageCache[src]);
+                return;
+            }
+            
+            // 加載新圖片
+            const img = new Image();
+            img.onload = () => {
+                // 緩存並返回圖片
+                imageCache[src] = img;
+                console.log(`圖片預加載成功: ${src}`);
+                resolve(img);
+            };
+            img.onerror = (err) => {
+                console.error(`圖片加載失敗: ${src}`, err);
+                reject(err);
+            };
+            img.src = src;
+        });
+    }
+    
+    // 預加載首頁和第一題圖片
+    function preloadInitialImages() {
+        try {
+            console.log("預加載初始圖片...");
+            Promise.all([
+                preloadImage('./images/Intro.webp'),
+                preloadImage('./images/Q1.webp')
+            ]).then(() => {
+                console.log("初始圖片加載完成");
+                
+                // 在空閒時預加載其他圖片
+                if (window.requestIdleCallback) {
+                    requestIdleCallback(() => {
+                        preloadRemainingImages();
+                    });
+                } else {
+                    setTimeout(preloadRemainingImages, 1000);
+                }
+            }).catch(err => {
+                console.error("初始圖片預加載錯誤:", err);
+            });
+        } catch(error) {
+            console.error("預加載函數錯誤:", error);
+            // 出錯不阻止應用繼續運行
+        }
+    }
+    
+    // 預加載剩餘問題圖片
+    function preloadRemainingImages() {
+        console.log("開始預加載剩餘圖片...");
+        
+        // 分批加載，每批2-3張圖片，減少並發請求
+        for (let batch = 0; batch < 4; batch++) {
+            setTimeout(() => {
+                const startIdx = batch * 3 + 2; // 從Q2開始，每批3張
+                const endIdx = Math.min(startIdx + 2, 11);
+                
+                for (let i = startIdx; i <= endIdx; i++) {
+                    preloadImage(`./images/Q${i}.webp`).catch(err => {
+                        // 錯誤處理，但不阻止應用繼續運行
+                        console.warn(`加載Q${i}圖片失敗，將在需要時重試`, err);
+                    });
+                }
+            }, batch * 300); // 每批延遲300ms
+        }
+    }
+    
+    // 立即開始預加載初始圖片
+    preloadInitialImages();
     
     // 設置視口高度 - 確保移動設備上正確顯示100vh
     function setViewportHeight() {
@@ -61,7 +157,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', `${vh}px`);
         } catch (error) {
-            console.error("设置视口高度时出错：", error);
+            console.error("設置視口高度時出錯:", error);
         }
     }
     
@@ -69,37 +165,80 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('resize', setViewportHeight);
     setViewportHeight();
     
-    // 简化的切换屏幕函数 - 移除复杂动画，确保稳定性
+    // 提供觸覺反饋（如果設備支持）
+    function provideFeedback() {
+        try {
+            if (navigator && navigator.vibrate) {
+                navigator.vibrate(30); // 短暫振動30ms
+            }
+        } catch (error) {
+            // 不阻止應用繼續運行
+            console.warn("觸覺反饋不可用:", error);
+        }
+    }
+    
+    // 優化的屏幕切換函數
     function switchScreen(fromScreen, toScreen) {
         try {
-            // 简单的屏幕切换
-            fromScreen.classList.remove('active');
-            void toScreen.offsetWidth; // 强制重排
-            toScreen.classList.add('active');
+            // 檢查動畫狀態
+            if (!beginAnimation(document.querySelector('.container'), 'slide-up')) {
+                return;
+            }
+            
+            // 添加離開動畫
+            fromScreen.classList.add('fade-out');
+            
+            // 設置適當延遲以確保動畫流暢
+            setTimeout(() => {
+                // 切換屏幕顯示狀態
+                fromScreen.classList.remove('active', 'fade-out');
+                
+                // 強制重排以確保動畫效果
+                void toScreen.offsetWidth;
+                
+                // 添加進入動畫
+                toScreen.classList.add('active', 'fade-in');
+                
+                // 動畫完成後清理類
+                setTimeout(() => {
+                    toScreen.classList.remove('fade-in');
+                    endAnimation();
+                }, 600);
+            }, 500);
         } catch (error) {
-            console.error("切换屏幕时出错：", error);
-            alert("页面切换出错，请刷新页面重试");
+            console.error("屏幕切換出錯:", error);
+            // 出錯時確保基本功能正常
+            fromScreen.classList.remove('active');
+            toScreen.classList.add('active');
+            endAnimation();
         }
     }
     
     // 開始測驗
     DOM.buttons.start.addEventListener('click', function() {
         try {
-            console.log("点击开始测验按钮");
+            console.log("點擊開始測驗");
+            provideFeedback();
             switchScreen(DOM.containers.intro, DOM.containers.test);
-            renderQuestion();
+            setTimeout(() => {
+                renderQuestion();
+            }, 100);
         } catch (error) {
-            console.error("开始测验时出错：", error);
-            alert("开始测验时出错，请刷新页面重试");
+            console.error("開始測驗時出錯:", error);
+            alert("開始測驗時出錯，請刷新頁面重試");
         }
     });
     
-    // 重新開始測驗 - 导航回首页
+    // 重新開始測驗 - 導航回首頁
     DOM.buttons.restart.addEventListener('click', function() {
         try {
+            // 提供觸覺反饋
+            provideFeedback();
+            
             // 重置測驗狀態
             currentQuestionIndex = 0;
             userAnswers.length = 0;
+            previousProgress = 0;
             
             // 重置DOM元素
             DOM.elements.progressFill.style.width = '0%';
@@ -110,50 +249,147 @@ document.addEventListener('DOMContentLoaded', function() {
             // 滾動到頂部
             window.scrollTo(0, 0);
         } catch (error) {
-            console.error("重新开始测验时出错：", error);
-            alert("重新开始测验时出错，请刷新页面重试");
+            console.error("重新開始測驗時出錯:", error);
+            alert("重新開始測驗時出錯，請刷新頁面重試");
         }
     });
     
-    // 简化的渲染问题函数 - 专注于基本功能
+    // 優化的問題渲染函數
     function renderQuestion() {
         try {
+            // 防止動畫重疊
+            if (isAnimating) {
+                console.log("動畫進行中，忽略渲染請求");
+                return;
+            }
+            
+            beginAnimation(DOM.elements.questionContainer, 'slide-down');
+            
             const question = questions[currentQuestionIndex];
-            
-            // 設置問題文本 - 移除標號以增加沉浸感
-            const questionTextWithoutNumber = question.question.replace(/^\d+\.\s*/, '');
-            DOM.elements.questionText.textContent = questionTextWithoutNumber;
-            
-            // 設置背景圖片 - 基于问题序号
             const questionNumber = currentQuestionIndex + 1;
-            DOM.elements.questionContainer.style.backgroundImage = `url('./images/Q${questionNumber}.webp')`;
+            const bgImageUrl = `./images/Q${questionNumber}.webp`;
             
-            // 渲染選項
-            let optionsHTML = '';
-            question.options.forEach((option, index) => {
-                const isSelected = userAnswers[currentQuestionIndex] === index;
-                optionsHTML += `
-                <div class="option ${isSelected ? 'selected' : ''}" data-index="${index}">
-                    ${option.text}
-                </div>`;
-            });
-            DOM.elements.optionsContainer.innerHTML = optionsHTML;
+            // 舊內容淡出
+            DOM.elements.questionText.classList.add('fade-out');
+            DOM.elements.optionsContainer.classList.add('fade-out');
             
-            // 為選項添加事件監聽器
-            document.querySelectorAll('.option').forEach(option => {
-                option.addEventListener('click', handleOptionClick);
-            });
+            // 添加背景加載狀態
+            DOM.elements.questionContainer.classList.add('loading-bg');
             
-            updateProgressBar();
+            // 使用定時器確保動畫順序
+            setTimeout(() => {
+                // 更新問題文本
+                const questionTextWithoutNumber = question.question.replace(/^\d+\.\s*/, '');
+                DOM.elements.questionText.textContent = questionTextWithoutNumber;
+                
+                // 構建選項HTML
+                let optionsHTML = '';
+                question.options.forEach((option, index) => {
+                    const isSelected = userAnswers[currentQuestionIndex] === index;
+                    optionsHTML += `
+                    <div class="option ${isSelected ? 'selected' : ''}" data-index="${index}">
+                        ${option.text}
+                    </div>`;
+                });
+                DOM.elements.optionsContainer.innerHTML = optionsHTML;
+                
+                // 預加載並設置背景圖片
+                loadBackgroundImage(bgImageUrl).then(() => {
+                    // 移除淡出類和添加淡入類
+                    DOM.elements.questionText.classList.remove('fade-out');
+                    DOM.elements.optionsContainer.classList.remove('fade-out');
+                    DOM.elements.questionText.classList.add('fade-in');
+                    DOM.elements.optionsContainer.classList.add('fade-in');
+                    
+                    // 為選項添加事件監聽器
+                    document.querySelectorAll('.option').forEach(option => {
+                        option.addEventListener('click', handleOptionClick);
+                    });
+                    
+                    // 更新進度條
+                    updateProgressBar();
+                    
+                    // 清理動畫類
+                    setTimeout(() => {
+                        DOM.elements.questionText.classList.remove('fade-in');
+                        DOM.elements.optionsContainer.classList.remove('fade-in');
+                        endAnimation();
+                    }, 600);
+                });
+            }, 300);
         } catch (error) {
-            console.error("渲染问题时出错：", error);
-            alert("显示问题时出错，请刷新页面重试");
+            console.error("渲染問題時出錯:", error);
+            // 確保動畫狀態重置
+            DOM.elements.questionContainer.classList.remove('loading-bg');
+            endAnimation();
         }
     }
     
-    // 简化的选项点击处理
+    // 加載背景圖片並處理過渡效果
+    function loadBackgroundImage(url) {
+        return new Promise((resolve, reject) => {
+            try {
+                // 先嘗試使用緩存
+                if (imageCache[url]) {
+                    console.log(`使用緩存圖片: ${url}`);
+                    DOM.elements.questionContainer.style.backgroundImage = `url('${url}')`;
+                    
+                    // 短暫延遲以確保CSS過渡效果
+                    setTimeout(() => {
+                        DOM.elements.questionContainer.classList.remove('loading-bg');
+                        DOM.elements.questionContainer.classList.add('bg-loaded');
+                        
+                        // 動畫完成後移除加載類
+                        setTimeout(() => {
+                            DOM.elements.questionContainer.classList.remove('bg-loaded');
+                            resolve();
+                        }, 500);
+                    }, 50);
+                    return;
+                }
+                
+                // 如果沒有緩存，加載新圖片
+                preloadImage(url)
+                    .then(img => {
+                        DOM.elements.questionContainer.style.backgroundImage = `url('${url}')`;
+                        
+                        // 短暫延遲以確保CSS過渡效果
+                        setTimeout(() => {
+                            DOM.elements.questionContainer.classList.remove('loading-bg');
+                            DOM.elements.questionContainer.classList.add('bg-loaded');
+                            
+                            // 動畫完成後移除加載類
+                            setTimeout(() => {
+                                DOM.elements.questionContainer.classList.remove('bg-loaded');
+                                resolve();
+                            }, 500);
+                        }, 50);
+                    })
+                    .catch(err => {
+                        console.error("背景圖片加載錯誤:", err);
+                        // 即使圖片加載失敗，也要繼續
+                        DOM.elements.questionContainer.classList.remove('loading-bg');
+                        resolve();
+                    });
+            } catch (error) {
+                console.error("加載背景圖片時出錯:", error);
+                DOM.elements.questionContainer.classList.remove('loading-bg');
+                resolve(); // 即使出錯也繼續
+            }
+        });
+    }
+    
+    // 處理選項點擊
     function handleOptionClick(e) {
         try {
+            // 防止動畫重疊或選項重複點擊
+            if (isAnimating) {
+                return;
+            }
+            
+            // 設置動畫狀態
+            beginAnimation(DOM.elements.questionContainer, 'slide-up');
+            
             // 確保點擊的是選項元素本身，而不是子元素
             const targetElement = e.target.closest('.option');
             if (!targetElement) return;
@@ -168,14 +404,21 @@ document.addEventListener('DOMContentLoaded', function() {
             
             console.log(`問題 ${currentQuestionIndex+1} 選擇了選項 ${optionIndex+1}, 主要類型: ${questions[currentQuestionIndex].options[optionIndex].primary}`);
             
+            // 提供觸覺反饋
+            provideFeedback();
+            
             // 更新選項樣式
             document.querySelectorAll('.option').forEach(opt => {
                 opt.classList.remove('selected');
             });
             targetElement.classList.add('selected');
             
+            // 淡出當前內容
+            DOM.elements.questionText.classList.add('fade-out');
+            DOM.elements.optionsContainer.classList.add('fade-out');
+            
             // 添加延遲，讓用戶能看到選中效果
-            setTimeout(function() {
+            setTimeout(() => {
                 // 判斷是否為最後一題
                 if (currentQuestionIndex < questions.length - 1) {
                     // 如果不是最後一題，自動前進到下一題
@@ -190,23 +433,43 @@ document.addEventListener('DOMContentLoaded', function() {
                     } catch (error) {
                         console.error("顯示結果時發生錯誤:", error);
                         alert("顯示結果時出錯，請重新嘗試測驗");
+                        endAnimation(); // 重置動畫狀態
                     }
                 }
-            }, 300);
+            }, 600);
         } catch (error) {
-            console.error("处理选项点击时出错：", error);
-            alert("选择选项时出错，请刷新页面重试");
+            console.error("處理選項點擊時出錯:", error);
+            endAnimation(); // 確保動畫狀態重置
         }
     }
     
     // 更新進度條
     function updateProgressBar() {
         try {
-            const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
-            DOM.elements.progressFill.style.width = `${progress}%`;
+            const currentProgress = ((currentQuestionIndex + 1) / questions.length) * 100;
+            
+            // 設置CSS變量以供動畫使用
+            DOM.elements.progressFill.style.setProperty('--progress-from', `${previousProgress}%`);
+            DOM.elements.progressFill.style.setProperty('--progress-to', `${currentProgress}%`);
+            
+            // 添加動畫類
+            DOM.elements.progressFill.classList.add('animate');
+            
+            // 設置當前進度
+            DOM.elements.progressFill.style.width = `${currentProgress}%`;
+            
+            // 更新進度文本
             DOM.elements.progressText.textContent = `問題 ${currentQuestionIndex + 1}/${questions.length}`;
+            
+            // 保存當前進度以供下次動畫使用
+            previousProgress = currentProgress;
+            
+            // 動畫完成後移除動畫類
+            setTimeout(() => {
+                DOM.elements.progressFill.classList.remove('animate');
+            }, 500);
         } catch (error) {
-            console.error("更新进度条时出错：", error);
+            console.error("更新進度條時出錯:", error);
         }
     }
     
@@ -328,12 +591,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // 顯示結果 - 简化版
+    // 顯示結果
     function showResult() {
         try {
+            // 計算結果
             const result = calculateResult();
             
-            // 設置結果標題和副標題
+            // 準備結果內容
             if (result.title.includes('靈魂圖書管理員')) {
                 DOM.elements.resultTitle.textContent = `你是：${result.title}`;
             } else {
@@ -394,7 +658,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 設置分享文字
             DOM.elements.shareText.textContent = result.shareText || '';
             
-            // 切换到结果页面
+            // 切換到結果頁面
             switchScreen(DOM.containers.test, DOM.containers.result);
             
             // 確保結果容器可滾動
@@ -405,6 +669,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error("顯示結果時發生錯誤:", error);
             alert("顯示結果時出錯，請重新嘗試測驗");
+            endAnimation(); // 重置動畫狀態
         }
     }
     
@@ -426,13 +691,16 @@ document.addEventListener('DOMContentLoaded', function() {
             traitElement.appendChild(traitStars);
             DOM.elements.traitsContainer.appendChild(traitElement);
         } catch (error) {
-            console.error("添加特质元素时出错：", error);
+            console.error("添加特質元素時出錯:", error);
         }
     }
     
     // 複製分享文字
     DOM.buttons.copy.addEventListener('click', function() {
         try {
+            // 提供觸覺反饋
+            provideFeedback();
+            
             const shareText = DOM.elements.shareText.textContent;
             navigator.clipboard.writeText(shareText).then(() => {
                 DOM.buttons.copy.textContent = '已複製!';
@@ -444,7 +712,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('複製失敗，請手動選擇文字並複製');
             });
         } catch (error) {
-            console.error("复制分享文字时出错：", error);
+            console.error("複製分享文字時出錯:", error);
             alert('複製失敗，請手動選擇文字並複製');
         }
     });

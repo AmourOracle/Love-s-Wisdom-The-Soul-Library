@@ -8,6 +8,9 @@
     --overlay-color: rgba(0, 0, 0, 0.45);
     --card-padding: 24px;
     --border-radius: 12px;
+    --transition-speed: 0.5s;
+    --transition-timing: cubic-bezier(0.25, 0.1, 0.25, 1.0);
+    --animation-stagger: 0.05s;
 }
 
 * {
@@ -26,7 +29,7 @@ body {
     overflow: hidden;
     margin: 0;
     padding: 0;
-    transition: background-color 0.8s ease; /* 添加背景色平滑过渡 */
+    transition: background-color 0.8s ease;
 }
 
 .container {
@@ -34,7 +37,70 @@ body {
     height: 100%;
     position: relative;
     overflow: hidden;
-    transition: background-color 0.5s ease; /* 添加背景色过渡效果 */
+    transition: background-color 0.5s ease;
+}
+
+/* 基础动画关键帧定义 */
+@keyframes fadeIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(15px);
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeOut {
+    from { 
+        opacity: 1; 
+        transform: translateY(0);
+    }
+    to { 
+        opacity: 0; 
+        transform: translateY(-15px);
+    }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(0); }
+    to { transform: translateY(-10px); }
+}
+
+@keyframes slideDown {
+    from { transform: translateY(0); }
+    to { transform: translateY(10px); }
+}
+
+/* 背景图片淡入动画 */
+@keyframes bgFadeIn {
+    from { 
+        opacity: 0.7; 
+        transform: scale(1.03);
+    }
+    to { 
+        opacity: 1; 
+        transform: scale(1);
+    }
+}
+
+/* 选项级联动画 */
+@keyframes optionFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 进度条动画 */
+@keyframes progressFill {
+    from { width: var(--progress-from); }
+    to { width: var(--progress-to); }
 }
 
 /* 通用屏幕容器样式 */
@@ -48,11 +114,30 @@ body {
     opacity: 0;
     transition: opacity 0.6s ease-in-out;
     overflow: hidden;
+    will-change: opacity, transform;
 }
 
 .screen-container.active {
     display: block;
     opacity: 1;
+}
+
+/* 动画状态类 */
+.screen-container.fade-in {
+    animation: fadeIn var(--transition-speed) var(--transition-timing) forwards;
+}
+
+.screen-container.fade-out {
+    animation: fadeOut var(--transition-speed) var(--transition-timing) forwards;
+}
+
+/* 视差滚动效果 */
+.container.animating.slide-up .active {
+    animation: slideUp 0.6s var(--transition-timing) forwards;
+}
+
+.container.animating.slide-down .active {
+    animation: slideDown 0.6s var(--transition-timing) forwards;
 }
 
 /* 卡片式设计 - 首页 */
@@ -66,6 +151,7 @@ body {
     justify-content: space-between;
     position: relative;
     transition: transform 0.8s ease-out, opacity 0.8s ease;
+    will-change: transform, opacity;
 }
 
 .card-background::before {
@@ -95,9 +181,18 @@ body {
 
 .card-header {
     margin-bottom: 20px;
-    transition: transform 0.6s ease-out, opacity 0.6s ease;
     transform: translateY(0);
     opacity: 1;
+    transition: transform 0.6s ease-out, opacity 0.6s ease;
+}
+
+.fade-in .card-header {
+    animation: fadeIn 0.6s var(--transition-timing) forwards;
+    animation-delay: calc(var(--animation-stagger) * 1);
+}
+
+.fade-out .card-header {
+    animation: fadeOut 0.5s var(--transition-timing) forwards;
 }
 
 .card-header .label {
@@ -121,9 +216,19 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    transition: transform 0.6s ease-out, opacity 0.6s ease;
     transform: translateY(0);
     opacity: 1;
+    transition: transform 0.6s ease-out, opacity 0.6s ease;
+}
+
+.fade-in .card-body {
+    animation: fadeIn 0.6s var(--transition-timing) forwards;
+    animation-delay: calc(var(--animation-stagger) * 2);
+}
+
+.fade-out .card-body {
+    animation: fadeOut 0.5s var(--transition-timing) forwards;
+    animation-delay: var(--animation-stagger);
 }
 
 .card-body .description {
@@ -139,9 +244,19 @@ body {
 .card-footer {
     margin-top: 20px;
     text-align: center;
-    transition: transform 0.6s ease-out, opacity 0.6s ease;
     transform: translateY(0);
     opacity: 1;
+    transition: transform 0.6s ease-out, opacity 0.6s ease;
+}
+
+.fade-in .card-footer {
+    animation: fadeIn 0.6s var(--transition-timing) forwards;
+    animation-delay: calc(var(--animation-stagger) * 3);
+}
+
+.fade-out .card-footer {
+    animation: fadeOut 0.5s var(--transition-timing) forwards;
+    animation-delay: calc(var(--animation-stagger) * 2);
 }
 
 .card-meta {
@@ -209,7 +324,11 @@ body {
     background-color: var(--primary-color);
     height: 100%;
     width: 0%;
-    transition: width 0.5s ease;
+    transition: width 0.5s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.progress-fill.animate {
+    animation: progressFill 0.5s cubic-bezier(0.33, 1, 0.68, 1) forwards;
 }
 
 .progress-text {
@@ -220,14 +339,26 @@ body {
     padding-right: 5px;
 }
 
-/* 问题容器 - 全屏背景 */
+/* 问题容器样式 */
 .question-container {
     width: 100%;
     height: 100%;
     background-size: cover;
     background-position: center;
     position: relative;
-    transition: transform 0.8s ease-out, opacity 0.8s ease;
+    transition: transform 0.6s ease, opacity 0.4s ease, background-image 0.1s ease;
+    will-change: transform, opacity, background-image;
+}
+
+/* 背景加载状态 */
+.question-container.loading-bg {
+    opacity: 0.7;
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+/* 背景图加载完成状态 */
+.question-container.bg-loaded {
+    animation: bgFadeIn 0.5s ease forwards;
 }
 
 .overlay {
@@ -250,10 +381,16 @@ body {
     text-align: center;
     margin-bottom: 30px;
     padding: 0 20px;
-    margin-top: 40px; /* 增加上边距，解决选项贴近底部问题 */
-    transition: transform 0.5s ease-out 0.4s, opacity 0.5s ease 0.4s; /* 添加延迟 */
-    transform: translateY(0);
-    opacity: 1;
+    margin-top: 40px;
+    will-change: transform, opacity;
+}
+
+.question.fade-in {
+    animation: fadeIn 0.5s var(--transition-timing) forwards;
+}
+
+.question.fade-out {
+    animation: fadeOut 0.5s var(--transition-timing) forwards;
 }
 
 /* 选项样式 */
@@ -264,10 +401,16 @@ body {
     width: 100%;
     max-width: 500px;
     margin: 0 auto;
-    padding: 0 10px 20px; /* 增加底部内边距 */
-    transition: transform 0.5s ease-out 0.5s, opacity 0.5s ease 0.5s; /* 添加延迟，比问题晚一点 */
-    transform: translateY(0);
-    opacity: 1;
+    padding: 0 10px 20px;
+    will-change: transform, opacity;
+}
+
+.options-container.fade-in {
+    animation: fadeIn 0.5s var(--transition-timing) 0.1s forwards;
+}
+
+.options-container.fade-out {
+    animation: fadeOut 0.5s var(--transition-timing) forwards;
 }
 
 .option {
@@ -278,9 +421,32 @@ body {
     padding: 15px 20px;
     cursor: pointer;
     transition: all 0.3s ease;
-    text-align: center; /* 文本居中 */
-    opacity: 1;
-    transform: translateY(0);
+    text-align: center;
+    opacity: 0;
+    transform: translateY(10px);
+    will-change: transform, opacity, background-color;
+}
+
+/* 选项动画延迟设置，创造瀑布效果 */
+.options-container.fade-in .option:nth-child(1) { 
+    animation: optionFadeIn 0.4s ease forwards;
+    animation-delay: 0.15s;
+}
+.options-container.fade-in .option:nth-child(2) { 
+    animation: optionFadeIn 0.4s ease forwards;
+    animation-delay: 0.2s;
+}
+.options-container.fade-in .option:nth-child(3) { 
+    animation: optionFadeIn 0.4s ease forwards;
+    animation-delay: 0.25s;
+}
+.options-container.fade-in .option:nth-child(4) { 
+    animation: optionFadeIn 0.4s ease forwards;
+    animation-delay: 0.3s;
+}
+.options-container.fade-in .option:nth-child(5) { 
+    animation: optionFadeIn 0.4s ease forwards;
+    animation-delay: 0.35s;
 }
 
 .option:hover {
@@ -291,13 +457,15 @@ body {
 .option.selected {
     background-color: var(--primary-color);
     border-color: var(--primary-color);
+    opacity: 1;
+    transform: translateY(0);
 }
 
 /* 结果页面样式 */
 #result-container {
     background-color: var(--background-color);
     padding: 20px;
-    overflow-y: auto; /* 保留滚动功能 */
+    overflow-y: auto;
     
     /* 隐藏滚动条 - WebKit浏览器（Chrome、Safari等） */
     &::-webkit-scrollbar {
@@ -319,9 +487,16 @@ body {
     box-shadow: 0 5px 15px var(--shadow-color);
     padding: var(--card-padding);
     max-width: 800px;
-    margin: 0 auto 40px auto; /* 添加底部边距确保内容完全可见 */
+    margin: 0 auto 40px auto;
     color: var(--text-color-dark);
     text-align: center;
+    transition: transform 0.6s var(--transition-timing), opacity 0.6s var(--transition-timing);
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.fade-in .result-card {
+    animation: fadeIn 0.7s var(--transition-timing) 0.1s forwards;
 }
 
 .result-title {
@@ -417,7 +592,7 @@ h3 {
     .question {
         font-size: 20px;
         padding: 0 10px;
-        margin-top: 30px; /* 在小屏幕上适当减少上边距 */
+        margin-top: 30px;
     }
     
     .option {
@@ -441,7 +616,7 @@ h3 {
         max-width: calc(100vh * 9/16);
         margin: 0 auto;
         height: 100vh;
-        box-shadow: 0 0 30px rgba(0, 0, 0, 0.3); /* 添加阴影增强立体感 */
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
     }
 }
 
