@@ -6,6 +6,25 @@
     <title>靈魂藏書閣：藏在字裡行間的秘密</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- 添加图片预加载功能，提升用户体验 -->
+    <link rel="preload" href="./images/intro.jpg" as="image">
+    <link rel="preload" href="./images/q1.jpg" as="image">
+    
+    <!-- 预加载关键图片的脚本 -->
+    <script>
+        // 页面加载后在后台预加载所有问题图片
+        window.addEventListener('load', function() {
+            console.log("开始预加载问题图片...");
+            // 预加载问题1-11的图片
+            for (let i = 1; i <= 11; i++) {
+                const img = new Image();
+                img.src = `./images/q${i}.jpg`;
+                img.onload = () => console.log(`问题${i}图片加载完成`);
+                img.onerror = () => console.error(`问题${i}图片加载失败`);
+            }
+        });
+    </script>
 </head>
 <body>
     <div class="page-background"></div>
