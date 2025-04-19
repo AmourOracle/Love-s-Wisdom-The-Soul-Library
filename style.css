@@ -39,11 +39,11 @@ body {
     transition: background-color 0.5s ease;
 }
 
-/* 基础动画关键帧定义 */
+/* 基础动画关键帧定义 - 降低位移幅度减少弹跳感 */
 @keyframes fadeIn {
     from { 
         opacity: 0; 
-        transform: translateY(20px); 
+        transform: translateY(10px);  /* 减小位移距离 */
     }
     to { 
         opacity: 1; 
@@ -58,14 +58,15 @@ body {
     }
     to { 
         opacity: 0; 
-        transform: translateY(-20px); 
+        transform: translateY(-10px);  /* 减小位移距离 */
     }
 }
 
-@keyframes slideInUp {
+/* 为选项创建单独的动画，避免冲突 */
+@keyframes optionFadeIn {
     from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(8px);  /* 更轻微的位移 */
     }
     to {
         opacity: 1;
@@ -73,33 +74,26 @@ body {
     }
 }
 
-@keyframes slideOutUp {
+@keyframes optionFadeOut {
     from {
         opacity: 1;
         transform: translateY(0);
     }
     to {
         opacity: 0;
-        transform: translateY(-20px);
+        transform: translateY(-8px);  /* 更轻微的位移 */
     }
 }
 
-/* 背景图片视差动画 */
-@keyframes parallaxBgOut {
+/* 背景图片平滑过渡动画 */
+@keyframes bgFadeIn {
     from {
-        transform: translateY(0) scale(1);
+        opacity: 0.6;
+        transform: scale(1.01);  /* 轻微放大效果 */
     }
     to {
-        transform: translateY(-10px) scale(1.02);
-    }
-}
-
-@keyframes parallaxBgIn {
-    from {
-        transform: translateY(10px) scale(0.98);
-    }
-    to {
-        transform: translateY(0) scale(1);
+        opacity: 1;
+        transform: scale(1);
     }
 }
 
@@ -122,12 +116,19 @@ body {
     opacity: 1;
 }
 
+/* 防止重复动画的状态标记样式 */
+.screen-container.animating {
+    pointer-events: none;  /* 动画过程中禁止交互 */
+}
+
 .screen-container.fade-in {
     animation: fadeIn var(--transition-speed) var(--transition-timing) forwards;
+    animation-iteration-count: 1;  /* 确保动画仅执行一次 */
 }
 
 .screen-container.fade-out {
     animation: fadeOut var(--transition-speed) var(--transition-timing) forwards;
+    animation-iteration-count: 1;  /* 确保动画仅执行一次 */
 }
 
 /* 卡片背景样式 */
@@ -159,14 +160,6 @@ body {
     z-index: 1;
 }
 
-.fade-in .card-background {
-    animation: parallaxBgIn 0.8s var(--transition-timing) forwards;
-}
-
-.fade-out .card-background {
-    animation: parallaxBgOut 0.8s var(--transition-timing) forwards;
-}
-
 /* 卡片内容样式 */
 .card-content {
     position: relative;
@@ -183,15 +176,16 @@ body {
     transform: translateY(0);
     opacity: 1;
     transition: transform 0.6s var(--transition-timing), opacity 0.6s var(--transition-timing);
+    will-change: transform, opacity;  /* 优化动画性能 */
 }
 
 .fade-in .card-header {
-    animation: slideInUp 0.6s var(--transition-timing) forwards;
+    animation: fadeIn 0.6s var(--transition-timing) forwards;
     animation-delay: 0.1s;
 }
 
 .fade-out .card-header {
-    animation: slideOutUp 0.5s var(--transition-timing) forwards;
+    animation: fadeOut 0.5s var(--transition-timing) forwards;
 }
 
 .card-header .label {
@@ -218,15 +212,16 @@ body {
     transform: translateY(0);
     opacity: 1;
     transition: transform 0.6s var(--transition-timing), opacity 0.6s var(--transition-timing);
+    will-change: transform, opacity;  /* 优化动画性能 */
 }
 
 .fade-in .card-body {
-    animation: slideInUp 0.6s var(--transition-timing) forwards;
+    animation: fadeIn 0.6s var(--transition-timing) forwards;
     animation-delay: 0.2s;
 }
 
 .fade-out .card-body {
-    animation: slideOutUp 0.5s var(--transition-timing) forwards;
+    animation: fadeOut 0.5s var(--transition-timing) forwards;
     animation-delay: 0.05s;
 }
 
@@ -246,15 +241,16 @@ body {
     transform: translateY(0);
     opacity: 1;
     transition: transform 0.6s var(--transition-timing), opacity 0.6s var(--transition-timing);
+    will-change: transform, opacity;  /* 优化动画性能 */
 }
 
 .fade-in .card-footer {
-    animation: slideInUp 0.6s var(--transition-timing) forwards;
+    animation: fadeIn 0.6s var(--transition-timing) forwards;
     animation-delay: 0.3s;
 }
 
 .fade-out .card-footer {
-    animation: slideOutUp 0.5s var(--transition-timing) forwards;
+    animation: fadeOut 0.5s var(--transition-timing) forwards;
     animation-delay: 0.1s;
 }
 
@@ -334,28 +330,26 @@ body {
     padding-right: 5px;
 }
 
-/* 问题容器样式 */
+/* 问题容器样式 - 添加背景加载状态样式 */
 .question-container {
     width: 100%;
     height: 100%;
     background-size: cover;
     background-position: center;
     position: relative;
-    transition: transform 0.8s var(--transition-timing), opacity 0.8s var(--transition-timing);
+    transition: opacity 0.3s ease;  /* 更快的透明度过渡 */
     will-change: transform, background-image;
 }
 
-.fade-in .question-container {
-    animation: parallaxBgIn 0.8s var(--transition-timing) forwards;
+/* 背景加载状态 */
+.question-container.loading-bg {
+    opacity: 0.7;  /* 加载中轻微降低透明度 */
+    background-color: rgba(0, 0, 0, 0.8);  /* 加载中的背景色 */
 }
 
-.fade-out .question-container {
-    animation: parallaxBgOut 0.8s var(--transition-timing) forwards;
-}
-
-.question-container.slight-fade {
-    opacity: 0.9;
-    transition: opacity 0.3s ease;
+/* 背景图片加载完成后的过渡效果 */
+.question-container.bg-loaded {
+    animation: bgFadeIn 0.5s ease forwards;
 }
 
 .overlay {
@@ -379,19 +373,21 @@ body {
     margin-bottom: 30px;
     padding: 0 20px;
     margin-top: 40px;
-    transition: transform 0.5s var(--transition-timing), opacity 0.5s var(--transition-timing);
+    transition: transform 0.4s ease, opacity 0.4s ease;  /* 更快的过渡 */
     will-change: transform, opacity;
 }
 
 .question.fade-in {
-    animation: slideInUp 0.5s var(--transition-timing) forwards;
+    animation: fadeIn 0.4s ease forwards;
+    animation-iteration-count: 1;  /* 确保仅执行一次 */
 }
 
 .question.fade-out {
-    animation: slideOutUp 0.5s var(--transition-timing) forwards;
+    animation: fadeOut 0.4s ease forwards;
+    animation-iteration-count: 1;  /* 确保仅执行一次 */
 }
 
-/* 选项样式 */
+/* 选项样式优化 */
 .options-container {
     display: flex;
     flex-direction: column;
@@ -400,17 +396,15 @@ body {
     max-width: 500px;
     margin: 0 auto;
     padding: 0 10px 20px;
-    transition: transform 0.5s var(--transition-timing), opacity 0.5s var(--transition-timing);
-    will-change: transform, opacity;
+    transition: opacity 0.4s ease;  /* 仅使用透明度过渡 */
 }
 
 .options-container.fade-in {
-    animation: slideInUp 0.6s var(--transition-timing) forwards;
-    animation-delay: 0.1s;
+    opacity: 1;
 }
 
 .options-container.fade-out {
-    animation: slideOutUp 0.5s var(--transition-timing) forwards;
+    opacity: 0;
 }
 
 .option {
@@ -422,23 +416,36 @@ body {
     cursor: pointer;
     transition: all 0.3s ease;
     text-align: center;
-    opacity: 1;
-    transform: translateY(0);
+    opacity: 0;  /* 初始不可见 */
+    transform: translateY(8px);  /* 初始位置 */
     will-change: transform, opacity, background-color;
 }
 
-/* 自定义选项动画 - 使用延迟效果实现序列动画 */
-.fade-in .option:nth-child(1) { animation: slideInUp 0.5s var(--transition-timing) forwards; animation-delay: 0.1s; }
-.fade-in .option:nth-child(2) { animation: slideInUp 0.5s var(--transition-timing) forwards; animation-delay: 0.15s; }
-.fade-in .option:nth-child(3) { animation: slideInUp 0.5s var(--transition-timing) forwards; animation-delay: 0.2s; }
-.fade-in .option:nth-child(4) { animation: slideInUp 0.5s var(--transition-timing) forwards; animation-delay: 0.25s; }
-.fade-in .option:nth-child(5) { animation: slideInUp 0.5s var(--transition-timing) forwards; animation-delay: 0.3s; }
+/* 为每个选项设置单独的动画延迟，创建级联效果 */
+.options-container.fade-in .option:nth-child(1) { 
+    animation: optionFadeIn 0.4s ease forwards;
+    animation-delay: 0.05s;
+}
+.options-container.fade-in .option:nth-child(2) { 
+    animation: optionFadeIn 0.4s ease forwards;
+    animation-delay: 0.1s;
+}
+.options-container.fade-in .option:nth-child(3) { 
+    animation: optionFadeIn 0.4s ease forwards;
+    animation-delay: 0.15s;
+}
+.options-container.fade-in .option:nth-child(4) { 
+    animation: optionFadeIn 0.4s ease forwards;
+    animation-delay: 0.2s;
+}
+.options-container.fade-in .option:nth-child(5) { 
+    animation: optionFadeIn 0.4s ease forwards;
+    animation-delay: 0.25s;
+}
 
-.fade-out .option:nth-child(1) { animation: slideOutUp 0.4s var(--transition-timing) forwards; animation-delay: 0s; }
-.fade-out .option:nth-child(2) { animation: slideOutUp 0.4s var(--transition-timing) forwards; animation-delay: 0.05s; }
-.fade-out .option:nth-child(3) { animation: slideOutUp 0.4s var(--transition-timing) forwards; animation-delay: 0.1s; }
-.fade-out .option:nth-child(4) { animation: slideOutUp 0.4s var(--transition-timing) forwards; animation-delay: 0.15s; }
-.fade-out .option:nth-child(5) { animation: slideOutUp 0.4s var(--transition-timing) forwards; animation-delay: 0.2s; }
+.options-container.fade-out .option {
+    animation: optionFadeOut 0.3s ease forwards;
+}
 
 .option:hover {
     background-color: rgba(255, 255, 255, 0.2);
@@ -483,7 +490,7 @@ body {
 }
 
 .fade-in .result-card {
-    animation: slideInUp 0.6s var(--transition-timing) forwards;
+    animation: fadeIn 0.6s var(--transition-timing) forwards;
 }
 
 .result-title {
