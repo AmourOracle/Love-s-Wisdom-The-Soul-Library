@@ -9,7 +9,6 @@
     
     <!-- 预加载关键图片 -->
     <link rel="preload" href="./images/Intro.webp" as="image">
-    <link rel="preload" href="./images/Q1.webp" as="image">
 </head>
 <body>
     <div class="container">
@@ -37,7 +36,7 @@
             </div>
         </div>
         
-        <!-- 測驗頁面 - 全屏背景图设计 -->
+        <!-- 測驗頁面 - 視差滾動設計 -->
         <div id="test-container" class="screen-container">
             <div class="progress-container">
                 <div class="progress-bar">
@@ -46,15 +45,8 @@
                 <div class="progress-text" id="progress-text">問題 1/11</div>
             </div>
             
-            <div class="question-container" id="question-container">
-                <!-- 背景图片将通过JavaScript动态设置 -->
-                <div class="overlay">
-                    <div class="question" id="question-text"></div>
-                    
-                    <div class="options-container" id="options-container">
-                        <!-- 选项将由JavaScript动态生成 -->
-                    </div>
-                </div>
+            <div class="parallax-wrapper" id="parallax-wrapper">
+                <!-- 問題區域將由 JavaScript 動態生成 -->
             </div>
         </div>
         
@@ -98,6 +90,15 @@
                         <button class="btn primary-btn" id="restart-btn">重新測驗</button>
                     </div>
                 </div>
+            </div>
+        </div>
+        
+        <!-- 預加載指示器 -->
+        <div id="preloader" class="preloader">
+            <div class="preloader-content">
+                <div class="preloader-spinner"></div>
+                <div class="preloader-text">準備測驗中...</div>
+                <div id="preloader-progress">0%</div>
             </div>
         </div>
     </div>

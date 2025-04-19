@@ -11,6 +11,8 @@
     --transition-duration: 0.6s;
     --transition-timing: cubic-bezier(0.25, 0.1, 0.25, 1.0);
     --fade-transition: opacity 0.4s ease, transform 0.4s ease;
+    --parallax-transition: transform 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+    --deep-blue-bg: #121824;
 }
 
 * {
@@ -22,7 +24,7 @@
 body {
     font-family: 'Noto Serif TC', serif, 'Times New Roman', Times, serif;
     line-height: 1.6;
-    background-color: var(--background-color);
+    background-color: var(--deep-blue-bg);
     color: var(--text-color);
     height: 100vh;
     width: 100vw;
@@ -38,6 +40,7 @@ body {
     position: relative;
     overflow: hidden;
     transition: background-color 0.5s ease;
+    background-color: var(--deep-blue-bg);
 }
 
 /* 基础动画关键帧定义 */
@@ -63,14 +66,74 @@ body {
     }
 }
 
-/* 背景图片淡入动画 */
-@keyframes bgFadeIn {
-    from { 
-        opacity: 0.7; 
+@keyframes slideUp {
+    from {
+        transform: translateY(0);
     }
-    to { 
-        opacity: 1; 
+    to {
+        transform: translateY(-100%);
     }
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 预加载动画 */
+.preloader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--deep-blue-bg);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+}
+
+.preloader.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.preloader-content {
+    text-align: center;
+    color: var(--text-color);
+}
+
+.preloader-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255,255,255,0.1);
+    border-left-color: var(--primary-color);
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    animation: spin 1s linear infinite;
+}
+
+.preloader-text {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+#preloader-progress {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--primary-color);
 }
 
 /* 通用屏幕容器样式 */
@@ -84,6 +147,7 @@ body {
     opacity: 0;
     transition: opacity var(--transition-duration) var(--transition-timing);
     overflow: hidden;
+    background-color: var(--deep-blue-bg);
 }
 
 .screen-container.active {
@@ -98,19 +162,6 @@ body {
 
 .screen-container.fade-in {
     animation: fadeIn var(--transition-duration) var(--transition-timing) forwards;
-}
-
-/* 问题内容过渡动画 */
-.question-fadeout {
-    opacity: 0 !important;
-    transform: translateY(-10px) !important;
-    transition: var(--fade-transition) !important;
-}
-
-.question-fadein {
-    opacity: 1 !important;
-    transform: translateY(0) !important;
-    transition: var(--fade-transition) !important;
 }
 
 /* 卡片式设计 - 首页 */
@@ -272,25 +323,74 @@ body {
     padding-right: 5px;
 }
 
-/* 问题容器样式 */
-.question-container {
+/* 視差滾動容器 */
+.parallax-wrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* 問題區塊樣式 */
+.question-section {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    visibility: hidden;
+    opacity: 0;
+    will-change: transform, opacity;
+    transition: transform var(--parallax-transition), opacity var(--parallax-transition);
+    z-index: 1;
+}
+
+.question-section.active {
+    visibility: visible;
+    opacity: 1;
+    z-index: 3;
+    transform: translateY(0);
+}
+
+.question-section.next {
+    visibility: visible;
+    opacity: 0.5;
+    transform: translateY(100%);
+    z-index: 2;
+}
+
+.question-section.prev {
+    visibility: visible;
+    opacity: 0.5;
+    transform: translateY(-100%);
+    z-index: 2;
+}
+
+/* 問題背景 */
+.question-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
     background-size: cover;
     background-position: center;
-    position: relative;
-    transition: opacity 0.6s ease;
+    will-change: transform;
+    transition: transform calc(var(--parallax-transition) * 1.2);
 }
 
-/* 背景加载状态样式 */
-.question-container.loading-bg {
-    opacity: 0.7;
-    background-color: rgba(0, 0, 0, 0.5);
+.question-section.active .question-bg {
+    transform: translateY(0);
 }
 
-/* 背景加载完成样式 */
-.question-container.bg-loaded {
-    animation: bgFadeIn 0.5s ease forwards;
+.question-section.next .question-bg {
+    transform: translateY(-10%);
+}
+
+.question-section.prev .question-bg {
+    transform: translateY(10%);
 }
 
 .overlay {
@@ -304,10 +404,7 @@ body {
     flex-direction: column;
     justify-content: space-between;
     padding: 80px 20px 40px;
-}
-
-.overlay > * {
-    transition: var(--fade-transition);
+    z-index: 2;
 }
 
 .question {
@@ -318,6 +415,7 @@ body {
     margin-bottom: 30px;
     padding: 0 20px;
     margin-top: 40px;
+    will-change: transform, opacity;
     transition: var(--fade-transition);
 }
 
@@ -330,6 +428,7 @@ body {
     max-width: 500px;
     margin: 0 auto;
     padding: 0 10px 20px;
+    will-change: transform, opacity;
     transition: var(--fade-transition);
 }
 
@@ -355,6 +454,32 @@ body {
     border-color: var(--primary-color);
     transform: translateY(-2px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 滚动提示 */
+.scroll-indicator {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    color: white;
+    font-size: 12px;
+    text-align: center;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.3; }
+    50% { opacity: 1; }
+    100% { opacity: 0.3; }
+}
+
+.scroll-indicator svg {
+    display: block;
+    margin: 0 auto 5px;
+    width: 20px;
+    height: 20px;
 }
 
 /* 结果页面样式 */
@@ -486,6 +611,15 @@ h3 {
 #result-container .secondary-btn:hover {
     background-color: rgba(0, 0, 0, 0.05);
     transform: translateY(-2px);
+}
+
+/* 页面过渡效果增强 */
+.transition-slide-up {
+    animation: slideUp 0.8s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+.transition-slide-down {
+    animation: slideDown 0.8s cubic-bezier(0.23, 1, 0.32, 1) forwards;
 }
 
 /* 响应式设计 - 确保9:16比例 */
