@@ -199,6 +199,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // 預加載問題背景圖片
+    function preloadQuestionImage(questionNumber) {
+        const nextImage = new Image();
+        nextImage.src = `./images/Q${questionNumber}.webp`;
+        imageCache[questionNumber] = nextImage;
+        return nextImage;
+    }
+    
     // 簡化的問題渲染函數 - 更可靠的實現
     function renderQuestion() {
         try {
@@ -215,8 +223,32 @@ document.addEventListener('DOMContentLoaded', function() {
             // 設置背景圖片和加載狀態
             DOM.elements.questionContainer.classList.add('loading-bg');
             
-            // 直接設置背景圖片，不等待加載完成
-            DOM.elements.questionContainer.style.backgroundImage = `url('./images/Q${questionNumber}.webp')`;
+            // 嘗試從緩存獲取圖片，或直接設置背景
+            if (imageCache[questionNumber]) {
+                DOM.elements.questionContainer.style.backgroundImage = `url('./images/Q${questionNumber}.webp')`;
+                DOM.elements.questionContainer.classList.remove('loading-bg');
+                DOM.elements.questionContainer.classList.add('bg-loaded');
+                
+                setTimeout(() => {
+                    DOM.elements.questionContainer.classList.remove('bg-loaded');
+                }, 500);
+            } else {
+                // 直接設置背景圖片，不等待加載完成
+                DOM.elements.questionContainer.style.backgroundImage = `url('./images/Q${questionNumber}.webp')`;
+                
+                // 監聽背景圖片加載
+                const img = preloadQuestionImage(questionNumber);
+                img.onload = () => {
+                    // 圖片加載完成後移除加載狀態
+                    DOM.elements.questionContainer.classList.remove('loading-bg');
+                    DOM.elements.questionContainer.classList.add('bg-loaded');
+                    
+                    // 短暫延遲後移除加載完成狀態
+                    setTimeout(() => {
+                        DOM.elements.questionContainer.classList.remove('bg-loaded');
+                    }, 500);
+                };
+            }
             
             // 構建選項HTML - 一次性更新DOM
             let optionsHTML = '';
@@ -237,26 +269,27 @@ document.addEventListener('DOMContentLoaded', function() {
             // 更新進度條
             updateProgressBar();
             
-            // 監聽背景圖片加載
-            const img = new Image();
-            img.onload = () => {
-                // 圖片加載完成後移除加載狀態
-                DOM.elements.questionContainer.classList.remove('loading-bg');
-                DOM.elements.questionContainer.classList.add('bg-loaded');
-                
-                // 短暫延遲後移除加載完成狀態
-                setTimeout(() => {
-                    DOM.elements.questionContainer.classList.remove('bg-loaded');
-                }, 500);
-            };
-            
-            // 設置圖片路徑觸發加載，使用相對路徑
-            img.src = `./images/Q${questionNumber}.webp`;
+            // 預加載下一題圖片（如果不是最後一題）
+            if (currentQuestionIndex < questions.length - 1) {
+                preloadQuestionImage(questionNumber + 1);
+            }
             
             // 安全措施：即使圖片未加載也不會永久卡在加載狀態
             setTimeout(() => {
                 DOM.elements.questionContainer.classList.remove('loading-bg');
             }, 3000); // 3秒後強制移除加載狀態
+            
+            // 為問題和選項添加淡入效果
+            DOM.elements.questionText.style.opacity = '0';
+            DOM.elements.optionsContainer.style.opacity = '0';
+            
+            // 短暫延遲後顯示問題和選項，創建淡入效果
+            setTimeout(() => {
+                DOM.elements.questionText.style.transition = 'opacity 0.4s ease';
+                DOM.elements.optionsContainer.style.transition = 'opacity 0.4s ease';
+                DOM.elements.questionText.style.opacity = '1';
+                DOM.elements.optionsContainer.style.opacity = '1';
+            }, 100);
             
         } catch (error) {
             console.error("渲染問題出錯:", error);
@@ -266,7 +299,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // 處理選項點擊 - 优化最后一题处理逻辑
+    // 處理選項點擊 - 優化問題之間的過渡動畫
     function handleOptionClick(e) {
         try {
             // 防止動畫進行時或內容未渲染時的點擊
@@ -306,11 +339,15 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 // 判斷是否為最後一題
                 if (currentQuestionIndex < questions.length - 1) {
-                    // 如果不是最後一題，自動前進到下一題
-                    currentQuestionIndex++;
-                    contentRendered = false;
-                    renderQuestion();
-                    resetAnimationState();
+                    // 如果不是最後一題，為問題容器添加淡出效果
+                    fadeOutCurrentQuestion(() => {
+                        // 淡出完成後，更新問題索引並渲染下一題
+                        currentQuestionIndex++;
+                        contentRendered = false;
+                        
+                        // 淡入下一個問題
+                        fadeInNextQuestion();
+                    });
                 } else {
                     // 如果是最後一題，則顯示結果
                     console.log("已完成所有問題，準備顯示結果");
@@ -334,6 +371,47 @@ document.addEventListener('DOMContentLoaded', function() {
                 emergencyShowResult();
             }
         }
+    }
+    
+    // 淡出當前問題的輔助函數
+    function fadeOutCurrentQuestion(callback) {
+        // 為問題文本和選項添加淡出效果
+        DOM.elements.questionText.style.transition = 'opacity 0.4s ease';
+        DOM.elements.optionsContainer.style.transition = 'opacity 0.4s ease';
+        DOM.elements.questionText.style.opacity = '0';
+        DOM.elements.optionsContainer.style.opacity = '0';
+        
+        // 為背景添加淡出效果
+        DOM.elements.questionContainer.style.transition = 'opacity 0.6s ease';
+        DOM.elements.questionContainer.style.opacity = '0.7';
+        
+        // 等待淡出動畫完成
+        setTimeout(() => {
+            if (callback && typeof callback === 'function') {
+                callback();
+            }
+        }, 400);
+    }
+    
+    // 淡入下一個問題的輔助函數
+    function fadeInNextQuestion() {
+        // 先重置問題容器的透明度
+        DOM.elements.questionContainer.style.transition = 'none';
+        DOM.elements.questionContainer.style.opacity = '0.7';
+        
+        // 重置過渡屬性以準備動畫
+        setTimeout(() => {
+            DOM.elements.questionContainer.style.transition = 'opacity 0.6s ease';
+            DOM.elements.questionContainer.style.opacity = '1';
+            
+            // 渲染下一題內容
+            renderQuestion();
+            
+            // 動畫完成後重置狀態
+            setTimeout(() => {
+                resetAnimationState();
+            }, 600);
+        }, 50);
     }
     
     // 应急显示结果函数 - 确保即使出错也能显示结果
@@ -365,28 +443,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // 处理并显示结果 - 专门处理最后一题到结果页面的过渡
+    // 处理并显示结果 - 优化过渡效果
     function processAndShowResult() {
         console.log("开始处理并显示结果...");
         
-        // 重置动画状态以确保流程不被阻塞
-        resetAnimationState();
-        
-        // 计算结果
-        const result = calculateResult();
-        
-        // 准备结果数据但不切换页面
-        prepareResultData(result);
-        
-        // 显示前重置状态
-        resultShowing = false;
-        
-        // 使用较长的延迟确保选择效果可见
-        setTimeout(() => {
+        // 先淡出最后一个问题
+        fadeOutCurrentQuestion(() => {
+            // 重置动画状态以确保流程不被阻塞
+            resetAnimationState();
+            
+            // 计算结果
+            const result = calculateResult();
+            
+            // 准备结果数据但不切换页面
+            prepareResultData(result);
+            
+            // 显示前重置状态
+            resultShowing = false;
+            
             // 切换到结果页面
             switchScreen(DOM.containers.test, DOM.containers.result);
             console.log("结果页面显示完成");
-        }, 300);
+        });
     }
     
     // 准备结果数据 - 从showResult抽取的数据准备逻辑
