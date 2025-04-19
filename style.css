@@ -10,6 +10,7 @@
     --border-radius: 12px;
     --transition-duration: 0.6s;
     --transition-timing: cubic-bezier(0.25, 0.1, 0.25, 1.0);
+    --fade-transition: opacity 0.4s ease, transform 0.4s ease;
 }
 
 * {
@@ -97,6 +98,19 @@ body {
 
 .screen-container.fade-in {
     animation: fadeIn var(--transition-duration) var(--transition-timing) forwards;
+}
+
+/* 问题内容过渡动画 */
+.question-fadeout {
+    opacity: 0 !important;
+    transform: translateY(-10px) !important;
+    transition: var(--fade-transition) !important;
+}
+
+.question-fadein {
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+    transition: var(--fade-transition) !important;
 }
 
 /* 卡片式设计 - 首页 */
@@ -265,7 +279,7 @@ body {
     background-size: cover;
     background-position: center;
     position: relative;
-    transition: opacity 0.4s ease;
+    transition: opacity 0.6s ease;
 }
 
 /* 背景加载状态样式 */
@@ -292,6 +306,10 @@ body {
     padding: 80px 20px 40px;
 }
 
+.overlay > * {
+    transition: var(--fade-transition);
+}
+
 .question {
     font-size: 24px;
     font-weight: 500;
@@ -300,7 +318,7 @@ body {
     margin-bottom: 30px;
     padding: 0 20px;
     margin-top: 40px;
-    transition: opacity 0.4s ease;
+    transition: var(--fade-transition);
 }
 
 /* 选项样式 */
@@ -312,7 +330,7 @@ body {
     max-width: 500px;
     margin: 0 auto;
     padding: 0 10px 20px;
-    transition: opacity 0.4s ease;
+    transition: var(--fade-transition);
 }
 
 .option {
@@ -335,6 +353,8 @@ body {
 .option.selected {
     background-color: var(--primary-color);
     border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* 结果页面样式 */
@@ -366,6 +386,7 @@ body {
     margin: 0 auto 40px auto;
     color: var(--text-color-dark);
     text-align: center;
+    animation: fadeIn 0.8s ease-out;
 }
 
 .result-title {
@@ -392,6 +413,7 @@ body {
 
 .book-traits, .related-books {
     margin: 25px 0;
+    animation: fadeIn 1s ease-out 0.3s backwards;
 }
 
 h3 {
@@ -405,6 +427,13 @@ h3 {
     display: flex;
     justify-content: space-between;
     margin-bottom: 10px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    transition: background-color 0.3s ease;
+}
+
+.trait-item:hover {
+    background-color: rgba(0, 0, 0, 0.03);
 }
 
 .trait-stars {
@@ -419,6 +448,7 @@ h3 {
     margin: 15px 0;
     white-space: pre-wrap;
     text-align: left;
+    animation: fadeIn 1s ease-out 0.6s backwards;
 }
 
 .action-buttons {
@@ -426,6 +456,7 @@ h3 {
     gap: 15px;
     margin-top: 20px;
     justify-content: center;
+    animation: fadeIn 1s ease-out 0.9s backwards;
 }
 
 .action-buttons .btn {
@@ -436,12 +467,25 @@ h3 {
 #result-container .primary-btn {
     background-color: var(--primary-color);
     color: white;
+    transition: all 0.3s ease;
+}
+
+#result-container .primary-btn:hover {
+    background-color: #e53935;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
 #result-container .secondary-btn {
     background-color: transparent;
     color: var(--secondary-color);
     border: 1px solid var(--secondary-color);
+    transition: all 0.3s ease;
+}
+
+#result-container .secondary-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
 }
 
 /* 响应式设计 - 确保9:16比例 */
