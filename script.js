@@ -2,23 +2,16 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log("頁面已載入，測驗初始化中...");
     
-    // 頁面動畫控制函數
-    // 為容器添加動畫狀態，並指定動畫方向
-    function addAnimatingClass(direction = 'out') {
+    // 動畫狀態標記，但不影響頁面結構
+    function addAnimatingClass() {
         document.querySelector('.container').classList.add('animating');
-        document.querySelector('.container').setAttribute('data-direction', direction);
     }
     
-    // 移除動畫狀態類
     function removeAnimatingClass() {
         setTimeout(() => {
             document.querySelector('.container').classList.remove('animating');
-            document.querySelector('.container').removeAttribute('data-direction');
-        }, 100); // 短暫延遲確保CSS過渡開始
+        }, 100);
     }
-    
-    // 标记页面是否首次加载
-    const isFirstLoad = true;
     
     // 预加载所有问题图片
     preloadQuestionImages();
@@ -81,28 +74,28 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('resize', setViewportHeight);
     setViewportHeight();
     
-    // 切换屏幕的通用函数 - 添加视差滚动效果
+    // 修改后的切换屏幕函数 - 保持原有结构，添加适度的动画效果
     function switchScreen(fromScreen, toScreen) {
-        // 添加動畫狀態 - 为退出屏幕设置向上滑出效果
-        addAnimatingClass('out');
+        // 添加动画状态，但不改变页面结构
+        fromScreen.classList.add('fade-out');
         
-        // 先隱藏fromScreen
-        fromScreen.classList.remove('active');
-        
-        // 強制重排
-        void toScreen.offsetWidth;
-        
-        // 短暫延遲後顯示toScreen，讓動畫效果能夠顯示
+        // 延迟显示下一个屏幕，确保过渡平滑
         setTimeout(() => {
-            // 为进入屏幕设置从下向上滑入效果
-            document.querySelector('.container').setAttribute('data-direction', 'in');
+            fromScreen.classList.remove('active');
+            fromScreen.classList.remove('fade-out');
+            
+            // 强制重排
+            void toScreen.offsetWidth;
+            
+            // 添加进入动画类
+            toScreen.classList.add('fade-in');
             toScreen.classList.add('active');
             
-            // 延遲移除動畫狀態，讓動畫能夠執行
+            // 移除进入动画类
             setTimeout(() => {
-                removeAnimatingClass();
-            }, 100);
-        }, 400); // 增加延时，确保前一个动画有足够时间显示
+                toScreen.classList.remove('fade-in');
+            }, 500);
+        }, 500);
     }
     
     // 開始測驗
@@ -127,43 +120,54 @@ document.addEventListener('DOMContentLoaded', function() {
         window.scrollTo(0, 0);
     });
     
-    // 渲染當前問題 - 添加视差滚动效果
+    // 渲染當前問題 - 保持结构完整性
     function renderQuestion() {
-        // 添加動畫狀態 - 使用视差效果
-        addAnimatingClass('transition');
-        
         const question = questions[currentQuestionIndex];
         
-        // 設置問題文本 - 移除標號以增加沉浸感
-        const questionTextWithoutNumber = question.question.replace(/^\d+\.\s*/, '');
-        DOM.elements.questionText.textContent = questionTextWithoutNumber;
+        // 淡出当前内容
+        DOM.elements.questionText.classList.add('fade-out');
+        DOM.elements.optionsContainer.classList.add('fade-out');
         
-        // 設置背景圖片 - 基于问题序号
-        const questionNumber = currentQuestionIndex + 1;
-        DOM.elements.questionContainer.style.backgroundImage = `url('./images/Q${questionNumber}.webp')`;
-        
-        // 渲染選項
-        let optionsHTML = '';
-        question.options.forEach((option, index) => {
-            const isSelected = userAnswers[currentQuestionIndex] === index;
-            optionsHTML += `
-            <div class="option ${isSelected ? 'selected' : ''}" data-index="${index}">
-                ${option.text}
-            </div>`;
-        });
-        DOM.elements.optionsContainer.innerHTML = optionsHTML;
-        
-        // 為選項添加事件監聽器
-        document.querySelectorAll('.option').forEach(option => {
-            option.addEventListener('click', handleOptionClick);
-        });
-        
-        updateProgressBar();
-        
-        // 延遲移除動畫狀態，讓動畫能夠執行
         setTimeout(() => {
-            removeAnimatingClass();
-        }, 100);
+            // 設置問題文本 - 移除標號以增加沉浸感
+            const questionTextWithoutNumber = question.question.replace(/^\d+\.\s*/, '');
+            DOM.elements.questionText.textContent = questionTextWithoutNumber;
+            
+            // 設置背景圖片 - 基于问题序号
+            const questionNumber = currentQuestionIndex + 1;
+            DOM.elements.questionContainer.style.backgroundImage = `url('./images/Q${questionNumber}.webp')`;
+            
+            // 渲染選項
+            let optionsHTML = '';
+            question.options.forEach((option, index) => {
+                const isSelected = userAnswers[currentQuestionIndex] === index;
+                optionsHTML += `
+                <div class="option ${isSelected ? 'selected' : ''}" data-index="${index}">
+                    ${option.text}
+                </div>`;
+            });
+            DOM.elements.optionsContainer.innerHTML = optionsHTML;
+            
+            // 為選項添加事件監聽器
+            document.querySelectorAll('.option').forEach(option => {
+                option.addEventListener('click', handleOptionClick);
+            });
+            
+            updateProgressBar();
+            
+            // 淡入新内容
+            DOM.elements.questionText.classList.remove('fade-out');
+            DOM.elements.questionText.classList.add('fade-in');
+            
+            DOM.elements.optionsContainer.classList.remove('fade-out');
+            DOM.elements.optionsContainer.classList.add('fade-in');
+            
+            // 移除淡入动画类
+            setTimeout(() => {
+                DOM.elements.questionText.classList.remove('fade-in');
+                DOM.elements.optionsContainer.classList.remove('fade-in');
+            }, 500);
+        }, 300);
     }
     
     // 獲取問題選項中的主導類型
@@ -190,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return dominantType;
     }
     
-    // 處理選項點擊 - 添加视差滚动效果
+    // 處理選項點擊 - 轻微改进，保持结构完整
     function handleOptionClick(e) {
         // 確保點擊的是選項元素本身，而不是子元素
         const targetElement = e.target.closest('.option');
@@ -212,11 +216,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         targetElement.classList.add('selected');
         
-        // 添加動畫狀態 - 使用视差效果
-        addAnimatingClass('slide-up');
+        // 添加轻微的淡出效果
+        DOM.elements.questionContainer.classList.add('slight-fade');
         
         // 添加延遲，讓用戶能看到選中效果
         setTimeout(() => {
+            DOM.elements.questionContainer.classList.remove('slight-fade');
+            
             // 判斷是否為最後一題
             if (currentQuestionIndex < questions.length - 1) {
                 // 如果不是最後一題，自動前進到下一題
@@ -471,8 +477,4 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('無法複製: ', err);
         });
     });
-    
-    // 初始化時不添加首頁動畫，避免重復效果
-    // 只在用戶操作時才添加動畫效果
-    console.log("初始化完成，等待用戶操作...");
 });
