@@ -7,40 +7,38 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- 添加图片预加载功能，提升用户体验 -->
-    <link rel="preload" href="./images/intro.jpg" as="image">
-    <link rel="preload" href="./images/q1.jpg" as="image">
-    
-    <!-- 预加载关键图片的脚本 -->
-    <script>
-        // 页面加载后在后台预加载所有问题图片
-        window.addEventListener('load', function() {
-            console.log("开始预加载问题图片...");
-            // 预加载问题1-11的图片
-            for (let i = 1; i <= 11; i++) {
-                const img = new Image();
-                img.src = `./images/q${i}.jpg`;
-                img.onload = () => console.log(`问题${i}图片加载完成`);
-                img.onerror = () => console.error(`问题${i}图片加载失败`);
-            }
-        });
-    </script>
+    <!-- 预加载关键图片 -->
+    <link rel="preload" href="./images/Intro.webp" as="image">
+    <link rel="preload" href="./images/Q1.webp" as="image">
 </head>
 <body>
-    <div class="page-background"></div>
-    
     <div class="container">
-        <!-- 介紹頁面 -->
-        <div id="intro-container" class="test-container active">
-            <div class="intro">
-                <p><i>愛是我們第一個學會的語言，卻是被我們最快遺忘。</i></p>
-                <p>我們的愛是封未署名的信箋，散落在那些無人知曉的深夜，飛過高樓與大廈、飛過還沒抵達的承諾，而不知該落在哪扇窗台、不知該寄往何方。今天這個無聲靜謐的夜晚，讓我們一起踏入這場字裡行間，尋訪那些被我們遺落的情感。或許，當最後一頁翻過我們會發現，所有的答案早已寫在心上，只是我們忘了如何閱讀、忘了自己。</p>
+        <!-- 介紹頁面 - 新卡片式设计 -->
+        <div id="intro-container" class="screen-container active">
+            <div class="card-background" style="background-image: url('./images/Intro.webp')">
+                <div class="card-content">
+                    <div class="card-header">
+                        <div class="label">靈魂藏書閣</div>
+                        <h1 class="title">情感測試</h1>
+                    </div>
+                    
+                    <div class="card-body">
+                        <p class="description"><i>愛是我們第一個學會的語言，卻是被我們最快遺忘。</i></p>
+                        <p class="description">我們的愛是封未署名的信箋，散落在那些無人知曉的深夜，飛過高樓與大廈、飛過還沒抵達的承諾，而不知該落在哪扇窗台、不知該寄往何方。</p>
+                    </div>
+                    
+                    <div class="card-footer">
+                        <button class="btn primary-btn" id="start-test">開始測驗</button>
+                        <div class="card-meta">
+                            <span>靈魂藏書閣 | 2025</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <button class="start-btn" id="start-test">開始測驗</button>
         </div>
         
-        <!-- 測驗頁面 - 沉浸式設計 -->
-        <div id="test-container" class="test-container fullscreen">
+        <!-- 測驗頁面 - 全屏背景图设计 -->
+        <div id="test-container" class="screen-container">
             <div class="progress-container">
                 <div class="progress-bar">
                     <div class="progress-fill" id="progress-fill"></div>
@@ -48,55 +46,58 @@
                 <div class="progress-text" id="progress-text">問題 1/11</div>
             </div>
             
-            <!-- 問題圖片區域 -->
-            <div class="question-image-container" id="question-image-container">
-                <div class="question-overlay">
+            <div class="question-container" id="question-container">
+                <!-- 背景图片将通过JavaScript动态设置 -->
+                <div class="overlay">
                     <div class="question" id="question-text"></div>
+                    
+                    <div class="options-container" id="options-container">
+                        <!-- 选项将由JavaScript动态生成 -->
+                    </div>
                 </div>
-            </div>
-            
-            <!-- 選項區域 -->
-            <div class="options-container" id="options-container">
-                <!-- 選項將由JavaScript動態生成 -->
             </div>
         </div>
         
         <!-- 結果頁面 -->
-        <div id="result-container" class="result-container">
-            <h2 class="result-title" id="result-title">你的靈魂之書是：</h2>
-            <div class="result-subtitle" id="result-subtitle"></div>
-            
-            <div class="result-description" id="result-description">
-                <!-- 結果描述將由JavaScript動態生成 -->
-            </div>
-            
-            <div class="book-traits">
-                <h3>你的書本特質</h3>
-                <div id="traits-container">
-                    <!-- 特質將由JavaScript動態生成 -->
-                </div>
-            </div>
-            
-            <div class="related-books">
-                <h3>與你相似的書籍</h3>
-                <div id="similar-books">
-                    <!-- 相似書籍將由JavaScript動態生成 -->
+        <div id="result-container" class="screen-container">
+            <div class="result-card">
+                <h2 class="result-title" id="result-title">你的靈魂之書是：</h2>
+                <div class="result-subtitle" id="result-subtitle"></div>
+                
+                <div class="result-description" id="result-description">
+                    <!-- 結果描述將由JavaScript動態生成 -->
                 </div>
                 
-                <h3>互補的閱讀視角</h3>
-                <div id="complementary-books">
-                    <!-- 互補書籍將由JavaScript動態生成 -->
+                <div class="book-traits">
+                    <h3>你的書本特質</h3>
+                    <div id="traits-container">
+                        <!-- 特質將由JavaScript動態生成 -->
+                    </div>
                 </div>
-            </div>
-            
-            <div class="share-section">
-                <h3>分享你的結果</h3>
-                <p>複製以下文字，分享你的測驗結果：</p>
-                <div class="share-text" id="share-text">
-                    <!-- 分享文字將由JavaScript動態生成 -->
+                
+                <div class="related-books">
+                    <h3>與你相似的書籍</h3>
+                    <div id="similar-books">
+                        <!-- 相似書籍將由JavaScript動態生成 -->
+                    </div>
+                    
+                    <h3>互補的閱讀視角</h3>
+                    <div id="complementary-books">
+                        <!-- 互補書籍將由JavaScript動態生成 -->
+                    </div>
                 </div>
-                <button class="copy-btn" id="copy-btn">複製</button>
-                <button class="restart-btn" id="restart-btn">重新測驗</button>
+                
+                <div class="share-section">
+                    <h3>分享你的結果</h3>
+                    <p>複製以下文字，分享你的測驗結果：</p>
+                    <div class="share-text" id="share-text">
+                        <!-- 分享文字將由JavaScript動態生成 -->
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn secondary-btn" id="copy-btn">複製</button>
+                        <button class="btn primary-btn" id="restart-btn">重新測驗</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
