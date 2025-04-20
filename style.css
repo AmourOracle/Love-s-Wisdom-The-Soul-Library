@@ -424,7 +424,8 @@ body {
     background-color: var(--overlay-color);
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
     padding: 80px 20px 40px;
     z-index: 2;
 }
