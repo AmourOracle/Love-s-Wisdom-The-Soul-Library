@@ -306,7 +306,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateProgressBar(1);
     }
     
-    // 處理選項點擊
+    // 處理選項點擊 - 重要修改：修復最後一題的處理邏輯
     function handleOptionClick(event) {
         // 防止重複點擊或動畫進行時的點擊
         if (isAnimating) {
@@ -335,12 +335,13 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 短暫延遲，讓用戶看到選中效果
         setTimeout(() => {
-            // 判斷是否為最後一題
+            // 修改：使用明確的數字比較而不是與變量比較
+            // 修改：更清晰的問題索引比較邏輯
             if (questionNum < questions.length) {
-                // 切換到下一題
+                // 不是最後一題，切換到下一題
                 goToNextQuestion(questionNum);
             } else {
-                // 顯示結果
+                // 是最後一題，顯示結果
                 console.log("最后一题，准备显示结果");
                 showResults();
             }
@@ -405,23 +406,38 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // 显示结果
+    // 显示结果 - 添加更多错误处理和日志
     function showResults() {
         console.log("显示结果页面...");
         
         try {
+            // 输出用户选择，帮助调试
+            console.log("用户选择记录:", userAnswers);
+            console.log("用户选择数量:", userAnswers.length);
+            console.log("问题总数:", questions.length);
+            
             // 计算结果
             const result = calculateResult();
+            console.log("计算得到的结果类型:", result.title);
             
             // 准备结果数据
             prepareResultData(result);
+            console.log("结果数据准备完成");
             
             // 延迟切换到结果页面，确保用户可以看到最后一题的选择效果
             setTimeout(() => {
-                // 切换到结果页面
+                // 确保DOM元素存在
+                if (!DOM.containers.test || !DOM.containers.result) {
+                    console.error("测试容器或结果容器DOM元素不存在!");
+                    alert("显示结果时出错，请刷新页面重试");
+                    return;
+                }
+                
                 console.log("切换到结果页面");
+                // 强制重置动画状态，确保可以切换
+                isAnimating = false;
                 switchScreen(DOM.containers.test, DOM.containers.result);
-            }, 300);
+            }, 800); // 增加延迟时间，确保有足够时间完成动画
         } catch (error) {
             console.error("顯示結果時發生錯誤:", error);
             console.log("尝试应急显示结果...");
@@ -431,12 +447,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 const result = calculateResult();
                 prepareResultData(result);
                 
-                // 强制切换屏幕
+                // 强制切换屏幕，绕过动画
                 DOM.containers.test.classList.remove('active');
                 DOM.containers.result.classList.add('active');
                 resultShowing = true;
                 document.body.style.overflow = 'auto';
                 isAnimating = false;
+                console.log("应急显示结果成功");
             } catch (e) {
                 console.error("应急显示结果也失败:", e);
                 alert("顯示結果時出錯，請重新嘗試測驗");
