@@ -667,22 +667,27 @@ h3 {
         margin-bottom: 10px;  /* 減少下方margin，原先是30px */
     }
     
-    /* 上移選項容器 */
+    /* 上移選項容器並最大化可見性 */
     .options-container {
         padding: 0 10px 15px;  /* 減少padding */
         margin-top: 0;         /* 移除頂部margin */
-        gap: 8px;              /* 減少選項間距 */
+        gap: 6px;              /* 進一步減少選項間距 */
     }
     
     /* 調整問題overlay的padding，讓內容更緊湊 */
     .overlay {
-        padding: 50px 15px 20px;  /* 頂部縮小，確保進度條仍然可見 */
+        padding: 50px 15px 30px;  /* 頂部縮小，確保進度條仍然可見 */
+        justify-content: flex-start; /* 內容從頂部開始排列 */
     }
     
     /* 減小選項間距和內部padding */
     .option {
-        padding: 10px 15px;
+        padding: 8px 15px;
         font-size: 14px;     /* 略微減小字體 */
+        min-height: 44px;    /* 確保觸控區域足夠大 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     
     .btn {
@@ -690,10 +695,21 @@ h3 {
         font-size: 15px;
     }
 
-    /* 確保視差滾動容器正確顯示完整內容 */
+    /* 確保視差滾動容器正確顯示內容，不啟用滾動 */
     .question-section {
         height: 100%;
-        overflow-y: auto;  /* 允許在需要時滾動 */
+        overflow: hidden;  /* 防止出現滾動條 */
+    }
+    
+    /* 對於選項較多的題目，稍微調整選項容器布局 */
+    .question-section:nth-child(n+5) .options-container {
+        gap: 5px;  /* 為選項較多的問題進一步減少間距 */
+    }
+    
+    /* 首頁按鈕位置調整，確保在底部可見 */
+    #start-test {
+        position: relative;
+        z-index: 5;
     }
 }
 
@@ -706,39 +722,12 @@ h3 {
     }
     
     .option {
-        padding: 8px 12px;
-        margin-bottom: 6px;
+        padding: 6px 10px;
+        font-size: 13px;
+        min-height: 40px;
     }
     
     .overlay {
         padding: 40px 10px 15px;
-    }
-}
-
-/* 确保9:16比例的容器 */
-@media (orientation: landscape) {
-    .container {
-        max-width: calc(100vh * 9/16);
-        margin: 0 auto;
-        height: 100vh;
-        box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
-    }
-}
-
-/* 横屏模式优化 */
-@media (max-width: 768px) and (orientation: landscape) {
-    .options-container {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-        max-width: 90%;
-    }
-    
-    .overlay {
-        padding: 70px 20px 20px;
-    }
-    
-    .question {
-        margin-bottom: 15px;
     }
 }
