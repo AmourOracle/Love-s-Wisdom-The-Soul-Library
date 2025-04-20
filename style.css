@@ -209,9 +209,11 @@ body {
     position: relative;
     z-index: 2;
     height: 100%;
+    /* 修改 flex 配置，與問題頁面保持一致 */
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    flex-wrap: nowrap;
+    justify-content: flex-end; /* 改為底部對齊，取代原有的 space-between */
     padding: 40px 30px;
 }
 
@@ -255,7 +257,7 @@ body {
 }
 
 .card-footer {
-    margin-top: 20px;
+    margin-bottom: 40px;
     text-align: center;
     transition: transform 0.6s ease-out, opacity 0.6s ease;
 }
@@ -649,7 +651,7 @@ h3 {
 /* 移动端优化 */
 @media (max-width: 768px) {
     .card-content {
-        padding: 30px 20px;
+        padding-bottom: 50px; /* 在移動端增加底部內邊距，確保按鈕可見 */
     }
     
     .card-header .title {
@@ -658,6 +660,10 @@ h3 {
     
     .card-body .description {
         font-size: 16px;
+    }
+
+    .card-footer {
+        margin-bottom: 20px; /* 調整移動端的底部間距 */
     }
     
     /* 簡化頂部進度條，移除背景 */
