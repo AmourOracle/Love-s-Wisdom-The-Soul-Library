@@ -304,16 +304,6 @@ body {
 }
 
 /* 测验页面样式 */
-.progress-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    padding: 12px 15px 5px;
-    background-color: rgba(0, 0, 0, 0.4);
-    z-index: 10;
-}
-
 .progress-bar {
     background-color: rgba(255, 255, 255, 0.2);
     height: 4px;
