@@ -74,12 +74,16 @@ document.addEventListener('DOMContentLoaded', function() {
         function updateProgress() {
             loadedImages++;
             const progress = Math.round((loadedImages / totalImages) * 100);
-            DOM.elements.preloaderProgress.textContent = `${progress}%`;
+            if (DOM.elements.preloaderProgress) {
+                DOM.elements.preloaderProgress.textContent = `${progress}%`;
+            }
             
             if (loadedImages >= totalImages) {
                 preloadComplete = true;
                 setTimeout(() => {
-                    DOM.containers.preloader.classList.remove('active');
+                    if (DOM.containers.preloader) {
+                        DOM.containers.preloader.classList.remove('active');
+                    }
                 }, 500);
             }
         }
@@ -251,6 +255,11 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("初始化視差滾動測驗...");
         
         // 清空容器
+        if (!DOM.elements.parallaxWrapper) {
+            console.error("parallaxWrapper element not found!");
+            return;
+        }
+        
         DOM.elements.parallaxWrapper.innerHTML = '';
         
         // 創建所有問題區域
@@ -301,10 +310,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleOptionClick(event) {
         // 防止重複點擊或動畫進行時的點擊
         if (isAnimating) {
+            console.log("动画进行中，忽略点击");
             return;
         }
         
         isAnimating = true;
+        console.log("点击选项，启动动画过渡");
         
         const option = event.currentTarget;
         const questionNum = parseInt(option.dataset.question);
@@ -330,6 +341,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 goToNextQuestion(questionNum);
             } else {
                 // 顯示結果
+                console.log("最后一题，准备显示结果");
                 showResults();
             }
         }, 500);
@@ -337,13 +349,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 切換到下一題
     function goToNextQuestion(currentNum) {
+        console.log(`切換到下一題，当前题号: ${currentNum}`);
+        
         // 獲取當前和下一個問題區域
         const currentSection = document.getElementById(`question-${currentNum}`);
         const nextSection = document.getElementById(`question-${currentNum + 1}`);
         const nextNextSection = document.getElementById(`question-${currentNum + 2}`);
         
+        if (!currentSection || !nextSection) {
+            console.error(`无法找到问题区域: 当前题 ${currentNum} 或下一题 ${currentNum + 1}`);
+            isAnimating = false;
+            return;
+        }
+        
         // 更新問題索引
         currentQuestionIndex = currentNum;
+        
+        // 添加过渡效果的调试记录
+        console.log(`应用过渡效果: question-${currentNum} => prev, question-${currentNum + 1} => active`);
         
         // 更新CSS類，應用視差過渡效果
         currentSection.classList.remove('active');
@@ -363,6 +386,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 動畫完成後重置狀態
         setTimeout(() => {
             isAnimating = false;
+            console.log("问题过渡动画完成，重置动画状态");
         }, 800);
     }
     
@@ -370,8 +394,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateProgressBar(questionNumber) {
         try {
             const progress = (questionNumber / questions.length) * 100;
-            DOM.elements.progressFill.style.width = `${progress}%`;
-            DOM.elements.progressText.textContent = `問題 ${questionNumber}/${questions.length}`;
+            if (DOM.elements.progressFill) {
+                DOM.elements.progressFill.style.width = `${progress}%`;
+            }
+            if (DOM.elements.progressText) {
+                DOM.elements.progressText.textContent = `問題 ${questionNumber}/${questions.length}`;
+            }
         } catch (error) {
             console.error("更新進度條出錯:", error);
         }
@@ -388,12 +416,31 @@ document.addEventListener('DOMContentLoaded', function() {
             // 准备结果数据
             prepareResultData(result);
             
-            // 切换到结果页面
-            switchScreen(DOM.containers.test, DOM.containers.result);
+            // 延迟切换到结果页面，确保用户可以看到最后一题的选择效果
+            setTimeout(() => {
+                // 切换到结果页面
+                console.log("切换到结果页面");
+                switchScreen(DOM.containers.test, DOM.containers.result);
+            }, 300);
         } catch (error) {
             console.error("顯示結果時發生錯誤:", error);
-            alert("顯示結果時出錯，請重新嘗試測驗");
-            resetAnimationState();
+            console.log("尝试应急显示结果...");
+            
+            // 应急处理：强制显示结果
+            try {
+                const result = calculateResult();
+                prepareResultData(result);
+                
+                // 强制切换屏幕
+                DOM.containers.test.classList.remove('active');
+                DOM.containers.result.classList.add('active');
+                resultShowing = true;
+                document.body.style.overflow = 'auto';
+                isAnimating = false;
+            } catch (e) {
+                console.error("应急显示结果也失败:", e);
+                alert("顯示結果時出錯，請重新嘗試測驗");
+            }
         }
     }
     
@@ -480,6 +527,16 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             
             console.log("計算結果 - 用戶選擇:", userAnswers);
+            
+            // 檢查答案完整性
+            if (userAnswers.length < questions.length) {
+                console.warn(`用户回答不完整: ${userAnswers.length}/${questions.length}`);
+                // 如果最後一題沒有回答，使用默認選項0
+                if (userAnswers[questions.length - 1] === undefined) {
+                    console.log("最后一题未回答，使用默认选项0");
+                    userAnswers[questions.length - 1] = 0;
+                }
+            }
             
             // 計算每種類型的得分 - 多特質比例計分
             userAnswers.forEach((answerIndex, questionIndex) => {
@@ -639,7 +696,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log("测验中发生错误，尝试恢复状态");
             
             // 如果所有问题已经回答，显示结果
-            if (userAnswers.length >= questions.length) {
+            if (userAnswers.length >= questions.length - 1) {
                 showResults();
             }
         }
