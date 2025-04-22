@@ -34,6 +34,7 @@ body {
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fadeOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-10px); } }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* 文字爆裂動畫 (恢復) */
 @keyframes explodeForwardBlur {
     0% { opacity: 1; filter: blur(0px); transform: translate3d(0, 0, 5px) rotate(0deg) scale(1); }
     60% { opacity: 0.9; filter: blur(1px); }
@@ -88,14 +89,13 @@ body {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     background-size: cover; background-position: center;
     z-index: 5; opacity: 1; filter: blur(0px);
-    /* --- 修改：增加 background-image 過渡，雖然效果可能不明顯 --- */
-    transition: opacity 0.8s ease-out, filter 0.8s ease-out, background-image 0.3s ease-in-out;
+    transition: opacity 0.8s ease-out, filter 0.8s ease-out; /* 移除 background-image transition */
 }
-/* --- 修改：統一使用 is-hidden 控制淡出和進場前狀態 --- */
+/* 背景隱藏狀態 (淡出後 & 進場前) */
 #test-background.is-hidden {
     opacity: 0;
-    filter: blur(10px);
-    pointer-events: none; /* 淡出時不接受事件 */
+    filter: blur(10px); /* 增加模糊效果 */
+    pointer-events: none;
 }
 
 /* 進度條 */
@@ -131,10 +131,10 @@ body {
 .option.exploded { opacity: 0 !important; transform: scale(0.9) !important; transition: opacity 0.3s ease-out, transform 0.3s ease-out !important; pointer-events: none; }
 .option:hover { background-color: rgba(255, 255, 255, 0.2); }
 
-/* 文字爆裂效果容器 */
+/* 文字爆裂效果容器 (恢復) */
 #explosion-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; overflow: hidden; z-index: 1000; transform-style: preserve-3d; }
 
-/* 爆裂的文字字符 */
+/* 爆裂的文字字符 (恢復) */
 .char-explode { display: inline-block; position: absolute; color: white; font-size: 24px; font-weight: bold; opacity: 1; animation: explodeForwardBlur 1.0s forwards cubic-bezier(0.16, 1, 0.3, 1); white-space: pre; will-change: transform, opacity, filter; transform-style: preserve-3d; filter: blur(0px); }
 
 /* ================= 結果頁面樣式 ================= */
@@ -154,25 +154,7 @@ h3 { color: var(--secondary-color); margin-bottom: 15px; font-size: 18px; }
 
 
 /* ================= 響應式設計 ================= */
-@media (max-width: 768px) {
-    #test-container { padding: 60px 15px 30px; }
-    #question-title { font-size: 20px; margin-bottom: 30px; }
-    #options-container { gap: 10px; }
-    .option { padding: 12px 20px; font-size: 14px; min-height: 44px;}
-    .card-content { padding-bottom: 50px; }
-    .card-body .description { font-size: 16px; }
-    .card-footer { margin-bottom: 20px; }
-    .progress-container { padding: 8px 15px 2px; }
-}
-@media (max-width: 375px) and (max-height: 667px) {
-     #question-title { font-size: 18px; margin-bottom: 25px; }
-     .option { padding: 10px 15px; font-size: 13px; min-height: 40px; }
-     #options-container { gap: 8px; }
-}
-@media (max-width: 900px) and (orientation: landscape) {
-     .container { max-width: 100vw; max-height: 100vh; }
-     #test-container { padding: 20px; justify-content: center; }
-     #question-title { margin-bottom: 20px; font-size: 20px; }
-     #options-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 90%; }
-     .result-card { margin: 20px auto; }
-}
+@media (max-width: 768px) { #test-container { padding: 60px 15px 30px; } #question-title { font-size: 20px; margin-bottom: 30px; } #options-container { gap: 10px; } .option { padding: 12px 20px; font-size: 14px; min-height: 44px;} .card-content { padding-bottom: 50px; } .card-body .description { font-size: 16px; } .card-footer { margin-bottom: 20px; } .progress-container { padding: 8px 15px 2px; } }
+@media (max-width: 375px) and (max-height: 667px) { #question-title { font-size: 18px; margin-bottom: 25px; } .option { padding: 10px 15px; font-size: 13px; min-height: 40px; } #options-container { gap: 8px; } }
+@media (max-width: 900px) and (orientation: landscape) { .container { max-width: 100vw; max-height: 100vh; } #test-container { padding: 20px; justify-content: center; } #question-title { margin-bottom: 20px; font-size: 20px; } #options-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 90%; } .result-card { margin: 20px auto; } }
+
