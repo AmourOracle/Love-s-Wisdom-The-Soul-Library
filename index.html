@@ -6,22 +6,19 @@
     <title>靈魂藏書閣：藏在字裡行間的秘密</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- 预加载关键图片 -->
+
     <link rel="preload" href="./images/Intro.webp" as="image">
+    <link rel="preload" href="./images/Q1.webp" as="image">
 </head>
 <body>
     <div class="container">
-        <!-- 介紹頁面 - 新卡片式设计 -->
         <div id="intro-container" class="screen-container active">
             <div class="card-background" style="background-image: url('./images/Intro.webp')">
                 <div class="card-content">
-                    
                     <div class="card-body">
                         <p class="description"><i>愛是我們第一個學會的語言，卻是被我們最快遺忘。</i></p>
                         <p class="description">我們的愛是封未署名的信箋，散落在那些無人知曉的深夜，飛過高樓與大廈、飛過還沒抵達的承諾，而不知該落在哪扇窗台、不知該寄往何方。今天這個無聲靜謐的夜晚，讓我們一起踏入這場字裡行間，尋訪那些被我們遺落的情感。或許，當最後一頁翻過我們會發現，所有的答案早已寫在心上，只是我們忘了如何閱讀、忘了自己。</p>
                     </div>
-                    
                     <div class="card-footer">
                         <button class="btn primary-btn" id="start-test">開始測驗</button>
                         <div class="card-meta">
@@ -31,55 +28,42 @@
                 </div>
             </div>
         </div>
-        
-        <!-- 測驗頁面 - 視差滾動設計 -->
+
         <div id="test-container" class="screen-container">
             <div class="progress-container">
                 <div class="progress-bar">
                     <div class="progress-fill" id="progress-fill"></div>
                 </div>
+                </div>
+
+            <h1 id="question-title"></h1>
+
+            <div id="options-container">
+                </div>
+
+            <div id="explosion-container"></div>
+
             </div>
-            
-            <div class="parallax-wrapper" id="parallax-wrapper">
-                <!-- 問題區域將由 JavaScript 動態生成 -->
-            </div>
-        </div>
-        
-        <!-- 結果頁面 -->
+
         <div id="result-container" class="screen-container">
             <div class="result-card">
                 <h2 class="result-title" id="result-title">你的靈魂之書是：</h2>
                 <div class="result-subtitle" id="result-subtitle"></div>
-                
-                <div class="result-description" id="result-description">
-                    <!-- 結果描述將由JavaScript動態生成 -->
-                </div>
-                
+                <div class="result-description" id="result-description"></div>
                 <div class="book-traits">
                     <h3>你的書本特質</h3>
-                    <div id="traits-container">
-                        <!-- 特質將由JavaScript動態生成 -->
-                    </div>
+                    <div id="traits-container"></div>
                 </div>
-                
                 <div class="related-books">
                     <h3>與你相似的書籍</h3>
-                    <div id="similar-books">
-                        <!-- 相似書籍將由JavaScript動態生成 -->
-                    </div>
-                    
+                    <div id="similar-books"></div>
                     <h3>互補的閱讀視角</h3>
-                    <div id="complementary-books">
-                        <!-- 互補書籍將由JavaScript動態生成 -->
-                    </div>
+                    <div id="complementary-books"></div>
                 </div>
-                
                 <div class="share-section">
                     <h3>分享你的結果</h3>
                     <p>複製以下文字，分享你的測驗結果：</p>
-                    <div class="share-text" id="share-text">
-                        <!-- 分享文字將由JavaScript動態生成 -->
-                    </div>
+                    <div class="share-text" id="share-text"></div>
                     <div class="action-buttons">
                         <button class="btn secondary-btn" id="copy-btn">複製</button>
                         <button class="btn primary-btn" id="restart-btn">重新測驗</button>
@@ -87,8 +71,7 @@
                 </div>
             </div>
         </div>
-        
-        <!-- 預加載指示器 -->
+
         <div id="preloader" class="preloader">
             <div class="preloader-content">
                 <div class="preloader-spinner"></div>

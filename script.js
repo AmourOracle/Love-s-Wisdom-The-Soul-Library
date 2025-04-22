@@ -1,28 +1,32 @@
 // 在頁面載入完成後運行
 document.addEventListener('DOMContentLoaded', function() {
     console.log("頁面已載入，測驗初始化中...");
-    
-    // 圖片緩存 - 簡化圖片管理
-    const imageCache = {};
-    
-    // 狀態標記 - 防止並發動畫和操作
-    let isAnimating = false;
-    let contentRendered = false;
-    let resultShowing = false; // 添加结果页面状态标记
-    let preloadComplete = false; // 预加载完成标记
-    
-    // 保存元素引用，避免重複獲取
+
+    // --- 狀態管理 ---
+    const state = {
+        isAnimating: false,     // 防止動畫重疊
+        isTransitioning: false, // 防止轉場時重複點擊
+        currentQuestionIndex: 0,
+        userAnswers: [],
+        preloadComplete: false,
+        resultShowing: false,
+        finalScores: {}         // 儲存最終分數
+    };
+
+    // --- DOM 元素快取 ---
     const DOM = {
         containers: {
             intro: document.getElementById('intro-container'),
             test: document.getElementById('test-container'),
             result: document.getElementById('result-container'),
-            preloader: document.getElementById('preloader')
+            preloader: document.getElementById('preloader'),
+            options: document.getElementById('options-container'), // 選項容器
+            explosion: document.getElementById('explosion-container') // 爆裂容器
         },
         elements: {
-            parallaxWrapper: document.getElementById('parallax-wrapper'),
             progressFill: document.getElementById('progress-fill'),
-            progressText: document.getElementById('progress-text'),
+            // progressText: document.getElementById('progress-text'), // 如果需要
+            questionTitle: document.getElementById('question-title'), // 問題標題
             resultTitle: document.getElementById('result-title'),
             resultSubtitle: document.getElementById('result-subtitle'),
             resultDescription: document.getElementById('result-description'),
@@ -38,17 +42,20 @@ document.addEventListener('DOMContentLoaded', function() {
             restart: document.getElementById('restart-btn')
         }
     };
-    
-    // 從 data.js 獲取測驗數據
+
+    // --- 從 data.js 獲取數據 ---
+    // 確保 testData 已定義 (來自 data.js)
+    if (typeof testData === 'undefined') {
+        console.error("錯誤：找不到 testData，請確保 data.js 已載入。");
+        return; // 停止執行
+    }
     const questions = testData.questions;
     const results = testData.results;
     const traitNames = testData.traitNames;
-    
-    // 跟踪當前問題索引和用戶選擇
-    let currentQuestionIndex = 0;
-    const userAnswers = [];
-    
-    // 設置視口高度 - 確保移動設備上正確顯示100vh
+
+    // --- 輔助函數 ---
+
+    // 設置視口高度
     function setViewportHeight() {
         try {
             let vh = window.innerHeight * 0.01;
@@ -57,668 +64,588 @@ document.addEventListener('DOMContentLoaded', function() {
             console.warn("設置視口高度錯誤:", error);
         }
     }
-    
-    // 在初始化和窗口大小調整時設置視口高度
-    window.addEventListener('resize', setViewportHeight);
-    setViewportHeight();
-    
-    // 預加載所有問題圖片
-    function preloadAllImages() {
-        // 顯示預加載指示器
+
+    // 預加載圖片
+    function preloadImages() {
+        if (!DOM.containers.preloader || !questions || questions.length === 0) return;
+
         DOM.containers.preloader.classList.add('active');
-        
-        const totalImages = questions.length + 1; // +1 是首頁圖片
-        let loadedImages = 0;
-        
-        // 更新進度函數
+        const imageUrls = ['./images/Intro.webp']; // 首頁圖
+        questions.forEach((_, index) => imageUrls.push(`./images/Q${index + 1}.webp`)); // 問題圖
+
+        let loadedCount = 0;
+        const totalImages = imageUrls.length;
+
         function updateProgress() {
-            loadedImages++;
-            const progress = Math.round((loadedImages / totalImages) * 100);
+            loadedCount++;
+            const progress = Math.round((loadedCount / totalImages) * 100);
             if (DOM.elements.preloaderProgress) {
                 DOM.elements.preloaderProgress.textContent = `${progress}%`;
             }
-            
-            if (loadedImages >= totalImages) {
-                preloadComplete = true;
+            if (loadedCount >= totalImages) {
+                state.preloadComplete = true;
                 setTimeout(() => {
                     if (DOM.containers.preloader) {
                         DOM.containers.preloader.classList.remove('active');
                     }
-                }, 500);
+                    console.log("圖片預載入完成");
+                    // 可以在這裡觸發一些依賴圖片的操作
+                }, 300);
             }
         }
-        
-        // 預加載首頁圖片
-        const introImg = new Image();
-        introImg.src = './images/Intro.webp';
-        introImg.onload = updateProgress;
-        introImg.onerror = updateProgress; // 即使失敗也算作完成了一個
-        
-        // 預加載所有問題圖片
-        for (let i = 1; i <= questions.length; i++) {
+
+        imageUrls.forEach(url => {
             const img = new Image();
-            img.src = `./images/Q${i}.webp`;
-            imageCache[i] = img;
-            
+            img.src = url;
             img.onload = updateProgress;
-            img.onerror = updateProgress; // 即使失敗也算作完成了一個
-        }
+            img.onerror = () => {
+                console.warn(`無法載入圖片: ${url}`);
+                updateProgress(); // 即使失敗也計數
+            };
+        });
     }
-    
-    // 立即開始預加載所有圖片
-    preloadAllImages();
-    
-    // 重置动画和状态标记的辅助函数
-    function resetAnimationState() {
-        console.log("重置动画状态...");
-        isAnimating = false;
-    }
-    
-    // 优化的屏幕切换函数 - 穩健可靠的實現
-    function switchScreen(fromScreen, toScreen) {
-        console.log(`切換屏幕從 ${fromScreen.id} 到 ${toScreen.id}...`);
-        
-        // 防止重複觸發
-        if (isAnimating) {
-            console.log("動畫進行中，忽略切換請求");
+
+    // 切換屏幕 (基本淡入淡出)
+    function switchScreen(fromScreenId, toScreenId) {
+        const fromScreen = DOM.containers[fromScreenId];
+        const toScreen = DOM.containers[toScreenId];
+
+        if (!fromScreen || !toScreen) {
+            console.error(`切換屏幕失敗: 無效的 ID ${fromScreenId} 或 ${toScreenId}`);
             return;
         }
-        
-        // 設置動畫狀態
-        isAnimating = true;
-        
-        try {
-            // 添加淡出動畫類
-            fromScreen.classList.add('fade-out');
-            
-            // 使用較長的延遲確保動畫完成
-            setTimeout(() => {
-                // 切換屏幕
-                fromScreen.classList.remove('active', 'fade-out');
-                
-                // 強制重排，確保渲染更新
-                void toScreen.offsetWidth;
-                
-                // 顯示目標屏幕
-                toScreen.classList.add('active', 'fade-in');
-                
-                // 如果是切換到測驗頁面，確保視差滾動內容已經初始化
-                if (toScreen.id === 'test-container') {
-                    // 測驗頁面需要禁止滾動
-                    document.body.style.overflow = 'hidden';
-                    
-                    // 如果還沒有初始化內容
-                    if (!contentRendered) {
-                        console.log("初始化視差滾動測驗...");
-                        initParallaxTest();
-                        contentRendered = true;
-                    }
-                }
-                
-                // 如果是切換到結果頁面，設置相應狀態
-                if (toScreen.id === 'result-container') {
-                    resultShowing = true;
-                    // 結果頁面需要滾動
-                    document.body.style.overflow = 'auto';
-                } else {
-                    resultShowing = false;
-                }
-                
-                // 動畫完成後清理狀態
-                setTimeout(() => {
-                    toScreen.classList.remove('fade-in');
-                    resetAnimationState();
-                    console.log("屏幕切換完成，狀態已重置");
-                }, 600);
-            }, 600); // 確保有足夠時間完成淡出動畫
-        } catch (error) {
-            console.error("屏幕切換出錯:", error);
-            
-            // 出錯時確保基本功能可用
+
+        console.log(`切換屏幕從 ${fromScreenId} 到 ${toScreenId}...`);
+
+        if (state.isAnimating) return;
+        state.isAnimating = true;
+
+        fromScreen.classList.add('fade-out');
+
+        setTimeout(() => {
             fromScreen.classList.remove('active', 'fade-out');
-            toScreen.classList.add('active');
-            resetAnimationState();
-            
-            // 如果是測驗頁面，確保內容顯示
-            if (toScreen.id === 'test-container' && !contentRendered) {
-                initParallaxTest();
-                contentRendered = true;
-            }
-            
-            // 如果是結果頁面，確保正確設置
-            if (toScreen.id === 'result-container') {
-                resultShowing = true;
+            void toScreen.offsetWidth; // 強制重繪
+            toScreen.classList.add('active', 'fade-in');
+
+            // 根據目標屏幕調整 body 滾動
+            if (toScreenId === 'result') {
                 document.body.style.overflow = 'auto';
-            }
-        }
-    }
-    
-    // 開始測驗
-    DOM.buttons.start.addEventListener('click', function() {
-        console.log("點擊開始測驗按鈕");
-        
-        // 確保所有圖片已經預加載完成
-        if (!preloadComplete) {
-            // 如果預加載未完成，顯示預加載指示器並等待
-            DOM.containers.preloader.classList.add('active');
-            
-            // 每100ms檢查一次是否預加載完成
-            const checkInterval = setInterval(() => {
-                if (preloadComplete) {
-                    clearInterval(checkInterval);
-                    DOM.containers.preloader.classList.remove('active');
-                    setTimeout(() => {
-                        switchScreen(DOM.containers.intro, DOM.containers.test);
-                    }, 300);
-                }
-            }, 100);
-        } else {
-            // 預加載已完成，直接切換
-            switchScreen(DOM.containers.intro, DOM.containers.test);
-        }
-    });
-    
-    // 重新開始測驗 - 導航回首頁
-    DOM.buttons.restart.addEventListener('click', function() {
-        try {
-            console.log("點擊重新測驗按鈕");
-            // 重置測驗狀態
-            currentQuestionIndex = 0;
-            userAnswers.length = 0;
-            resultShowing = false;
-            
-            // 重置DOM元素
-            DOM.elements.progressFill.style.width = '0%';
-            
-            // 切換到首頁
-            switchScreen(DOM.containers.result, DOM.containers.intro);
-            
-            // 清空和重置視差滾動內容
-            contentRendered = false;
-            if (DOM.elements.parallaxWrapper) {
-                DOM.elements.parallaxWrapper.innerHTML = '';
-            }
-            
-            // 滾動到頂部
-            window.scrollTo(0, 0);
-        } catch (error) {
-            console.error("重新開始測驗出錯:", error);
-            // 出錯時嘗試直接切換
-            DOM.containers.result.classList.remove('active');
-            DOM.containers.intro.classList.add('active');
-            resetAnimationState();
-        }
-    });
-    
-    // 初始化視差滾動測驗
-    function initParallaxTest() {
-        console.log("初始化視差滾動測驗...");
-        
-        // 清空容器
-        if (!DOM.elements.parallaxWrapper) {
-            console.error("parallaxWrapper element not found!");
-            return;
-        }
-        
-        DOM.elements.parallaxWrapper.innerHTML = '';
-        
-        // 創建所有問題區域
-        questions.forEach((question, index) => {
-            const questionNumber = index + 1;
-            const section = document.createElement('section');
-            section.className = 'question-section';
-            section.id = `question-${questionNumber}`;
-            
-            // 第一個問題默認激活
-            if (questionNumber === 1) {
-                section.classList.add('active');
-            } else if (questionNumber === 2) {
-                section.classList.add('next');
-            }
-            
-            // 獲取問題文本（去掉前面的題號）
-            const questionText = question.question.replace(/^\d+\.\s*/, '');
-            
-            // 設置問題區域內容
-            section.innerHTML = `
-                <div class="question-bg" style="background-image: url('./images/Q${questionNumber}.webp')"></div>
-                <div class="overlay">
-                    <div class="question">${questionText}</div>
-                    <div class="options-container">
-                        ${question.options.map((option, optIdx) => `
-                            <div class="option" data-question="${questionNumber}" data-index="${optIdx}">
-                                ${option.text}
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-            
-            DOM.elements.parallaxWrapper.appendChild(section);
-        });
-        
-        // 為所有選項添加事件監聽
-        document.querySelectorAll('.option').forEach(option => {
-            option.addEventListener('click', handleOptionClick);
-        });
-        
-        // 更新進度條
-        updateProgressBar(1);
-    }
-    
-    // 處理選項點擊 - 重要修改：修復最後一題的處理邏輯
-    function handleOptionClick(event) {
-        // 防止重複點擊或動畫進行時的點擊
-        if (isAnimating) {
-            console.log("动画进行中，忽略点击");
-            return;
-        }
-        
-        isAnimating = true;
-        console.log("点击选项，启动动画过渡");
-        
-        const option = event.currentTarget;
-        const questionNum = parseInt(option.dataset.question);
-        const optionIndex = parseInt(option.dataset.index);
-        
-        console.log(`問題 ${questionNum} 選擇了選項 ${optionIndex + 1}`);
-        
-        // 記錄用戶選擇
-        userAnswers[questionNum - 1] = optionIndex;
-        
-        // 更新選中狀態
-        const optionsContainer = option.closest('.options-container');
-        optionsContainer.querySelectorAll('.option').forEach(opt => {
-            opt.classList.remove('selected');
-        });
-        option.classList.add('selected');
-        
-        // 短暫延遲，讓用戶看到選中效果
-        setTimeout(() => {
-            // 修改：使用明確的數字比較而不是與變量比較
-            // 修改：更清晰的問題索引比較邏輯
-            if (questionNum < questions.length) {
-                // 不是最後一題，切換到下一題
-                goToNextQuestion(questionNum);
+                state.resultShowing = true;
             } else {
-                // 是最後一題，顯示結果
-                console.log("最后一题，准备显示结果");
-                showResults();
+                document.body.style.overflow = 'hidden';
+                state.resultShowing = false;
             }
-        }, 500);
+
+            // 如果切換到測驗頁，初始化第一個問題
+            if (toScreenId === 'test' && !state.contentRendered) {
+                 initializeTestScreen(); // 初始化測驗界面
+                 state.contentRendered = true;
+            }
+
+            setTimeout(() => {
+                toScreen.classList.remove('fade-in');
+                state.isAnimating = false;
+                console.log("屏幕切換完成");
+            }, parseFloat(getComputedStyle(toScreen).transitionDuration || '0.6s') * 1000);
+
+        }, parseFloat(getComputedStyle(fromScreen).transitionDuration || '0.6s') * 1000);
     }
-    
-    // 切換到下一題
-    function goToNextQuestion(currentNum) {
-        console.log(`切換到下一題，当前题号: ${currentNum}`);
-        
-        // 獲取當前和下一個問題區域
-        const currentSection = document.getElementById(`question-${currentNum}`);
-        const nextSection = document.getElementById(`question-${currentNum + 1}`);
-        const nextNextSection = document.getElementById(`question-${currentNum + 2}`);
-        
-        if (!currentSection || !nextSection) {
-            console.error(`无法找到问题区域: 当前题 ${currentNum} 或下一题 ${currentNum + 1}`);
-            isAnimating = false;
-            return;
-        }
-        
-        // 更新問題索引
-        currentQuestionIndex = currentNum;
-        
-        // 添加过渡效果的调试记录
-        console.log(`应用过渡效果: question-${currentNum} => prev, question-${currentNum + 1} => active`);
-        
-        // 更新CSS類，應用視差過渡效果
-        currentSection.classList.remove('active');
-        currentSection.classList.add('prev');
-        
-        nextSection.classList.remove('next');
-        nextSection.classList.add('active');
-        
-        // 如果有後面的問題，設置為next
-        if (nextNextSection) {
-            nextNextSection.classList.add('next');
-        }
-        
-        // 更新進度條
-        updateProgressBar(currentNum + 1);
-        
-        // 動畫完成後重置狀態
-        setTimeout(() => {
-            isAnimating = false;
-            console.log("问题过渡动画完成，重置动画状态");
-        }, 800);
-    }
-    
+
     // 更新進度條
     function updateProgressBar(questionNumber) {
+        if (!DOM.elements.progressFill) return;
         try {
             const progress = (questionNumber / questions.length) * 100;
-            if (DOM.elements.progressFill) {
-                DOM.elements.progressFill.style.width = `${progress}%`;
-            }
-            if (DOM.elements.progressText) {
-                DOM.elements.progressText.textContent = `問題 ${questionNumber}/${questions.length}`;
-            }
+            DOM.elements.progressFill.style.width = `${progress}%`;
+            // if (DOM.elements.progressText) { ... } // 如果需要更新文字
         } catch (error) {
             console.error("更新進度條出錯:", error);
         }
     }
-    
-    // 显示结果 - 添加更多错误处理和日志
-    function showResults() {
-        console.log("显示结果页面...");
-        
-        try {
-            // 输出用户选择，帮助调试
-            console.log("用户选择记录:", userAnswers);
-            console.log("用户选择数量:", userAnswers.length);
-            console.log("问题总数:", questions.length);
-            
-            // 计算结果
-            const result = calculateResult();
-            console.log("计算得到的结果类型:", result.title);
-            
-            // 准备结果数据
-            prepareResultData(result);
-            console.log("结果数据准备完成");
-            
-            // 延迟切换到结果页面，确保用户可以看到最后一题的选择效果
-            setTimeout(() => {
-                // 确保DOM元素存在
-                if (!DOM.containers.test || !DOM.containers.result) {
-                    console.error("测试容器或结果容器DOM元素不存在!");
-                    alert("显示结果时出错，请刷新页面重试");
-                    return;
-                }
-                
-                console.log("切换到结果页面");
-                // 强制重置动画状态，确保可以切换
-                isAnimating = false;
-                switchScreen(DOM.containers.test, DOM.containers.result);
-            }, 800); // 增加延迟时间，确保有足够时间完成动画
-        } catch (error) {
-            console.error("顯示結果時發生錯誤:", error);
-            console.log("尝试应急显示结果...");
-            
-            // 应急处理：强制显示结果
-            try {
-                const result = calculateResult();
-                prepareResultData(result);
-                
-                // 强制切换屏幕，绕过动画
-                DOM.containers.test.classList.remove('active');
-                DOM.containers.result.classList.add('active');
-                resultShowing = true;
-                document.body.style.overflow = 'auto';
-                isAnimating = false;
-                console.log("应急显示结果成功");
-            } catch (e) {
-                console.error("应急显示结果也失败:", e);
-                alert("顯示結果時出錯，請重新嘗試測驗");
-            }
-        }
+
+    // --- 測驗核心邏輯 ---
+
+    // 初始化測驗屏幕 (顯示第一題)
+    function initializeTestScreen() {
+        console.log("初始化測驗屏幕...");
+        state.currentQuestionIndex = 0;
+        state.userAnswers = [];
+        displayQuestion(state.currentQuestionIndex);
+        updateProgressBar(1);
     }
-    
-    // 准备结果数据
-    function prepareResultData(result) {
-        try {
-            // 設置結果標題和副標題
-            if (result.title.includes('靈魂圖書管理員')) {
-                DOM.elements.resultTitle.textContent = `你是：${result.title}`;
-            } else {
-                DOM.elements.resultTitle.textContent = `你的靈魂之書是：${result.title}`;
-            }
-            
-            DOM.elements.resultSubtitle.textContent = result.subtitle || '';
-            DOM.elements.resultDescription.textContent = result.description || '';
-            
-            // 設置書本特質
-            DOM.elements.traitsContainer.innerHTML = '';
-            const typeScores = window.finalTypeScores || {
-                'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0
-            };
-            
-            // 特殊處理《靈魂圖書管理員》的特質顯示
-            if (result.title.includes('靈魂圖書管理員')) {
-                Object.keys(traitNames).forEach(type => {
-                    addTraitElement(type, 3);
-                });
-            } else {
-                // 為每種特質創建評分顯示
-                Object.keys(traitNames).forEach(type => {
-                    // 獲取原始分數
-                    const score = typeScores[type] || 0;
-                    
-                    // 根據得分計算星星數 (0-11分映射到1-5星)
-                    let normalizedScore;
-                    if (score < 1) {
-                        normalizedScore = 1; 
-                    } else if (score >= 1 && score < 3) {
-                        normalizedScore = 2; 
-                    } else if (score >= 3 && score < 5) {
-                        normalizedScore = 3; 
-                    } else if (score >= 5 && score < 7) {
-                        normalizedScore = 4; 
-                    } else {
-                        normalizedScore = 5; 
+
+    // 顯示指定索引的問題
+    function displayQuestion(index) {
+        if (index < 0 || index >= questions.length) {
+            console.error(`無效的問題索引: ${index}`);
+            return;
+        }
+        const questionData = questions[index];
+
+        // 1. 更新標題
+        if (DOM.elements.questionTitle) {
+            DOM.elements.questionTitle.innerText = questionData.question.replace(/^\d+\.\s*/, ''); // 移除題號
+            DOM.elements.questionTitle.classList.remove('is-hidden'); // 確保標題可見
+            // 清理可能殘留的內聯樣式
+            DOM.elements.questionTitle.style.opacity = '';
+            DOM.elements.questionTitle.style.filter = '';
+            DOM.elements.questionTitle.style.transform = '';
+            DOM.elements.questionTitle.style.transition = '';
+        }
+
+        // 2. 更新選項
+        if (DOM.containers.options) {
+            DOM.containers.options.innerHTML = ''; // 清空舊選項
+            questionData.options.forEach((optionData, optIndex) => {
+                const optionElement = document.createElement('div');
+                optionElement.className = 'option'; // 初始 class
+                optionElement.dataset.text = optionData.text; // 存儲原始文本
+                optionElement.dataset.index = optIndex; // 存儲選項索引
+                optionElement.innerText = optionData.text;
+                optionElement.setAttribute('role', 'button'); // 無障礙性
+                optionElement.tabIndex = 0; // 可通過鍵盤聚焦
+
+                // 初始設為可見 (移除 is-hidden)
+                optionElement.classList.remove('is-hidden');
+                optionElement.style.opacity = '';
+                optionElement.style.filter = '';
+                option.style.transform = '';
+                optionElement.style.transition = '';
+                optionElement.style.transitionDelay = '';
+
+                // 添加事件監聽
+                optionElement.addEventListener('click', handleOptionClick);
+                optionElement.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleOptionClick(e);
                     }
-                    
-                    addTraitElement(type, normalizedScore);
                 });
-            }
-            
-            // 設置相似和互補書籍
-            if (result.similar && Array.isArray(result.similar)) {
-                DOM.elements.similarBooks.innerHTML = result.similar.map(book => `<p>${book}</p>`).join('');
-            } else {
-                DOM.elements.similarBooks.innerHTML = '<p>無相似書籍資料</p>';
-            }
-            
-            if (result.complementary && Array.isArray(result.complementary)) {
-                DOM.elements.complementaryBooks.innerHTML = result.complementary.map(book => `<p>${book}</p>`).join('');
-            } else {
-                DOM.elements.complementaryBooks.innerHTML = '<p>無互補書籍資料</p>';
-            }
-            
-            // 設置分享文字
-            DOM.elements.shareText.textContent = result.shareText || '';
-            
-            console.log("結果數據準備完成");
-        } catch (error) {
-            console.error("準備結果數據時出錯:", error);
+
+                DOM.containers.options.appendChild(optionElement);
+            });
         }
+        state.isTransitioning = false; // 確保初始狀態不是轉場中
     }
-    
-    // 計算結果函數 - 使用多特質比例計分邏輯
+
+    // 處理選項點擊
+    function handleOptionClick(event) {
+        const clickedOption = event.currentTarget;
+        const optionIndex = parseInt(clickedOption.dataset.index);
+        const questionIndex = state.currentQuestionIndex;
+
+        if (isNaN(optionIndex) || isNaN(questionIndex)) {
+            console.error("無法獲取選項或問題索引");
+            return;
+        }
+
+        if (state.isTransitioning || clickedOption.classList.contains('exploded') || clickedOption.classList.contains('fade-out')) {
+            console.log("轉場中，點擊無效");
+            return;
+        }
+        state.isTransitioning = true; // 開始轉場
+        console.log(`問題 ${questionIndex + 1} 選擇了選項 ${optionIndex + 1}`);
+
+        // 記錄答案
+        state.userAnswers[questionIndex] = optionIndex;
+
+        // --- 觸發淡出和爆裂 ---
+        triggerQuestionFadeOut(clickedOption);
+        triggerExplosion(clickedOption);
+
+        // --- 計算延遲並準備下一步 ---
+        const explosionDuration = 1000; // 與 CSS animation 匹配
+        const maxExplosionDelay = 200; // 與 JS 隨機 delay 匹配
+        const fadeOutDuration = 500;   // 與 CSS transition 匹配
+        const transitionDelay = Math.max(explosionDuration + maxExplosionDelay, fadeOutDuration) + 80; // 等待動畫完成 + 緩衝
+
+        setTimeout(() => {
+            if (questionIndex < questions.length - 1) {
+                prepareNextQuestion();
+            } else {
+                console.log("最後一題，準備顯示結果");
+                showResults();
+            }
+        }, transitionDelay);
+    }
+
+    // 觸發當前問題內容淡出
+    function triggerQuestionFadeOut(clickedOptionElement) {
+        // 淡出標題
+        if (DOM.elements.questionTitle) {
+            DOM.elements.questionTitle.classList.add('is-hidden');
+        }
+        // 淡出其他選項
+        const allCurrentOptions = DOM.containers.options.querySelectorAll('.option');
+        allCurrentOptions.forEach(option => {
+            if (option !== clickedOptionElement) {
+                option.classList.add('fade-out');
+            } else {
+                option.classList.add('exploded'); // 被點擊的選項用 exploded 效果消失
+            }
+        });
+    }
+
+    // 觸發文字爆裂效果
+    function triggerExplosion(clickedOptionElement) {
+        if (!DOM.containers.explosion) return;
+
+        const clickRect = clickedOptionElement.getBoundingClientRect();
+        const containerRect = DOM.containers.test.getBoundingClientRect(); // 相對 test container 定位
+        // 計算相對於 test container 的起始位置
+        const startX = clickRect.left - containerRect.left + clickRect.width / 2;
+        const startY = clickRect.top - containerRect.top + clickRect.height / 2;
+
+        const originalText = clickedOptionElement.dataset.text || clickedOptionElement.innerText;
+
+        originalText.split('').forEach((char) => {
+            if (char.trim() === '') return; // 忽略空白
+
+            const span = document.createElement('span');
+            span.textContent = char;
+            span.className = `char-explode`;
+
+            // 設定隨機最終狀態
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.random() * (Math.min(window.innerWidth, window.innerHeight) * 0.6);
+            const translateX = Math.cos(angle) * radius;
+            const translateY = Math.sin(angle) * radius;
+            const translateZ = Math.random() * 400 + 300;
+            const rotateZ = (Math.random() - 0.5) * 540;
+            const scale = Math.random() * 4 + 3;
+            const delay = Math.random() * 0.2; // 隨機延遲
+
+            // 設置初始位置和 CSS 變數
+            span.style.left = `${startX}px`;
+            span.style.top = `${startY}px`;
+            span.style.setProperty('--tx', `${translateX}px`);
+            span.style.setProperty('--ty', `${translateY}px`);
+            span.style.setProperty('--tz', `${translateZ}px`);
+            span.style.setProperty('--rz', `${rotateZ}deg`);
+            span.style.setProperty('--sc', `${scale}`);
+            span.style.animationDelay = `${delay}s`;
+
+            DOM.containers.explosion.appendChild(span);
+
+            // 動畫結束後移除元素
+            span.addEventListener('animationend', () => {
+                span.remove();
+            });
+        });
+    }
+
+    // 準備並顯示下一題
+    function prepareNextQuestion() {
+        state.currentQuestionIndex++;
+        const questionIndex = state.currentQuestionIndex;
+
+        if (questionIndex >= questions.length) {
+            console.error("嘗試載入不存在的問題");
+            showResults(); // 如果索引超出，直接顯示結果
+            return;
+        }
+
+        const questionData = questions[questionIndex];
+        const newTitleText = questionData.question.replace(/^\d+\.\s*/, '');
+
+        console.log(`載入題目: ${questionIndex + 1}`);
+
+        // --- 1. 更新文本並設置進場前狀態 ---
+        if (DOM.elements.questionTitle) {
+             DOM.elements.questionTitle.classList.add('is-hidden'); // 確保 hidden
+             DOM.elements.questionTitle.innerText = newTitleText; // 更新文本
+             // 清理內聯樣式
+             DOM.elements.questionTitle.style.transform = '';
+             DOM.elements.questionTitle.style.transition = 'none'; // 暫停 transition
+        }
+        // 更新選項 (先清空再創建)
+        if (DOM.containers.options) {
+            DOM.containers.options.innerHTML = ''; // 清空舊選項
+            questionData.options.forEach((optionData, optIndex) => {
+                const optionElement = document.createElement('div');
+                optionElement.className = 'option is-hidden'; // 初始 class (包含 is-hidden)
+                optionElement.dataset.text = optionData.text;
+                optionElement.dataset.index = optIndex;
+                optionElement.innerText = optionData.text;
+                optionElement.setAttribute('role', 'button');
+                optionElement.tabIndex = 0;
+                // 清理內聯樣式
+                optionElement.style.opacity = '';
+                optionElement.style.filter = '';
+                optionElement.style.transform = '';
+                optionElement.style.transition = 'none'; // 暫停 transition
+                optionElement.style.transitionDelay = '0s';
+
+                DOM.containers.options.appendChild(optionElement);
+            });
+            // 更新 allOptions 引用
+             allOptions = DOM.containers.options.querySelectorAll('.option');
+             // 重新綁定事件 (因為元素已重新創建)
+             updateOptionsEventListeners();
+        }
+         // 清空爆裂容器
+        if (DOM.containers.explosion) {
+            DOM.containers.explosion.innerHTML = '';
+        }
+
+        // --- 2. 觸發進場動畫 ---
+        // 觸發標題進場
+        const titleEnterDelay = 100; // 標題先進
+        setTimeout(() => {
+            requestAnimationFrame(() => {
+                 if (DOM.elements.questionTitle) {
+                    DOM.elements.questionTitle.style.transition = ''; // 恢復 CSS transition
+                    DOM.elements.questionTitle.classList.remove('is-hidden');
+                    console.log("Title enter triggered");
+                 }
+            });
+        }, titleEnterDelay);
+
+        // 觸發選項 staggered 進場
+        const optionsEnterStartDelay = titleEnterDelay + 250; // 標題出現後再稍等
+        const optionStaggerDelay = 80; // 選項間隔
+
+        allOptions.forEach((option, index) => {
+            option.style.transition = ''; // 恢復 CSS transition
+            option.style.transitionDelay = `${optionsEnterStartDelay + index * optionStaggerDelay}ms`;
+             requestAnimationFrame(() => {
+                option.classList.remove('is-hidden');
+             });
+        });
+
+        // --- 3. 更新進度條和重置狀態 ---
+        updateProgressBar(questionIndex + 1);
+
+        const totalOptionsDelay = (allOptions.length - 1) * optionStaggerDelay;
+        const optionEnterDuration = 500; // 與 CSS transition 匹配
+        const finalResetDelay = optionsEnterStartDelay + totalOptionsDelay + optionEnterDuration + 80;
+
+        setTimeout(() => {
+            console.log("所有進場動畫完成");
+            allOptions.forEach(option => {
+                option.style.transitionDelay = ''; // 清理 delay
+            });
+            state.isTransitioning = false; // 允許再次點擊
+            console.log("Transition Ended");
+        }, finalResetDelay);
+    }
+
+    // --- 結果計算與顯示 ---
+
+    // 計算結果
     function calculateResult() {
         try {
-            // 初始化各類型的得分
-            const typeScores = {
-                'A': 0, // 思辨抽離
-                'B': 0, // 情感共鳴
-                'C': 0, // 人文觀察
-                'D': 0, // 自我敘事
-                'E': 0  // 即興演出
-            };
-            
-            console.log("計算結果 - 用戶選擇:", userAnswers);
-            
-            // 檢查答案完整性
-            if (userAnswers.length < questions.length) {
-                console.warn(`用户回答不完整: ${userAnswers.length}/${questions.length}`);
-                // 如果最後一題沒有回答，使用默認選項0
-                if (userAnswers[questions.length - 1] === undefined) {
-                    console.log("最后一题未回答，使用默认选项0");
-                    userAnswers[questions.length - 1] = 0;
-                }
+            const scores = { 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0 };
+            // 確保答案數量正確
+            if (state.userAnswers.length !== questions.length) {
+                console.warn(`答案數量 (${state.userAnswers.length}) 與問題數量 (${questions.length}) 不符！`);
+                // 可以選擇填充預設答案或返回錯誤
+                 for (let i = 0; i < questions.length; i++) {
+                     if (state.userAnswers[i] === undefined) state.userAnswers[i] = 0; // 填充 0
+                 }
             }
-            
-            // 計算每種類型的得分 - 多特質比例計分
-            userAnswers.forEach((answerIndex, questionIndex) => {
-                if (answerIndex !== undefined && questionIndex < questions.length) {
-                    const question = questions[questionIndex];
-                    if (question && question.options && question.options[answerIndex]) {
-                        const selectedOption = question.options[answerIndex];
-                        
-                        // 獲取該選項的得分分配
-                        const scores = selectedOption.scores;
-                        
-                        // 將得分分配加入總分中
-                        for (const type in scores) {
-                            if (typeScores.hasOwnProperty(type)) {
-                                typeScores[type] += scores[type];
-                                console.log(`問題 ${questionIndex+1}: ${type} 類型得分 +${scores[type]}`);
-                            }
+
+            state.userAnswers.forEach((answerIndex, questionIndex) => {
+                const question = questions[questionIndex];
+                if (question?.options?.[answerIndex]?.scores) {
+                    const optionScores = question.options[answerIndex].scores;
+                    for (const type in optionScores) {
+                        if (scores.hasOwnProperty(type)) {
+                            scores[type] += optionScores[type];
                         }
                     }
                 }
             });
-            
-            // 將得分保存，以便在結果頁面顯示
-            window.finalTypeScores = typeScores;
-            
-            // 檢查是否有四種類型得分相同
+
+            state.finalScores = scores; // 儲存分數到狀態
+            console.log("最終分數:", state.finalScores);
+
+            // --- 判斷邏輯 (與之前相同) ---
+            const scoreValues = Object.values(scores);
             const scoreFrequency = {};
-            for (const type in typeScores) {
-                // 四捨五入到小數點後一位，避免浮點數比較問題
-                const score = Math.round(typeScores[type] * 10) / 10;
-                scoreFrequency[score] = (scoreFrequency[score] || 0) + 1;
-            }
-            
-            for (const score in scoreFrequency) {
-                if (scoreFrequency[score] === 4) {
-                    return results["SPECIAL"];
-                }
-            }
-            
-            // 尋找得分最高的類型
-            let maxScore = 0;
+            scoreValues.forEach(score => {
+                const roundedScore = Math.round(score * 10) / 10;
+                scoreFrequency[roundedScore] = (scoreFrequency[roundedScore] || 0) + 1;
+            });
+            for (const score in scoreFrequency) { if (scoreFrequency[score] >= 4) return results["SPECIAL"]; }
+
+            let maxScore = -Infinity;
             let highestTypes = [];
-            
-            for (const type in typeScores) {
-                if (typeScores[type] > maxScore) {
-                    maxScore = typeScores[type];
-                    highestTypes = [type];
-                } else if (Math.abs(typeScores[type] - maxScore) < 0.1) { // 考慮浮點數誤差，差異小於0.1視為相同
-                    highestTypes.push(type);
-                }
+            for (const type in scores) {
+                if (Math.abs(scores[type] - maxScore) < 0.01) { highestTypes.push(type); }
+                else if (scores[type] > maxScore) { maxScore = scores[type]; highestTypes = [type]; }
             }
-            
-            // 如果有三個或更多類型得分相同且為最高分，返回特殊結果
-            if (highestTypes.length >= 3) {
-                return results["SPECIAL"];
-            }
-            
-            // 如果只有一個最高分類型，直接返回結果
-            if (highestTypes.length === 1) {
-                return results[highestTypes[0]];
-            }
-            
-            // 如果有兩個類型同分且為最高分，使用決勝題機制 (僅第9題)
+
+            if (highestTypes.length === 1) return results[highestTypes[0]];
+            if (highestTypes.length >= 3) return results["SPECIAL"];
             if (highestTypes.length === 2) {
-                const tiebreakQuestionIndex = 8; // 第9題的索引是8
-                const tiebreakAnswer = userAnswers[tiebreakQuestionIndex];
-                
-                if (tiebreakAnswer !== undefined) {
-                    const tiebreakPrimaryType = questions[tiebreakQuestionIndex].options[tiebreakAnswer].primary;
-                    
-                    // 檢查決勝題的主要類型是否在最高分類型中
-                    if (highestTypes.includes(tiebreakPrimaryType)) {
-                        return results[tiebreakPrimaryType];
-                    }
-                }
-                
-                // 如果決勝題不能決勝，使用各類型分佈的差異性作為決勝依據
-                const balanceScores = {};
-                highestTypes.forEach(type => {
-                    let diffSum = 0;
-                    Object.keys(typeScores).forEach(otherType => {
-                        if (type !== otherType) {
-                            diffSum += Math.abs(typeScores[type] - typeScores[otherType]);
-                        }
-                    });
-                    balanceScores[type] = diffSum;
-                });
-                
-                // 選擇特質分佈最均衡的類型
-                const minBalanceScore = Math.min(...Object.values(balanceScores));
-                const balanceWinners = highestTypes.filter(
-                    type => balanceScores[type] === minBalanceScore
-                );
-                
-                return results[balanceWinners[0]];
+                const tiebreakQuestionIndex = 8;
+                const tiebreakAnswerIndex = state.userAnswers[tiebreakQuestionIndex];
+                const tiebreakPrimaryType = questions[tiebreakQuestionIndex]?.options?.[tiebreakAnswerIndex]?.primary;
+                if (tiebreakPrimaryType && highestTypes.includes(tiebreakPrimaryType)) { return results[tiebreakPrimaryType]; }
+                return results[highestTypes[0]]; // 決勝無效，返回第一個
             }
-            
-            // 保險處理：如果上述所有邏輯都未返回結果，選擇第一個最高分類型
-            return results[highestTypes[0]];
+            return results['A']; // 保險
+
         } catch (error) {
             console.error("計算結果時發生錯誤:", error);
-            // 出錯時返回默認結果，確保流程不中斷
-            return results['A']; 
+            return results['A']; // 出錯時返回預設
         }
     }
-    
-    // 添加特質元素助手函數
+
+    // 準備結果頁面數據
+    function prepareResultData(resultData) {
+        if (!resultData || !DOM.elements.resultTitle) return; // 防禦性檢查
+        try {
+            DOM.elements.resultTitle.textContent = resultData.title ? (resultData.title.includes('管理員') ? `你是：${resultData.title}` : `你的靈魂之書是：${resultData.title}`) : '結果未知';
+            DOM.elements.resultSubtitle.textContent = resultData.subtitle || '';
+            DOM.elements.resultDescription.textContent = resultData.description || '無法載入描述。';
+
+            // 填充特質
+            DOM.elements.traitsContainer.innerHTML = '';
+            const typeScores = state.finalScores; // 從 state 獲取
+            if (resultData.title && resultData.title.includes('管理員')) {
+                Object.keys(traitNames).forEach(type => addTraitElement(type, 3));
+            } else {
+                Object.keys(traitNames).forEach(type => {
+                    const score = typeScores[type] || 0;
+                    let stars = 1;
+                    if (score >= 7) stars = 5;
+                    else if (score >= 5) stars = 4;
+                    else if (score >= 3) stars = 3;
+                    else if (score >= 1) stars = 2;
+                    addTraitElement(type, stars);
+                });
+            }
+
+            // 填充相關書籍
+            DOM.elements.similarBooks.innerHTML = (resultData.similar?.length) ? resultData.similar.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>';
+            DOM.elements.complementaryBooks.innerHTML = (resultData.complementary?.length) ? resultData.complementary.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>';
+
+            // 填充分享文字
+            DOM.elements.shareText.textContent = resultData.shareText || '快來測測你的靈魂之書吧！#靈魂藏書閣 #AmourOracle';
+
+            console.log("結果數據準備完成");
+        } catch (error) {
+            console.error("準備結果數據時出錯:", error);
+            DOM.elements.resultTitle.textContent = "顯示結果時發生錯誤";
+        }
+    }
+
+    // 顯示結果頁面
+    function showResults() {
+        console.log("顯示結果頁面...");
+        state.isTransitioning = false; // 確保轉場標誌重置
+        try {
+            const resultData = calculateResult();
+            prepareResultData(resultData);
+            switchScreen('test', 'result'); // 切換到結果屏幕
+        } catch (error) {
+            console.error("顯示結果時發生錯誤:", error);
+            alert("抱歉，顯示結果時發生錯誤，請重試。");
+            // 可以嘗試切換回首頁
+            switchScreen('test', 'intro');
+        }
+    }
+
+    // 添加特質元素到結果頁
     function addTraitElement(type, starCount) {
+        if (!DOM.elements.traitsContainer) return;
         try {
             const traitElement = document.createElement('div');
             traitElement.className = 'trait-item';
-            
             const traitName = document.createElement('span');
             traitName.className = 'trait-name';
-            traitName.textContent = traitNames[type];
-            
+            traitName.textContent = traitNames[type] || type;
             const traitStars = document.createElement('span');
             traitStars.className = 'trait-stars';
-            traitStars.textContent = '★'.repeat(starCount) + '☆'.repeat(5 - starCount);
-            
+            const validStars = Math.max(0, Math.min(5, Math.round(starCount)));
+            traitStars.textContent = '★'.repeat(validStars) + '☆'.repeat(5 - validStars);
             traitElement.appendChild(traitName);
             traitElement.appendChild(traitStars);
             DOM.elements.traitsContainer.appendChild(traitElement);
         } catch (error) {
-            console.error("添加特質元素時出錯:", error);
+            console.error(`添加特質 ${type} 時出錯:`, error);
         }
     }
-    
+
     // 複製分享文字
-    DOM.buttons.copy.addEventListener('click', function() {
-        try {
-            const shareText = DOM.elements.shareText.textContent;
-            navigator.clipboard.writeText(shareText).then(() => {
-                DOM.buttons.copy.textContent = '已複製!';
-                setTimeout(() => {
-                    DOM.buttons.copy.textContent = '複製';
-                }, 2000);
-            }).catch(err => {
-                console.error('無法複製: ', err);
-                alert('複製失敗，請手動選擇文字並複製');
-            });
-        } catch (error) {
-            console.error("複製分享文字時出錯:", error);
-            alert('複製失敗，請手動選擇文字並複製');
-        }
-    });
-    
-    // 添加全局错误保护 - 防止页面完全卡死
-    window.addEventListener('error', function(event) {
-        console.error("捕获到全局错误:", event.error);
-        
-        // 恢复动画状态
-        isAnimating = false;
-        
-        // 如果在测验中出错尝试恢复
-        if (DOM.containers.test.classList.contains('active') && !resultShowing) {
-            console.log("测验中发生错误，尝试恢复状态");
-            
-            // 如果所有问题已经回答，显示结果
-            if (userAnswers.length >= questions.length - 1) {
-                showResults();
+    function copyShareText() {
+        if (!DOM.elements.shareText || !DOM.buttons.copy) return;
+         try {
+            const textToCopy = DOM.elements.shareText.textContent;
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    DOM.buttons.copy.textContent = '已複製!';
+                    setTimeout(() => { DOM.buttons.copy.textContent = '複製'; }, 2000);
+                }).catch(err => {
+                    console.warn('Clipboard API 複製失敗:', err);
+                    fallbackCopyText(textToCopy);
+                });
+            } else {
+                fallbackCopyText(textToCopy);
             }
+         } catch (error) {
+             console.error("複製操作出錯:", error);
+             alert('複製失敗，請手動複製。');
+         }
+    }
+    // 備用複製方法
+    function fallbackCopyText(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = 'fixed'; textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            DOM.buttons.copy.textContent = '已複製!';
+            setTimeout(() => { DOM.buttons.copy.textContent = '複製'; }, 2000);
+        } catch (err) {
+            console.error('備用複製方法失敗:', err);
+            alert('複製失敗，請手動複製。');
+        }
+        document.body.removeChild(textArea);
+    }
+
+    // --- 事件監聽器綁定 ---
+    DOM.buttons.start?.addEventListener('click', () => {
+        if (!state.preloadComplete) {
+             if(DOM.containers.preloader) DOM.containers.preloader.classList.add('active');
+             const interval = setInterval(() => {
+                 if (state.preloadComplete) {
+                     clearInterval(interval);
+                     if(DOM.containers.preloader) DOM.containers.preloader.classList.remove('active');
+                     setTimeout(() => switchScreen('intro', 'test'), 100);
+                 }
+             }, 100);
+        } else {
+             switchScreen('intro', 'test');
         }
     });
-    
-    // 页面加载完成后初始化的其他逻辑...
-    console.log("初始化完成，等待用户开始测验");
+
+    DOM.buttons.restart?.addEventListener('click', () => {
+        state.contentRendered = false; // 需要重新渲染測驗界面
+        switchScreen('result', 'intro');
+        // 清理結果頁面內容 (可選)
+        if(DOM.elements.traitsContainer) DOM.elements.traitsContainer.innerHTML = '';
+        // 重置進度條
+        updateProgressBar(0);
+    });
+
+    DOM.buttons.copy?.addEventListener('click', copyShareText);
+
+    // 全局錯誤處理
+    window.addEventListener('error', function(event) {
+        console.error("捕獲到全局錯誤:", event.error, "來自:", event.filename);
+        state.isAnimating = false; // 嘗試恢復狀態
+        state.isTransitioning = false;
+    });
+
+    // --- 初始化 ---
+    setViewportHeight();
+    window.addEventListener('resize', setViewportHeight);
+    preloadImages(); // 開始預載入
+
+    console.log("腳本初始化完成。");
 });
