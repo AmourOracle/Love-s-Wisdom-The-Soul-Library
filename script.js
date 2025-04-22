@@ -4,8 +4,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- 狀態管理 ---
     const state = {
-        isAnimating: false,
-        isTransitioning: false,
+        isAnimating: false,     // 防止屏幕切換動畫重疊
+        isTransitioning: false, // 防止問題轉場時重複點擊
         currentQuestionIndex: 0,
         userAnswers: [],
         preloadComplete: false,
@@ -16,11 +16,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- DOM 元素快取 ---
     let DOM = {}; // 在 DOMContentLoaded 後填充
+    let allOptions = []; // 選項元素的引用數組
 
     // --- 從 data.js 獲取數據 ---
     if (typeof testData === 'undefined') {
-        console.error("錯誤：找不到 testData。請確保 data.js 在 script.js 之前載入。");
-        // 可以在頁面上顯示錯誤提示
+        console.error("錯誤：找不到 testData。");
         document.body.innerHTML = '<p style="color: red; padding: 20px;">載入測驗數據失敗，請檢查 data.js 文件。</p>';
         return;
     }
@@ -29,12 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const traitNames = testData.traitNames;
 
     // --- 輔助函數 ---
-    function setViewportHeight() {
-        try {
-            let vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-        } catch (error) { console.warn("設置視口高度錯誤:", error); }
-    }
+    function setViewportHeight() { /* ... (保持不變) ... */ }
 
     // 快取 DOM 元素
     function cacheDOMElements() {
@@ -48,6 +43,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 explosion: document.getElementById('explosion-container')
             },
             elements: {
+                testBackground: document.getElementById('test-background'), // 新增背景元素
                 progressFill: document.getElementById('progress-fill'),
                 questionTitle: document.getElementById('question-title'),
                 resultTitle: document.getElementById('result-title'),
@@ -60,13 +56,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 preloaderProgress: document.getElementById('preloader-progress')
             },
             buttons: {
-                start: document.getElementById('start-test'), // *** 確保 ID 正確 ***
+                start: document.getElementById('start-test'),
                 copy: document.getElementById('copy-btn'),
                 restart: document.getElementById('restart-btn')
             }
         };
         // 檢查關鍵元素
-        if (!DOM.containers.intro || !DOM.containers.test || !DOM.containers.result || !DOM.buttons.start) {
+        if (!DOM.containers.intro || !DOM.containers.test || !DOM.containers.result || !DOM.buttons.start || !DOM.elements.testBackground) {
             console.error("錯誤：未能找到必要的 HTML 元素。");
             return false;
         }
@@ -78,9 +74,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function preloadImages() {
         if (!DOM.containers.preloader || !questions || questions.length === 0) {
              console.warn("無法預載入圖片：缺少 preloader 或 questions 數據。");
-             state.preloadComplete = true; // 標記完成以繼續
+             state.preloadComplete = true;
              if(DOM.containers.preloader) DOM.containers.preloader.classList.remove('active');
-             bindStartButton(); // 嘗試綁定按鈕
+             bindStartButton();
              return;
         }
 
@@ -104,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         DOM.containers.preloader.classList.remove('active');
                     }
                     console.log("圖片預載入完成");
-                    bindStartButton(); // *** 在預載完成後綁定按鈕 ***
+                    bindStartButton();
                 }, 300);
             }
         }
@@ -143,8 +139,10 @@ document.addEventListener('DOMContentLoaded', function() {
                  initializeTestScreen();
                  state.contentRendered = true;
             } else if (toScreenId === 'test' && state.contentRendered) {
-                state.isTransitioning = false; // 返回測驗頁時確保可交互
+                // 如果是從結果頁返回，需要重新初始化測驗狀態
+                initializeTestScreen(); // 確保每次進入測驗都重置
             }
+
             setTimeout(() => {
                 toScreen.classList.remove('fade-in');
                 state.isAnimating = false;
@@ -156,45 +154,66 @@ document.addEventListener('DOMContentLoaded', function() {
     // 更新進度條
     function updateProgressBar(questionNumber) {
         if (!DOM.elements.progressFill || !questions) return;
-        const progress = Math.min(100, (questionNumber / questions.length) * 100);
+        // --- 修正：確保 questionNumber 是有效的 ---
+        const currentQ = Math.max(1, Math.min(questionNumber, questions.length));
+        const progress = ((currentQ -1) / questions.length) * 100; // 從0開始計算進度
         DOM.elements.progressFill.style.width = `${progress}%`;
+        console.log(`進度條更新到: 問題 ${currentQ}, ${progress.toFixed(1)}%`);
     }
 
     // --- 測驗核心邏輯 ---
 
     // 初始化測驗屏幕
     function initializeTestScreen() {
-        if (!DOM.elements.questionTitle || !DOM.containers.options) {
+        if (!DOM.elements.questionTitle || !DOM.containers.options || !DOM.elements.testBackground) {
             console.error("無法初始化測驗屏幕：缺少元素。"); return;
         }
         console.log("初始化測驗屏幕...");
         state.currentQuestionIndex = 0;
         state.userAnswers = [];
-        displayQuestion(state.currentQuestionIndex, true);
-        updateProgressBar(1);
+        state.isTransitioning = false; // 重置轉場狀態
+        displayQuestion(state.currentQuestionIndex, true); // 初始顯示
+        updateProgressBar(1); // 初始進度為第一題
     }
 
     // 顯示指定索引的問題
     function displayQuestion(index, isInitialDisplay = false) {
         if (index < 0 || index >= questions.length) return;
         const questionData = questions[index];
+        const questionNumber = index + 1; // 從 1 開始計數
 
-        // 更新標題
+        // 1. 更新背景圖
+        if (DOM.elements.testBackground) {
+            const imageUrl = `./images/Q${questionNumber}.webp`; // *** 確保路徑和檔名正確 ***
+            // 為了看到轉場效果，先隱藏舊背景，再設置新背景並顯示
+            DOM.elements.testBackground.classList.add('is-hidden');
+            // 使用 setTimeout 確保樣式先生效
+            setTimeout(() => {
+                DOM.elements.testBackground.style.backgroundImage = `url('${imageUrl}')`;
+                requestAnimationFrame(() => { // 確保在下一幀移除 hidden
+                    DOM.elements.testBackground.classList.remove('is-hidden');
+                });
+            }, isInitialDisplay ? 0 : 50); // 初始顯示不需要延遲
+             console.log(`背景設置為: ${imageUrl}`);
+        } else { console.error("找不到 test-background 元素"); }
+
+
+        // 2. 更新標題
         if (DOM.elements.questionTitle) {
             DOM.elements.questionTitle.innerText = questionData.question.replace(/^\d+\.\s*/, '');
             DOM.elements.questionTitle.classList.remove('is-hidden');
             DOM.elements.questionTitle.style.transition = 'none'; // 避免進場動畫
         } else { console.error("找不到 questionTitle"); }
 
-        // 更新選項
+        // 3. 更新選項
         if (DOM.containers.options) {
             DOM.containers.options.innerHTML = '';
             questionData.options.forEach((optionData, optIndex) => {
                 const optionElement = document.createElement('div');
-                optionElement.className = 'option'; // 初始 class
+                optionElement.className = 'option';
                 if (!isInitialDisplay) {
-                    optionElement.classList.add('is-hidden'); // 非初始先隱藏
-                    optionElement.style.transition = 'none'; // 避免進場動畫
+                    optionElement.classList.add('is-hidden');
+                    optionElement.style.transition = 'none';
                 }
                 optionElement.dataset.text = optionData.text;
                 optionElement.dataset.index = optIndex;
@@ -229,16 +248,24 @@ document.addEventListener('DOMContentLoaded', function() {
         state.isTransitioning = true;
         console.log(`問題 ${questionIndex + 1} 選擇了選項 ${optionIndex + 1}`);
         state.userAnswers[questionIndex] = optionIndex;
+
         triggerQuestionFadeOut(clickedOption);
         triggerExplosion(clickedOption);
+
+        // --- 修正：確保進度條在觸發轉場前更新 ---
+        updateProgressBar(questionIndex + 2); // 更新為下一題的進度
+
         const explosionDuration = 1000;
         const maxExplosionDelay = 200;
         const fadeOutDuration = 500;
         const transitionDelay = Math.max(explosionDuration + maxExplosionDelay, fadeOutDuration) + 100;
+
         setTimeout(() => {
-            if (questionIndex < questions.length - 1) {
+            // --- 修正：使用 state.currentQuestionIndex 判斷 ---
+            if (state.currentQuestionIndex < questions.length - 1) {
                 prepareNextQuestion();
             } else {
+                console.log("最後一題完成，顯示結果");
                 showResults();
             }
         }, transitionDelay);
@@ -249,8 +276,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (DOM.elements.questionTitle) {
             DOM.elements.questionTitle.classList.add('is-hidden');
         }
-        allOptions.forEach(option => {
-            option.style.transitionDelay = ''; // 清除進場延遲
+        // --- 修正：確保獲取的是當前顯示的選項 ---
+        const currentOptions = DOM.containers.options.querySelectorAll('.option');
+        currentOptions.forEach(option => {
+            option.style.transitionDelay = '';
             if (option === clickedOptionElement) {
                 option.classList.add('exploded');
             } else {
@@ -306,8 +335,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // 觸發新問題內容進場動畫
     function triggerQuestionEnterAnimation() {
          console.log("觸發新內容進場動畫");
-         // 背景進場 (如果需要)
-         // requestAnimationFrame(() => { setTimeout(() => { backgroundPlaceholder.classList.remove('is-entering'); }, 50); });
+         // 背景進場 (如果需要獨立控制)
+         // if (DOM.elements.testBackground) {
+         //     requestAnimationFrame(() => { setTimeout(() => { DOM.elements.testBackground.classList.remove('is-hidden'); }, 50); });
+         // }
 
          // 標題進場
          const titleEnterDelay = 100;
@@ -346,25 +377,41 @@ document.addEventListener('DOMContentLoaded', function() {
               if(DOM.elements.questionTitle) {
                  DOM.elements.questionTitle.style.pointerEvents = '';
              }
-             state.isTransitioning = false;
+             state.isTransitioning = false; // 允許再次點擊
              console.log("轉場結束");
          }, finalResetDelay);
     }
 
 
-    // --- 結果計算與顯示 (保持不變) ---
-    function calculateResult() { /* ... (省略) ... */ }
-    function prepareResultData(resultData) { /* ... (省略) ... */ }
-    function showResults() { /* ... (省略) ... */ }
-    function addTraitElement(type, starCount) { /* ... (省略) ... */ }
-    function copyShareText() { /* ... (省略) ... */ }
-    function fallbackCopyText(text) { /* ... (省略) ... */ }
+    // --- 結果計算與顯示 ---
+    function calculateResult() { /* ... (保持不變) ... */ }
+    function prepareResultData(resultData) { /* ... (保持不變) ... */ }
+    function showResults() {
+        console.log("顯示結果頁面...");
+        state.isTransitioning = false; // 確保重置
+        try {
+            const resultData = calculateResult();
+            if (!resultData) { throw new Error("計算結果失敗"); } // 增加檢查
+            prepareResultData(resultData);
+            switchScreen('test', 'result'); // 切換到結果屏幕
+        } catch (error) {
+            console.error("顯示結果時發生錯誤:", error);
+            alert("抱歉，顯示結果時發生錯誤，請重試。");
+            switchScreen('test', 'intro'); // 出錯時返回首頁
+        }
+    }
+    function addTraitElement(type, starCount) { /* ... (保持不變) ... */ }
+    function copyShareText() { /* ... (保持不變) ... */ }
+    function fallbackCopyText(text) { /* ... (保持不變) ... */ }
 
     // --- 事件監聽器綁定 ---
-
-    // 綁定開始按鈕事件
     function bindStartButton() {
         if (DOM.buttons.start) {
+            // --- 修改：移除舊監聽器，避免重複綁定 ---
+            const newButton = DOM.buttons.start.cloneNode(true);
+            DOM.buttons.start.parentNode.replaceChild(newButton, DOM.buttons.start);
+            DOM.buttons.start = newButton; // 更新引用
+
             DOM.buttons.start.addEventListener('click', () => {
                 if (!state.preloadComplete) {
                      console.warn("圖片尚未載入完成，請稍候...");
@@ -376,48 +423,46 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log("開始按鈕事件已綁定");
         } else {
             console.error("無法綁定開始按鈕事件：按鈕未找到。");
-            // 可以考慮顯示錯誤給用戶
-            // alert("無法啟動測驗，請刷新頁面。");
         }
     }
-
-    // --- 修改：確保其他按鈕也延遲綁定 ---
     function bindOtherButtons() {
         if (DOM.buttons.restart) {
+             // --- 修改：移除舊監聽器 ---
+             const newRestartButton = DOM.buttons.restart.cloneNode(true);
+             DOM.buttons.restart.parentNode.replaceChild(newRestartButton, DOM.buttons.restart);
+             DOM.buttons.restart = newRestartButton;
+
              DOM.buttons.restart.addEventListener('click', () => {
-                state.contentRendered = false;
+                state.contentRendered = false; // 重置渲染標誌
                 switchScreen('result', 'intro');
                 if(DOM.elements.traitsContainer) DOM.elements.traitsContainer.innerHTML = '';
-                updateProgressBar(0); // 重置進度條為 0
+                updateProgressBar(0);
             });
             console.log("重新開始按鈕事件已綁定");
-        } else {
-             console.error("無法綁定重新開始按鈕。");
-        }
+        } else { console.error("無法綁定重新開始按鈕。"); }
 
         if (DOM.buttons.copy) {
+             // --- 修改：移除舊監聽器 ---
+             const newCopyButton = DOM.buttons.copy.cloneNode(true);
+             DOM.buttons.copy.parentNode.replaceChild(newCopyButton, DOM.buttons.copy);
+             DOM.buttons.copy = newCopyButton;
+
             DOM.buttons.copy.addEventListener('click', copyShareText);
             console.log("複製按鈕事件已綁定");
-        } else {
-             console.error("無法綁定複製按鈕。");
-        }
+        } else { console.error("無法綁定複製按鈕。"); }
     }
-
-
-    window.addEventListener('error', function(event) {
-        console.error("捕獲到全局錯誤:", event.error, "來自:", event.filename);
-        state.isAnimating = false;
-        state.isTransitioning = false;
-    });
+    window.addEventListener('error', function(event) { /* ... (保持不變) ... */ });
 
     // --- 初始化 ---
     setViewportHeight();
     window.addEventListener('resize', setViewportHeight);
-    // --- 修改：確保 DOM 快取成功後再執行後續操作 ---
-    if (cacheDOMElements()) {
+    if (cacheDOMElements()) { // *** 確保快取成功 ***
         preloadImages(); // 開始預載入
         bindOtherButtons(); // 綁定結果頁按鈕
         // bindStartButton 會在 preloadImages 完成後調用
+    } else {
+        // 如果無法快取 DOM，顯示錯誤
+        document.body.innerHTML = '<p style="color: red; padding: 20px;">頁面初始化失敗，請檢查 HTML 結構。</p>';
     }
 
     console.log("腳本初始化完成。");

@@ -3,23 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>靈魂藏書閣：藏在字裡行間的秘密 (修正啟動問題)</title>
-    <link rel="stylesheet" href="style.css">
+    <title>靈魂藏書閣：藏在字裡行間的秘密 (修正版 v2)</title> <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <link rel="preload" href="./images/Intro.webp" as="image"> <link rel="preload" href="./images/Q1.webp" as="image">
+    <link rel="preload" href="./images/Intro.webp" as="image">
+    <link rel="preload" href="./images/Q1.webp" as="image">
 </head>
 <body>
     <div class="container">
         <div id="intro-container" class="screen-container active">
-             <div class="card-background" style="background-image: url('./images/Intro.webp')">
+            <div class="card-background" style="background-image: url('./images/Intro.webp')">
                 <div class="card-content">
                     <div class="card-body">
                         <p class="description"><i>愛是我們第一個學會的語言，卻是被我們最快遺忘。</i></p>
                         <p class="description">我們的愛是封未署名的信箋，散落在那些無人知曉的深夜，飛過高樓與大廈、飛過還沒抵達的承諾，而不知該落在哪扇窗台、不知該寄往何方。今天這個無聲靜謐的夜晚，讓我們一起踏入這場字裡行間，尋訪那些被我們遺落的情感。或許，當最後一頁翻過我們會發現，所有的答案早已寫在心上，只是我們忘了如何閱讀、忘了自己。</p>
                     </div>
                     <div class="card-footer">
-                         <button class="btn primary-btn" id="start-test">開始測驗</button>
+                        <button class="btn primary-btn" id="start-test">開始測驗</button>
                         <div class="card-meta">
                             <span>靈魂藏書閣 | 2025</span>
                         </div>
@@ -29,14 +29,21 @@
         </div>
 
         <div id="test-container" class="screen-container">
+            <div id="test-background"></div>
+
             <div class="progress-container">
                 <div class="progress-bar">
                     <div class="progress-fill" id="progress-fill"></div>
                 </div>
             </div>
+
             <h1 id="question-title"></h1>
-            <div id="options-container"></div>
+
+            <div id="options-container">
+                </div>
+
             <div id="explosion-container"></div>
+
         </div>
 
         <div id="result-container" class="screen-container">
