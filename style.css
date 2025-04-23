@@ -42,12 +42,137 @@ body {
 }
 
 /* ================= 預加載畫面 ================= */
-.preloader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--deep-blue-bg); z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
-.preloader.active { opacity: 1; pointer-events: auto; }
-.preloader-content { text-align: center; color: var(--text-color); }
-.preloader-spinner { width: 60px; height: 60px; border: 4px solid rgba(255,255,255,0.1); border-left-color: var(--primary-color); border-radius: 50%; margin: 0 auto 20px; animation: spin 1s linear infinite; }
-.preloader-text { font-size: 18px; margin-bottom: 10px; }
-#preloader-progress { font-size: 24px; font-weight: bold; color: var(--primary-color); }
+.preloader {
+    /* ... existing styles ... */
+    transition: opacity 0.5s ease, visibility 0s linear 0.5s; /* Ensure it disappears fully */
+    visibility: hidden; /* Start hidden */
+}
+.preloader.active {
+    opacity: 1;
+    pointer-events: auto;
+    visibility: visible; /* Make visible when active */
+    transition: opacity 0.5s ease;
+}
+.preloader-content {
+    text-align: center;
+    color: var(--text-color);
+    width: 90%; /* Control overall content width */
+    max-width: 400px; /* Max width for larger screens */
+}
+
+/* Remove original spinner */
+.preloader-spinner {
+    display: none;
+}
+
+/* SVG Container Styles */
+#preloader #text {
+    width: 100%; /* Make SVG responsive */
+    height: auto;
+    display: block;
+    margin: 0 auto 20px; /* Center and add space below */
+    overflow: visible; /* Important for glow */
+    /* Apply glow animation to the whole SVG */
+    animation: glow 2.5s ease-in-out infinite alternate;
+    will-change: filter; /* Hint for performance */
+}
+
+/* Stroke Animation Setup */
+#preloader #text path {
+    stroke-width: 0.5px; /* Adjust thickness as needed */
+    /* Use a large dash array, likely longer than any path segment */
+    stroke-dasharray: 1500;
+    stroke-dashoffset: 1500;
+    /* Animation will be applied per class */
+    will-change: stroke-dashoffset, fill; /* Hint for performance */
+}
+
+/* Specific animations for different original fill colors */
+#preloader #text .st1 { /* Originally white */
+    stroke: #ffffff; /* White stroke */
+    animation: drawStrokeAndFillWhite 4s ease-out forwards;
+}
+
+#preloader #text .st3 { /* Originally #f2f2f2 */
+    stroke: #f2f2f2; /* Light grey stroke */
+    animation: drawStrokeAndFillGrey 4s ease-out forwards 0.5s; /* Slight delay */
+}
+
+/* Other paths (gradients, etc.) - Fade them in after drawing starts */
+#preloader #text .st0,
+#preloader #text .st2,
+#preloader #text .st4,
+#preloader #text .st5 {
+    opacity: 0;
+    animation: fadeInPath 2s ease-in forwards 2s; /* Fade in after stroke starts drawing */
+}
+
+
+/* Keyframes for Stroke Drawing and Filling */
+@keyframes drawStrokeAndFillWhite {
+    0% {
+        stroke-dashoffset: 1500;
+        fill: none;
+        opacity: 1; /* Ensure path is visible for stroke */
+    }
+    75% { /* Stroke drawing completes here */
+        stroke-dashoffset: 0;
+        fill: none;
+        opacity: 1;
+    }
+    100% { /* Fill appears */
+        stroke-dashoffset: 0;
+        fill: #ffffff; /* Final fill color */
+        opacity: 1;
+    }
+}
+
+@keyframes drawStrokeAndFillGrey {
+     0% {
+        stroke-dashoffset: 1500;
+        fill: none;
+        opacity: 1;
+    }
+    75% {
+        stroke-dashoffset: 0;
+        fill: none;
+        opacity: 1;
+    }
+    100% {
+        stroke-dashoffset: 0;
+        fill: #f2f2f2; /* Final fill color */
+        opacity: 1;
+    }
+}
+
+/* Keyframes for Fading In other paths */
+@keyframes fadeInPath {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+
+/* Keyframes for Glow Effect */
+@keyframes glow {
+    from {
+        filter: drop-shadow(0 0 4px rgba(246, 71, 64, 0.7)) /* Primary color glow */
+                drop-shadow(0 0 8px rgba(255, 255, 255, 0.3)); /* Subtle white halo */
+    }
+    to {
+        filter: drop-shadow(0 0 10px rgba(246, 71, 64, 1))   /* Brighter primary glow */
+                drop-shadow(0 0 15px rgba(255, 255, 255, 0.5)); /* Wider white halo */
+    }
+}
+
+.preloader-text {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+#preloader-progress {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--primary-color);
+}
 
 /* ================= 通用屏幕容器 ================= */
 .screen-container { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; transition: opacity var(--transition-duration) var(--transition-timing); overflow: hidden; background-color: var(--deep-blue-bg); }
