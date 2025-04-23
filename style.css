@@ -43,15 +43,28 @@ body {
 
 /* ================= 預加載畫面 ================= */
 .preloader {
-    /* ... existing styles ... */
-    transition: opacity 0.5s ease, visibility 0s linear 0.5s; /* Ensure it disappears fully */
+    /* --- 修改：添加 z-index --- */
+    z-index: 9999;
+    position: fixed; /* Ensure it's fixed relative to viewport */
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: var(--deep-blue-bg); /* Ensure background covers everything */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    /* --- 修改：調整 transition 和 visibility --- */
+    transition: opacity 0.5s ease, visibility 0s linear 0.5s;
     visibility: hidden; /* Start hidden */
 }
 .preloader.active {
     opacity: 1;
     pointer-events: auto;
     visibility: visible; /* Make visible when active */
-    transition: opacity 0.5s ease;
+    transition: opacity 0.5s ease; /* Only transition opacity when fading in */
 }
 .preloader-content {
     text-align: center;
@@ -84,6 +97,7 @@ body {
     stroke-dasharray: 1500;
     stroke-dashoffset: 1500;
     /* Animation will be applied per class */
+    fill: none; /* --- 確保初始 fill 為 none --- */
     will-change: stroke-dashoffset, fill; /* Hint for performance */
 }
 
@@ -112,12 +126,12 @@ body {
 @keyframes drawStrokeAndFillWhite {
     0% {
         stroke-dashoffset: 1500;
-        fill: none;
+        fill: none; /* 保持 none */
         opacity: 1; /* Ensure path is visible for stroke */
     }
     75% { /* Stroke drawing completes here */
         stroke-dashoffset: 0;
-        fill: none;
+        fill: none; /* 保持 none */
         opacity: 1;
     }
     100% { /* Fill appears */
@@ -130,12 +144,12 @@ body {
 @keyframes drawStrokeAndFillGrey {
      0% {
         stroke-dashoffset: 1500;
-        fill: none;
+        fill: none; /* 保持 none */
         opacity: 1;
     }
     75% {
         stroke-dashoffset: 0;
-        fill: none;
+        fill: none; /* 保持 none */
         opacity: 1;
     }
     100% {
