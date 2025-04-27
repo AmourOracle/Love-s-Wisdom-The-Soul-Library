@@ -11,18 +11,18 @@
     --transition-duration: 0.6s; /* 基礎屏幕切換時間 */
     --transition-timing: cubic-bezier(0.25, 0.1, 0.25, 1.0);
     --deep-blue-bg: #121824; /* 深藍背景 */
-    --preloader-exit-duration: 1.2s; /* Preloader自身的淡出時間 */
-    /* !! MODIFIED: 縮短 Intro 頁面內容的淡入延遲 */
-    --intro-fadein-delay: 0.1s; /* 從 0.8s 改為 0.1s */
+    /* !! MODIFIED: 使用統一的 Preloader 退場動畫時長變數 */
+    --preloader-exit-duration: 0.9s; /* 退場動畫時長 (放大+模糊+淡化)，可調整 */
+    --intro-fadein-delay: 0.1s;
     --intro-fadein-duration: 1s;
 
     /* --- SVG Animation Timings --- */
-    --svg-base-draw-duration: 2.5s; /* 描邊+填充動畫的基礎時長 */
-    --svg-glow-delay: calc(var(--svg-base-draw-duration) * 1.1); /* 光暈延遲 */
+    --svg-base-draw-duration: 2.5s;
+    --svg-glow-delay: calc(var(--svg-base-draw-duration) * 1.1);
     --svg-glow-duration: 2.5s;
-    --svg-stagger-delay: 0.15s; /* 主標題各部分描邊的交錯延遲 */
-    --svg-fade-in-duration: 1.5s; /* 副標題淡入的時長 */
-    --svg-fade-in-delay: 0.6s;  /* 副標題淡入開始的延遲 (略晚於主標題開始) */
+    --svg-stagger-delay: 0.15s;
+    --svg-fade-in-duration: 1.5s;
+    --svg-fade-in-delay: 0.6s;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -52,15 +52,6 @@ body {
     90% { opacity: 0.4; filter: blur(4px); }
     100% { opacity: 0; filter: blur(8px); transform: translate3d(var(--tx, 0), var(--ty, 0), var(--tz, 0)) rotate(var(--rz, 0deg)) scale(var(--sc, 1)); }
 }
-/* --- Preloader Exit Keyframes --- */
-@keyframes preloaderSvgExit {
-    from { opacity: 1; transform: translateY(0) scale(1); }
-    to { opacity: 0; transform: translateY(-150%) scale(0.5); }
-}
-@keyframes preloaderBgFadeOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
-}
 /* --- Intro Content Fade In --- */
 @keyframes introElementFadeIn {
     from { opacity: 0; transform: translateY(15px); }
@@ -68,20 +59,15 @@ body {
 }
 
 /* --- SVG Animation Keyframes --- */
-/* Keyframe for Stroke + Smooth Fill (for paths) */
 @keyframes drawStrokeAndFill {
     0% { stroke-dashoffset: 1500; fill: none; fill-opacity: 0; opacity: 1; }
     70% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 0; opacity: 1; }
     100% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 1; opacity: 1; }
 }
-
-/* Keyframe for simple fade-in (for groups) */
 @keyframes fadeInGroup {
     from { opacity: 0; }
     to { opacity: 1; }
 }
-
-/* --- SVG Glow Keyframes --- */
 @keyframes glow {
     from { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4)); }
     to { filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 15px rgba(246, 71, 64, 0.6)); }
@@ -91,30 +77,41 @@ body {
      to { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4)); opacity: 1;}
 }
 
+/* !! NEW: Preloader 退場動畫 Keyframes (放大+模糊+淡化) */
+@keyframes preloaderZoomBlurFadeOut {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+        filter: blur(0px);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.5); /* 放大效果 */
+        filter: blur(8px);   /* 模糊效果 */
+        visibility: hidden; /* 確保最終隱藏 */
+    }
+}
+
+
 /* ================= 預加載畫面 ================= */
 .preloader {
     z-index: 9999; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
     background-color: var(--deep-blue-bg); display: flex; justify-content: center; align-items: center;
-    opacity: 0; /* Start hidden */
-    visibility: hidden;
-    pointer-events: none;
-    /* !! MODIFIED: 移除基礎 transition，完全依賴 .active 和 animation */
+    opacity: 0; visibility: hidden; pointer-events: none;
 }
 .preloader.active {
-    opacity: 1; /* Make visible */
-    visibility: visible;
-    pointer-events: auto;
-    transition: none; /* Ensure no transition when becoming active */
+    opacity: 1; visibility: visible; pointer-events: auto; transition: none;
 }
+/* !! MODIFIED: 使用新的 ZoomBlurFadeOut 退場動畫 */
 .preloader.transitioning-out {
-    /* Animation handles fade-out and visibility */
-    animation: preloaderBgFadeOut var(--preloader-exit-duration) ease-out forwards;
-    pointer-events: none; /* Disable interaction immediately */
+    /* 將動畫應用於整個 preloader */
+    animation: preloaderZoomBlurFadeOut var(--preloader-exit-duration) ease-out forwards;
+    pointer-events: none;
 }
-.preloader.transitioning-out .preloader-content { background-color: transparent; }
-.preloader.transitioning-out #preloader-svg-container #preloader-svg {
-    animation: preloaderSvgExit var(--preloader-exit-duration) cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
-}
+/* 不再需要單獨控制 content 或 svg 的退出 */
+.preloader.transitioning-out .preloader-content {}
+.preloader.transitioning-out #preloader-svg-container #preloader-svg {}
+
 .preloader-content { text-align: center; color: var(--text-color); width: 90%; max-width: 450px; position: relative; }
 #preloader-svg-container { width: 100%; margin-bottom: 20px; }
 
@@ -129,62 +126,39 @@ body {
 }
 
 /* --- SVG Path/Group Animation Setup (Using Group IDs) --- */
-
 /* Default setup for paths INSIDE the main title group that need stroke */
 #preloader-svg #main-title-group path {
-    stroke-width: 0.5px;
-    stroke: #ffffff; /* Default stroke color */
-    stroke-dasharray: 1500;
-    stroke-dashoffset: 1500;
-    fill: none; /* Start with no fill */
-    fill-opacity: 0;
-    opacity: 0; /* Start path transparent, animation brings it in */
-    transform: translateZ(0);
-    will-change: stroke-dashoffset, fill, opacity;
+    stroke-width: 0.5px; stroke: #ffffff; stroke-dasharray: 1500; stroke-dashoffset: 1500;
+    fill: none; fill-opacity: 0; opacity: 0;
+    transform: translateZ(0); will-change: stroke-dashoffset, fill, opacity;
     animation-name: drawStrokeAndFill;
     animation-duration: var(--svg-base-draw-duration);
     animation-timing-function: ease-out;
-    animation-fill-mode: forwards; /* Keep end state */
-    --svg-fill-color: #ffffff; /* Default fill color */
+    animation-fill-mode: forwards;
+    --svg-fill-color: #ffffff;
 }
-
 /* Apply specific delays within the main title group */
 #preloader-svg #main-title-group .st1 { animation-delay: 0s; }
 #preloader-svg #main-title-group .st0 { animation-delay: calc(var(--svg-stagger-delay) * 1); } /* W */
 #preloader-svg #main-title-group .st2 { animation-delay: calc(var(--svg-stagger-delay) * 2); }
-/* #preloader-svg #main-title-group .st3 { animation-delay: calc(var(--svg-stagger-delay) * ?); } */ /* Only if st3 exists in main title */
 #preloader-svg #main-title-group .st4 { animation-delay: calc(var(--svg-stagger-delay) * 3); }
 #preloader-svg #main-title-group .st5 { animation-delay: calc(var(--svg-stagger-delay) * 4); }
-/* Adjust the order of delays (* 1, * 2, etc.) based on desired visual sequence */
 
 /* --- Setup for Subtitle Groups (Fade-in) --- */
 #preloader-svg #eng-subtitle-group,
 #preloader-svg #chn-subtitle-group {
-    opacity: 0; /* Start group transparent */
-    will-change: opacity;
+    opacity: 0; will-change: opacity;
     animation: fadeInGroup var(--svg-fade-in-duration) ease-in forwards;
     animation-delay: var(--svg-fade-in-delay);
 }
-
-/* Default appearance for paths INSIDE subtitle groups (fill, no stroke/animation) */
+/* Default appearance for paths INSIDE subtitle groups */
 #preloader-svg #eng-subtitle-group path,
 #preloader-svg #chn-subtitle-group path {
-    opacity: 1; /* Path is opaque, group opacity controls visibility */
-    fill: #ffffff; /* Default subtitle fill */
-    stroke: none;
-    /* Reset any potential conflicting properties from general path rules */
-    stroke-dasharray: none;
-    stroke-dashoffset: 0;
-    stroke-width: 0;
-    animation: none;
-    fill-opacity: 1; /* Ensure fill is visible */
+    opacity: 1; fill: #ffffff; stroke: none;
+    stroke-dasharray: none; stroke-dashoffset: 0; stroke-width: 0;
+    animation: none; fill-opacity: 1;
 }
-/* Specific fill color for .st3 within Chinese subtitle (if needed) */
-#preloader-svg #chn-subtitle-group .st3 {
-    fill: #f2f2f2; /* Or desired grey */
-}
-/* Note: .st1 paths within eng-subtitle-group will use the default fill (#ffffff) from the rule above */
-
+#preloader-svg #chn-subtitle-group .st3 { fill: #f2f2f2; }
 
 /* ================= 通用屏幕容器 ================= */
 .screen-container {
@@ -198,81 +172,30 @@ body {
     opacity: 1; visibility: visible;
     transition: opacity var(--transition-duration) var(--transition-timing), visibility 0s linear 0s;
 }
-#test-container { background-color: transparent; } /* Allow test background image to show */
+#test-container { background-color: transparent; }
 #result-container {
     background-color: var(--background-color);
     overflow-y: auto; color: var(--text-color-dark);
 }
-/* Hide scrollbar consistently */
 #result-container::-webkit-scrollbar { display: none; width: 0; background: transparent; }
 #result-container { scrollbar-width: none; -ms-overflow-style: none; }
 
 /* ================= 首頁卡片式設計 ================= */
-.intro-background {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background-size: cover; background-position: center; z-index: 1;
-    opacity: 0;
-}
-.intro-overlay {
-    content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 30%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0.7) 100%);
-    z-index: 2; opacity: 0;
-}
-.intro-content {
-    position: relative; z-index: 3; height: 100%;
-    display: flex; flex-direction: column; justify-content: space-between;
-    padding: 40px 30px;
-}
-/* Apply fade-in animation to intro elements when intro becomes active */
+.intro-background { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; z-index: 1; opacity: 0; }
+.intro-overlay { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 30%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0.7) 100%); z-index: 2; opacity: 0; }
+.intro-content { position: relative; z-index: 3; height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 40px 30px; }
 #intro-container.active .intro-background,
-#intro-container.active .intro-overlay {
-    animation: introElementFadeIn var(--intro-fadein-duration) ease-out var(--intro-fadein-delay) forwards;
-}
-#intro-container.active .intro-title-placeholder {
-    opacity: 0; /* Start hidden before animation */
-    animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--intro-fadein-delay) + 0.2s) forwards;
-}
+#intro-container.active .intro-overlay { animation: introElementFadeIn var(--intro-fadein-duration) ease-out var(--intro-fadein-delay) forwards; }
+#intro-container.active .intro-title-placeholder { opacity: 0; animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--intro-fadein-delay) + 0.2s) forwards; }
 #intro-container.active .card-body,
-#intro-container.active .card-footer {
-    opacity: 0; /* Start hidden before animation */
-    animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--intro-fadein-delay) + 0.4s) forwards;
-}
-/* --- Intro Title Placeholder & SVG --- */
-.intro-title-placeholder {
-    position: absolute; top: 5%; left: 50%;
-    transform: translateX(-50%); width: 60%; max-width: 300px;
-    z-index: 4; display: flex; justify-content: center; align-items: center;
-}
-/* Style for static Intro title SVG */
-#intro-title-svg {
-    width: 100%; height: auto;
-    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4));
-    transition: filter 0.5s ease-in-out;
-}
-/* Ensure all paths in static title are visible and styled correctly */
-#intro-title-svg g path { /* Target paths within any group */
-    fill: #ffffff; /* Default fill */
-    stroke: none;
-    opacity: 1;
-    animation: none !important;
-    stroke-dasharray: none !important;
-    stroke-dashoffset: 0 !important;
-    fill-opacity: 1 !important;
-}
-/* Static colors for specific parts if needed */
-#intro-title-svg #main-title-group path {
-   fill: #ffffff; /* Main title static color */
-}
-#intro-title-svg #eng-subtitle-group path, /* Eng Subtitle */
-#intro-title-svg #chn-subtitle-group path { /* Chn Subtitle */
-    fill: #cccccc; /* Lighter grey for static subtitles */
-}
-/* Specific static color for st3 within Chinese subtitle */
-#intro-title-svg #chn-subtitle-group .st3 {
-    fill: #b3b3b3; /* Slightly darker grey for st3 part */
-}
-
-/* Card Body, Footer, Meta */
+#intro-container.active .card-footer { opacity: 0; animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--intro-fadein-delay) + 0.4s) forwards; }
+.intro-title-placeholder { position: absolute; top: 5%; left: 50%; transform: translateX(-50%); width: 60%; max-width: 300px; z-index: 4; display: flex; justify-content: center; align-items: center; }
+#intro-title-svg { width: 100%; height: auto; filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4)); transition: filter 0.5s ease-in-out; }
+#intro-title-svg g path { fill: #ffffff; stroke: none; opacity: 1; animation: none !important; stroke-dasharray: none !important; stroke-dashoffset: 0 !important; fill-opacity: 1 !important; }
+#intro-title-svg #main-title-group path { fill: #ffffff; }
+#intro-title-svg #eng-subtitle-group path,
+#intro-title-svg #chn-subtitle-group path { fill: #cccccc; }
+#intro-title-svg #chn-subtitle-group .st3 { fill: #b3b3b3; }
 .card-body { flex: 1; display: flex; flex-direction: column; justify-content: center; }
 .card-body .description { font-size: 18px; line-height: 1.6; margin-bottom: 20px; max-width: 90%; text-align: center; margin-left: auto; margin-right: auto; }
 .card-footer { margin-bottom: 40px; text-align: center; position: relative; }
@@ -284,11 +207,7 @@ body {
 .btn-svg-style:hover { background-color: rgba(246, 71, 64, 0.15); color: #ffffff; border-color: rgba(255, 255, 255, 0.9); transform: translateY(-2px) scale(1.02); box-shadow: 0 0 15px rgba(246, 71, 64, 0.6); }
 .btn-svg-style .btn-text { display: inline-block; transition: opacity 0.3s ease; opacity: 1; }
 .btn-svg-style .btn-text.hidden { opacity: 0; }
-.btn.exploded {
-    opacity: 0 !important; transform: scale(0.9) !important;
-    transition: opacity 0.3s ease-out, transform 0.3s ease-out !important;
-    pointer-events: none;
-}
+.btn.exploded { opacity: 0 !important; transform: scale(0.9) !important; transition: opacity 0.3s ease-out, transform 0.3s ease-out !important; pointer-events: none; }
 .primary-btn { background-color: var(--primary-color); color: white; }
 .primary-btn:hover { background-color: #e53935; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); }
 .secondary-btn { background-color: transparent; color: white; border: 1px solid white; }

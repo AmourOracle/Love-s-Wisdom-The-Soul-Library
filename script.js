@@ -27,13 +27,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const traitNames = testData.traitNames || {};
 
     // --- Constants ---
-    // !! MODIFIED: 大幅縮短額外延遲
-    const PRELOADER_EXTRA_DELAY = 500; // 僅 0.5 秒額外延遲 (確保 SVG 動畫跑完)
-    // !! MODIFIED: 從 CSS 獲取 Preloader 退出時間
-    const PRELOADER_EXIT_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--preloader-exit-duration').replace('s','')) * 1000 || 1200;
-    // !! MODIFIED: 從 CSS 獲取 Intro 動畫時間 (含延遲)
-    const INTRO_ANIMATION_TOTAL_TIME = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-fadein-delay').replace('s','')) * 1000 || 0) +
-                                      (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-fadein-duration').replace('s','')) * 1000 || 1000);
+    // 從 CSS 獲取 Preloader 退場時間
+    const PRELOADER_EXIT_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--preloader-exit-duration').replace('s','')) * 1000 || 800; // Default 0.8s if not found
+    // 重新計算 Preloader 額外延遲
+    // SVG 動畫基礎時間 + 最長交錯延遲 + 短暫停留
+    const SVG_BASE_DRAW_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-base-draw-duration').replace('s','')) * 1000 || 2500;
+    const SVG_STAGGER_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-stagger-delay').replace('s','')) * 1000 || 150;
+    const MAX_STAGGER_STEPS = 4; // 假設最多交錯 4 步 (delay * 4)
+    const SVG_ANIMATION_TOTAL_ESTIMATED_TIME = SVG_BASE_DRAW_DURATION + (MAX_STAGGER_STEPS * SVG_STAGGER_DELAY);
+    const PRELOADER_PAUSE_AFTER_SVG = 400; // SVG 動畫後的停留時間 (ms)
+    const PRELOADER_EXTRA_DELAY = SVG_ANIMATION_TOTAL_ESTIMATED_TIME + PRELOADER_PAUSE_AFTER_SVG;
+
+    // 從 CSS 獲取 Intro 動畫時間 (含延遲)
+    const INTRO_FADEIN_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-fadein-delay').replace('s','')) * 1000 || 100;
+    const INTRO_FADEIN_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-fadein-duration').replace('s','')) * 1000 || 1000;
+    const INTRO_ANIMATION_TOTAL_TIME = INTRO_FADEIN_DELAY + INTRO_FADEIN_DURATION;
 
     const SCREEN_TRANSITION_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--transition-duration').replace('s','')) * 1000 || 600;
     const EXPLOSION_DURATION = 1000; // Matches CSS explodeForwardBlur animation
@@ -134,7 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
          }
     }
 
-    // !! MODIFIED Function: triggerIntroTransition (重疊動畫)
+    // Function: triggerIntroTransition (移除重疊, 使用新時長)
     function triggerIntroTransition() {
         if (!DOM.containers.preloader || !DOM.containers.intro) {
             console.error("Preloader or Intro container not found for transition.");
@@ -145,47 +153,40 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        console.log("開始 Preloader 到 Intro 的轉場...");
+        console.log("開始 Preloader 到 Intro 的轉場 (ZoomBlurFadeOut)...");
         state.isAnimating = true; // Lock state
 
-        // 1. 開始 Preloader 退出動畫 (CSS handles it)
+        // 1. 開始 Preloader 退出動畫 (使用新的 preloaderZoomBlurFadeOut)
         DOM.containers.preloader.classList.add('transitioning-out');
-        // 移除光暈效果
         if(DOM.elements.preloaderSvg) DOM.elements.preloaderSvg.classList.remove('glow-active');
 
-        // 2. !! MODIFIED: 提早觸發 Intro 頁面激活
-        // 在 Preloader 退出動畫進行到一半時就激活 Intro
-        const introActivationDelay = PRELOADER_EXIT_DURATION * 0.4; // 例如，退出動畫進行 40% 時
+        // 2. 等待 Preloader 退場動畫完成後，再激活 Intro
         setTimeout(() => {
-            if (!state.introVisible) { // 防止重複激活
-                 console.log("提早激活 Intro 容器...");
-                 DOM.containers.intro.classList.add('active'); // CSS handles intro fade-in (with its reduced delay)
+            console.log("Preloader 退場動畫結束。");
+            DOM.containers.preloader.classList.remove('active', 'transitioning-out');
+
+            // 激活 Intro
+            if (!state.introVisible) {
+                 console.log("激活 Intro 容器...");
+                 DOM.containers.intro.classList.add('active'); // CSS handles intro fade-in
                  state.introVisible = true;
             }
-        }, introActivationDelay);
 
-
-        // 3. Preloader 動畫完全結束後，才從 DOM 移除或隱藏 Preloader
-        setTimeout(() => {
-            console.log("Preloader 動畫結束，移除 Preloader active 狀態。");
-            DOM.containers.preloader.classList.remove('active', 'transitioning-out');
-            // (Intro 已經被提早激活了)
-
-            // 4. 解鎖狀態 - 確保 Intro 動畫也有足夠時間完成
-            // 解鎖時間點 = Preloader開始退出的時間點 + Math.max(Preloader退出時間, Intro激活延遲+Intro動畫時間) + 一點緩衝
-            const unlockDelay = Math.max(PRELOADER_EXIT_DURATION, introActivationDelay + INTRO_ANIMATION_TOTAL_TIME) + 100; // 100ms buffer
+            // 3. 解鎖狀態 - 在 Intro 動畫完成後
+            // 解鎖延遲 = Intro 動畫總時間 + 一點緩衝
+            const unlockDelay = INTRO_ANIMATION_TOTAL_TIME + 100;
             console.log(`預計在 ${unlockDelay}ms 後解除動畫鎖定`);
 
             setTimeout(() => {
                 state.isAnimating = false; // Unlock state
                 console.log("Intro 轉場完成且動畫應已結束，解除鎖定。");
-            }, unlockDelay - PRELOADER_EXIT_DURATION); // 計算從這個時間點還需等待多久
+            }, unlockDelay);
 
-        }, PRELOADER_EXIT_DURATION); // 等待 Preloader 退出動畫完成
+        }, PRELOADER_EXIT_DURATION); // 等待新的退場動畫時長
     }
 
 
-    // !! MODIFIED Function: preloadImages (使用縮短的延遲)
+    // Function: preloadImages (使用重新計算的延遲)
     function preloadImages() {
         if (!DOM.containers?.preloader || !DOM.elements.preloaderSvg) {
             console.warn("找不到 preloader 或 preloader SVG...");
@@ -227,18 +228,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 state.preloadComplete = true;
                 console.log(`圖片預載入處理完成 ${errorOccurred ? '（有錯誤）' : ''}`);
 
-                // !! MODIFIED: 使用縮短的 PRELOADER_EXTRA_DELAY
-                const totalDelay = errorOccurred ? 500 : PRELOADER_EXTRA_DELAY;
-                console.log(`等待額外延遲 ${totalDelay}ms...`);
+                // 使用重新計算的 PRELOADER_EXTRA_DELAY
+                const totalDelay = errorOccurred ? 500 : PRELOADER_EXTRA_DELAY; // 如果出錯，還是用短延遲
+                console.log(`等待 SVG 動畫 + 停留 ${totalDelay}ms...`);
 
                 setTimeout(() => {
                     // 再次檢查 preloader 是否仍然 active
                     if (DOM.containers.preloader && DOM.containers.preloader.classList.contains('active')) {
-                        triggerIntroTransition(); // 觸發轉場
+                        triggerIntroTransition(); // 觸發包含新退場動畫的轉場
                         bindStartButton(); // 確保按鈕事件已綁定
                     } else {
                         console.log("Preloader no longer active, skipping transition.");
-                        // 如果 preloader 已經不在，可能需要直接激活 intro (雖然正常流程下不應發生)
+                        // 如果 preloader 已經不在，可能需要直接激活 intro
                         if (!state.introVisible && DOM.containers.intro) {
                              DOM.containers.intro.classList.add('active');
                              state.introVisible = true;
@@ -265,7 +266,6 @@ document.addEventListener('DOMContentLoaded', function() {
         explosionContainer.innerHTML = ''; // Clear previous
         let startX, startY;
 
-        // Calculate start position based on the target element itself
         startX = targetElement.offsetWidth / 2;
         startY = targetElement.offsetHeight / 2;
 
@@ -378,7 +378,6 @@ document.addEventListener('DOMContentLoaded', function() {
             state.isTransitioning = false;
             return;
         }
-        // Allow switching only if not currently animating/transitioning (except from preloader)
         if ((state.isAnimating || state.isTransitioning) && fromScreenId !== 'preloader') {
              console.log("屏幕切換或問題轉換已在進行中... 忽略重複請求");
              return;
@@ -404,14 +403,13 @@ document.addEventListener('DOMContentLoaded', function() {
                  // Note: state.isTransitioning remains true until the first question finishes entering
             } else {
                  if (toScreenId === 'intro') {
-                     // Reset test/result states
                      state.currentQuestionIndex = 0;
                      state.userAnswers = [];
                      state.finalScores = {};
                      state.contentRendered = false;
                      if(DOM.elements.traitsContainer) DOM.elements.traitsContainer.innerHTML = '';
                      if(DOM.elements.progressFill) DOM.elements.progressFill.style.width = '0%';
-                     if(DOM.containers.startBtnExplosion) { // Reset explosion container style
+                     if(DOM.containers.startBtnExplosion) {
                         DOM.containers.startBtnExplosion.style.position = '';
                         DOM.containers.startBtnExplosion.style.top = '';
                         DOM.containers.startBtnExplosion.style.left = '';
@@ -729,6 +727,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.addEventListener('error', function(event) {
          console.error("Global error caught:", event.error, "at:", event.filename, ":", event.lineno);
+         // Attempt to reset state locks to prevent getting stuck
          state.isAnimating = false;
          state.isTransitioning = false;
     });
@@ -738,8 +737,9 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('resize', setViewportHeight);
 
     if (cacheDOMElements()) {
-        preloadImages();
+        preloadImages(); // Starts preloading and the whole sequence
         bindOtherButtons();
+        // bindStartButton() is called within preloadImages/triggerIntroTransition
     } else {
         console.error("DOM element caching failed, initialization incomplete.");
     }
