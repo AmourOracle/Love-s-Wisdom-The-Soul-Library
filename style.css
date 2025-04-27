@@ -16,11 +16,12 @@
     --intro-fadein-duration: 1s;
 
     /* --- SVG Animation Timings --- */
-    --svg-base-draw-duration: 2.5s; /* Base duration for drawing one part */
-    --svg-fill-start-offset: 0.6s; /* How much earlier fill starts before stroke ends (relative to base duration) */
-    --svg-glow-delay: calc(var(--svg-base-draw-duration) * 1.1); /* Glow starts slightly after first elements finish drawing */
+    --svg-base-draw-duration: 2.5s; /* 描邊+填充動畫的基礎時長 */
+    --svg-glow-delay: calc(var(--svg-base-draw-duration) * 1.1); /* 光暈延遲 */
     --svg-glow-duration: 2.5s;
-    --svg-stagger-delay: 0.15s; /* Delay between different parts starting animation */
+    --svg-stagger-delay: 0.15s; /* 主標題各部分描邊的交錯延遲 */
+    --svg-fade-in-duration: 1.5s; /* 副標題淡入的時長 */
+    --svg-fade-in-delay: 0.6s;  /* 副標題淡入開始的延遲 (略晚於主標題開始) */
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -65,202 +66,138 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* --- SVG Animation Keyframes (Revised for Smooth Fill) --- */
+/* --- SVG Animation Keyframes --- */
+/* Keyframe for Stroke + Smooth Fill (for paths) */
 @keyframes drawStrokeAndFill {
-    0% {
-        stroke-dashoffset: 1500; /* Start fully hidden */
-        fill: none;
-        fill-opacity: 0; /* Ensure fill starts transparent */
-        opacity: 1;
-    }
-    70% { /* Stroke mostly complete */
-        stroke-dashoffset: 0;
-        fill: var(--svg-fill-color, #ffffff); /* Set fill color */
-        fill-opacity: 0; /* Keep fill transparent */
-        opacity: 1;
-    }
-    /* Fill fades in between 70% and 100% */
-    100% {
-        stroke-dashoffset: 0;
-        fill: var(--svg-fill-color, #ffffff); /* Ensure fill color is set */
-        fill-opacity: 1; /* Fade fill in */
-        opacity: 1;
-    }
+    0% { stroke-dashoffset: 1500; fill: none; fill-opacity: 0; opacity: 1; }
+    70% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 0; opacity: 1; }
+    100% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 1; opacity: 1; }
 }
 
-/* Paths that only fade in (no stroke animation) - Keep as is, unless L/W were here */
-@keyframes fadeInPath {
+/* Keyframe for simple fade-in (for groups) */
+@keyframes fadeInGroup {
     from { opacity: 0; }
     to { opacity: 1; }
 }
 
-/* --- SVG Glow Keyframes (Revised Delay based on CSS Var) --- */
-@keyframes glow { /* Subtle pulsing glow */
+/* --- SVG Glow Keyframes --- */
+@keyframes glow {
     from { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4)); }
     to { filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 15px rgba(246, 71, 64, 0.6)); }
 }
-@keyframes fadeInGlow { /* Simple fade in for the glow effect */
+@keyframes fadeInGlow {
      from { filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)) drop-shadow(0 0 0px rgba(246, 71, 64, 0)); opacity: 0; }
-     /* Start glow animation slightly after the first elements finish drawing */
      to { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4)); opacity: 1;}
 }
 
 /* ================= 預加載畫面 ================= */
 .preloader {
-    z-index: 9999;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: var(--deep-blue-bg);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    opacity: 0;
-    pointer-events: none;
+    z-index: 9999; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background-color: var(--deep-blue-bg); display: flex; justify-content: center; align-items: center;
+    opacity: 0; pointer-events: none;
     transition: visibility 0s linear var(--preloader-exit-duration), opacity var(--preloader-exit-duration) ease-out;
     visibility: hidden;
 }
-.preloader.active {
-    opacity: 1;
-    pointer-events: auto;
-    visibility: visible;
-    transition: none;
-}
+.preloader.active { opacity: 1; pointer-events: auto; visibility: visible; transition: none; }
 .preloader.transitioning-out {
     animation: preloaderBgFadeOut var(--preloader-exit-duration) ease-out forwards;
-    pointer-events: none;
-    opacity: 0; /* Ensure final state is hidden */
-    visibility: hidden; /* Ensure final state is hidden */
+    pointer-events: none; opacity: 0; visibility: hidden;
 }
-.preloader.transitioning-out .preloader-content {
-     background-color: transparent;
-}
-/* Target SVG using its container and ID */
+.preloader.transitioning-out .preloader-content { background-color: transparent; }
 .preloader.transitioning-out #preloader-svg-container #preloader-svg {
     animation: preloaderSvgExit var(--preloader-exit-duration) cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
 }
-
-.preloader-content {
-    text-align: center;
-    color: var(--text-color);
-    width: 90%;
-    max-width: 450px;
-    position: relative;
-}
-
-/* --- Preloader SVG Specific Styling (Revised) --- */
-#preloader-svg-container {
-    width: 100%;
-    margin-bottom: 20px;
-}
+.preloader-content { text-align: center; color: var(--text-color); width: 90%; max-width: 450px; position: relative; }
+#preloader-svg-container { width: 100%; margin-bottom: 20px; }
 
 #preloader-svg {
-    width: 100%;
-    height: auto;
-    display: block;
-    overflow: visible;
-    will-change: filter, transform, opacity;
-    transform: translateY(0) scale(1);
-    opacity: 1;
-    filter: none; /* Start without glow */
+    width: 100%; height: auto; display: block; overflow: visible;
+    will-change: filter, transform, opacity; transform: translateY(0) scale(1);
+    opacity: 1; filter: none;
 }
 #preloader-svg.glow-active {
-    /* Apply glow using CSS variable for delay */
     animation: fadeInGlow calc(var(--svg-glow-duration) * 0.4) ease-out var(--svg-glow-delay) forwards,
                glow var(--svg-glow-duration) ease-in-out calc(var(--svg-glow-delay) + (var(--svg-glow-duration) * 0.4)) infinite alternate;
 }
 
-/* SVG Path Animation Setup (Revised for Staggering and Corrected Selectors) */
-#preloader-svg-container #preloader-svg path {
-    stroke-width: 0.5px; /* Keep stroke width */
-    stroke-dasharray: 1500; /* Assumed sufficient length */
-    stroke-dashoffset: 1500; /* Start hidden */
+/* --- SVG Path/Group Animation Setup (Using Group IDs) --- */
+
+/* Default setup for paths INSIDE the main title group that need stroke */
+#preloader-svg #main-title-group path {
+    stroke-width: 0.5px;
+    stroke: #ffffff; /* Default stroke color */
+    stroke-dasharray: 1500;
+    stroke-dashoffset: 1500;
     fill: none; /* Start with no fill */
-    opacity: 0; /* Start invisible, animation will make it visible */
-    transform: translateZ(0); /* Promote to own layer */
+    fill-opacity: 0;
+    opacity: 0; /* Start path transparent, animation brings it in */
+    transform: translateZ(0);
     will-change: stroke-dashoffset, fill, opacity;
-    /* Apply the single combined animation */
-    animation: drawStrokeAndFill var(--svg-base-draw-duration) ease-out forwards;
+    animation-name: drawStrokeAndFill;
+    animation-duration: var(--svg-base-draw-duration);
+    animation-timing-function: ease-out;
+    animation-fill-mode: forwards; /* Keep end state */
+    --svg-fill-color: #ffffff; /* Default fill color */
 }
 
-/* Apply STAGGERING delays and specific fill colors */
-/* --- IMPORTANT: You might need to adjust which classes get which delay based on your SVG structure! --- */
-/* Assuming .st1 is the main white part (maybe O, S, V, I, D, M) */
-#preloader-svg-container #preloader-svg .st1 {
-    stroke: #ffffff;
-    --svg-fill-color: #ffffff; /* Define fill color for the keyframe */
-    animation-delay: 0s; /* Start first */
+/* Apply specific delays within the main title group */
+#preloader-svg #main-title-group .st1 { animation-delay: 0s; }
+#preloader-svg #main-title-group .st0 { animation-delay: calc(var(--svg-stagger-delay) * 1); } /* W */
+#preloader-svg #main-title-group .st2 { animation-delay: calc(var(--svg-stagger-delay) * 2); }
+/* #preloader-svg #main-title-group .st3 { animation-delay: calc(var(--svg-stagger-delay) * ?); }  <- Only if st3 exists in main title */
+#preloader-svg #main-title-group .st4 { animation-delay: calc(var(--svg-stagger-delay) * 3); }
+#preloader-svg #main-title-group .st5 { animation-delay: calc(var(--svg-stagger-delay) * 4); }
+/* Adjust the order of delays (* 1, * 2, etc.) based on desired visual sequence */
+
+/* --- Setup for Subtitle Groups (Fade-in) --- */
+#preloader-svg #eng-subtitle-group,
+#preloader-svg #chn-subtitle-group {
+    opacity: 0; /* Start group transparent */
+    will-change: opacity;
+    animation: fadeInGroup var(--svg-fade-in-duration) ease-in forwards;
+    animation-delay: var(--svg-fade-in-delay);
 }
 
-/* Assuming .st3 is the grey part (maybe the lines inside 'O'?) */
-#preloader-svg-container #preloader-svg .st3 {
-    stroke: #f2f2f2;
-    --svg-fill-color: #f2f2f2; /* Define fill color */
-    animation-delay: calc(var(--svg-stagger-delay) * 1); /* Start slightly later */
-}
-
-/* --- FIX for L and W: Apply animation to their classes --- */
-/* Check your SVG: Identify classes for L and W. Let's ASSUME they are .st2 and .st4 for this example */
-#preloader-svg-container #preloader-svg .st2 { /* Example: Assuming this is 'L' */
-    stroke: #ffffff;
-    --svg-fill-color: #ffffff;
-    animation-delay: calc(var(--svg-stagger-delay) * 2); /* Start later */
-}
-#preloader-svg-container #preloader-svg .st4 { /* Example: Assuming this is 'W' */
-    stroke: #ffffff;
-    --svg-fill-color: #ffffff;
-    animation-delay: calc(var(--svg-stagger-delay) * 3); /* Start even later */
-}
-
-
-/* --- Elements that should ONLY fade in (if any remain) --- */
-/* If .st0 and .st5 are truly just fills with no stroke needed, keep them here. */
-/* Otherwise, move them to a stroke animation rule above. */
-#preloader-svg-container #preloader-svg .st0,
-#preloader-svg-container #preloader-svg .st5 {
-    stroke: none; /* Ensure no stroke is attempted */
-    fill: #ffffff; /* Set fill color directly */
-    opacity: 0; /* Start hidden */
-    /* Fade in starts after initial strokes begin */
-    animation: fadeInPath calc(var(--svg-base-draw-duration) * 0.6) ease-in calc(var(--svg-stagger-delay) * 2) forwards;
-    /* Override stroke properties just in case */
+/* Default appearance for paths INSIDE subtitle groups (fill, no stroke/animation) */
+#preloader-svg #eng-subtitle-group path,
+#preloader-svg #chn-subtitle-group path {
+    opacity: 1; /* Path is opaque, group opacity controls visibility */
+    fill: #ffffff; /* Default subtitle fill */
+    stroke: none;
+    /* Reset any potential conflicting properties from general path rules */
     stroke-dasharray: none;
     stroke-dashoffset: 0;
+    stroke-width: 0;
+    animation: none;
+    fill-opacity: 1;
 }
+/* Specific fill color for .st3 within Chinese subtitle (if needed) */
+#preloader-svg #chn-subtitle-group .st3 {
+    fill: #f2f2f2; /* Or desired grey */
+}
+/* Note: .st1 paths within eng-subtitle-group will use the default fill (#ffffff) from the rule above */
 
 
 /* ================= 通用屏幕容器 ================= */
 .screen-container {
-    display: block;
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0;
-    visibility: hidden;
+    display: block; position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    opacity: 0; visibility: hidden;
     transition: opacity var(--transition-duration) var(--transition-timing), visibility 0s linear var(--transition-duration);
-    overflow: hidden;
-    background-color: var(--deep-blue-bg);
+    overflow: hidden; background-color: var(--deep-blue-bg);
 }
 .screen-container.active {
-    opacity: 1;
-    visibility: visible;
+    opacity: 1; visibility: visible;
     transition: opacity var(--transition-duration) var(--transition-timing), visibility 0s linear 0s;
 }
-
 #test-container { background-color: transparent; } /* Allow test background image to show */
 #result-container {
     background-color: var(--background-color);
-    overflow-y: auto;
-    color: var(--text-color-dark); /* Ensure text is dark on light background */
+    overflow-y: auto; color: var(--text-color-dark);
 }
 /* Hide scrollbar consistently */
 #result-container::-webkit-scrollbar { display: none; width: 0; background: transparent; }
 #result-container { scrollbar-width: none; -ms-overflow-style: none; }
-
 
 /* ================= 首頁卡片式設計 ================= */
 .intro-background {
@@ -271,16 +208,13 @@ body {
 .intro-overlay {
     content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 30%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0.7) 100%);
-    z-index: 2;
-    opacity: 0;
+    z-index: 2; opacity: 0;
 }
-
 .intro-content {
-    position: relative; z-index: 3;
-    height: 100%; display: flex; flex-direction: column; justify-content: space-between;
+    position: relative; z-index: 3; height: 100%;
+    display: flex; flex-direction: column; justify-content: space-between;
     padding: 40px 30px;
 }
-
 /* Apply fade-in animation to intro elements when intro becomes active */
 #intro-container.active .intro-background,
 #intro-container.active .intro-overlay {
@@ -295,40 +229,40 @@ body {
     opacity: 0; /* Start hidden before animation */
     animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--intro-fadein-delay) + 0.4s) forwards;
 }
-
 /* --- Intro Title Placeholder & SVG --- */
 .intro-title-placeholder {
-    position: absolute;
-    top: 5%;
-    left: 50%;
-    transform: translateX(-50%); /* Horizontal centering */
-    width: 60%;
-    max-width: 300px;
-    z-index: 4;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    position: absolute; top: 5%; left: 50%;
+    transform: translateX(-50%); width: 60%; max-width: 300px;
+    z-index: 4; display: flex; justify-content: center; align-items: center;
 }
-/* Style the cloned SVG - No animation needed here, just appearance */
+/* Style for static Intro title SVG */
 #intro-title-svg {
-    width: 100%;
-    height: auto;
+    width: 100%; height: auto;
     filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4));
     transition: filter 0.5s ease-in-out;
 }
-#intro-title-svg path {
-    /* Ensure paths are filled white by default for the intro title */
-    fill: #ffffff;
-    stroke: none; /* Usually no stroke needed for the static title */
-    opacity: 1; /* Ensure visible */
-    /* Override any animation styles potentially inherited from clone */
+/* Ensure all paths in static title are visible and styled correctly */
+#intro-title-svg g path { /* Target paths within any group */
+    fill: #ffffff; /* Default fill */
+    stroke: none;
+    opacity: 1;
     animation: none !important;
     stroke-dasharray: none !important;
     stroke-dashoffset: 0 !important;
+    fill-opacity: 1 !important;
 }
-/* If specific paths need different colors in the static title, add rules here */
-/* e.g., #intro-title-svg .st3 { fill: #f2f2f2; } */
-
+/* Static colors for specific parts if needed */
+#intro-title-svg #main-title-group path {
+   fill: #ffffff; /* Main title static color */
+}
+#intro-title-svg #eng-subtitle-group path, /* Eng Subtitle */
+#intro-title-svg #chn-subtitle-group path { /* Chn Subtitle */
+    fill: #cccccc; /* Lighter grey for static subtitles */
+}
+/* Specific static color for st3 within Chinese subtitle */
+#intro-title-svg #chn-subtitle-group .st3 {
+    fill: #b3b3b3; /* Slightly darker grey for st3 part */
+}
 
 /* Card Body, Footer, Meta */
 .card-body { flex: 1; display: flex; flex-direction: column; justify-content: center; }
@@ -342,14 +276,11 @@ body {
 .btn-svg-style:hover { background-color: rgba(246, 71, 64, 0.15); color: #ffffff; border-color: rgba(255, 255, 255, 0.9); transform: translateY(-2px) scale(1.02); box-shadow: 0 0 15px rgba(246, 71, 64, 0.6); }
 .btn-svg-style .btn-text { display: inline-block; transition: opacity 0.3s ease; opacity: 1; }
 .btn-svg-style .btn-text.hidden { opacity: 0; }
-/* Added rule for start button explosion effect */
 .btn.exploded {
-    opacity: 0 !important;
-    transform: scale(0.9) !important;
+    opacity: 0 !important; transform: scale(0.9) !important;
     transition: opacity 0.3s ease-out, transform 0.3s ease-out !important;
     pointer-events: none;
 }
-
 .primary-btn { background-color: var(--primary-color); color: white; }
 .primary-btn:hover { background-color: #e53935; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); }
 .secondary-btn { background-color: transparent; color: white; border: 1px solid white; }
@@ -378,8 +309,7 @@ body {
 /* ================= Explosion Containers ================= */
 #explosion-container,
 #start-btn-explosion-container {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     pointer-events: none; overflow: hidden; z-index: 1000;
     transform-style: preserve-3d;
 }
