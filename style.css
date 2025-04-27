@@ -65,22 +65,25 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* --- SVG Animation Keyframes (Revised) --- */
+/* --- SVG Animation Keyframes (Revised for Smooth Fill) --- */
 @keyframes drawStrokeAndFill {
     0% {
         stroke-dashoffset: 1500; /* Start fully hidden */
         fill: none;
+        fill-opacity: 0; /* Ensure fill starts transparent */
         opacity: 1;
     }
-    70% { /* Stroke mostly complete, start fill */
+    70% { /* Stroke mostly complete */
         stroke-dashoffset: 0;
-        fill: none; /* Keep fill none until this point */
+        fill: var(--svg-fill-color, #ffffff); /* Set fill color */
+        fill-opacity: 0; /* Keep fill transparent */
         opacity: 1;
     }
-    /* Fill happens between 70% and 100% */
+    /* Fill fades in between 70% and 100% */
     100% {
         stroke-dashoffset: 0;
-        fill: var(--svg-fill-color, #ffffff); /* Use variable for fill color */
+        fill: var(--svg-fill-color, #ffffff); /* Ensure fill color is set */
+        fill-opacity: 1; /* Fade fill in */
         opacity: 1;
     }
 }
