@@ -96,6 +96,32 @@ document.addEventListener('DOMContentLoaded', function() {
                  displayInitializationError("頁面結構錯誤，無法啟動測驗。");
                  return false;
              }
+             
+             // --- Clone Preloader SVG for Intro Title ---
+             if (DOM.elements.preloaderSvg && DOM.containers.intro) {
+                const introTitlePlaceholder = DOM.containers.intro.querySelector('.intro-title-placeholder');
+                if (introTitlePlaceholder) {
+                    const clonedSvg = DOM.elements.preloaderSvg.cloneNode(true);
+                    clonedSvg.id = 'intro-title-svg'; // Assign the correct ID for styling
+                    // Remove preloader-specific animation/glow classes if they exist on the clone
+                    clonedSvg.classList.remove('glow-active');
+                    // Optional: Explicitly remove animation styles applied directly or via classes if needed
+                    // clonedSvg.style.animation = 'none';
+                    // clonedSvg.querySelectorAll('path').forEach(p => p.style.animation = 'none');
+
+                    introTitlePlaceholder.innerHTML = ''; // Clear placeholder
+                    introTitlePlaceholder.appendChild(clonedSvg);
+                    console.log("Intro title SVG 已從 Preloader SVG 複製並插入");
+                } else {
+                    console.error("找不到 Intro title placeholder (.intro-title-placeholder)");
+                }
+            } else {
+                console.error("無法複製 SVG：找不到 Preloader SVG 或 Intro container");
+            }
+            // --- End SVG Cloning ---
+
+            console.log("DOM 元素已快取"); // 原有的日誌行
+            return true;
              console.log("DOM 元素已快取");
              return true;
          } catch (error) {
