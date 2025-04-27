@@ -11,8 +11,9 @@
     --transition-duration: 0.6s; /* 基礎屏幕切換時間 */
     --transition-timing: cubic-bezier(0.25, 0.1, 0.25, 1.0);
     --deep-blue-bg: #121824; /* 深藍背景 */
-    --preloader-exit-duration: 1.2s; /* Duration for preloader SVG animation */
-    --intro-fadein-delay: 0.8s; /* Delay before intro content fades in */
+    --preloader-exit-duration: 1.2s; /* Preloader自身的淡出時間 */
+    /* !! MODIFIED: 縮短 Intro 頁面內容的淡入延遲 */
+    --intro-fadein-delay: 0.1s; /* 從 0.8s 改為 0.1s */
     --intro-fadein-duration: 1s;
 
     /* --- SVG Animation Timings --- */
@@ -94,14 +95,21 @@ body {
 .preloader {
     z-index: 9999; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
     background-color: var(--deep-blue-bg); display: flex; justify-content: center; align-items: center;
-    opacity: 0; pointer-events: none;
-    transition: visibility 0s linear var(--preloader-exit-duration), opacity var(--preloader-exit-duration) ease-out;
+    opacity: 0; /* Start hidden */
     visibility: hidden;
+    pointer-events: none;
+    /* !! MODIFIED: 移除基礎 transition，完全依賴 .active 和 animation */
 }
-.preloader.active { opacity: 1; pointer-events: auto; visibility: visible; transition: none; }
+.preloader.active {
+    opacity: 1; /* Make visible */
+    visibility: visible;
+    pointer-events: auto;
+    transition: none; /* Ensure no transition when becoming active */
+}
 .preloader.transitioning-out {
+    /* Animation handles fade-out and visibility */
     animation: preloaderBgFadeOut var(--preloader-exit-duration) ease-out forwards;
-    pointer-events: none; opacity: 0; visibility: hidden;
+    pointer-events: none; /* Disable interaction immediately */
 }
 .preloader.transitioning-out .preloader-content { background-color: transparent; }
 .preloader.transitioning-out #preloader-svg-container #preloader-svg {
@@ -144,7 +152,7 @@ body {
 #preloader-svg #main-title-group .st1 { animation-delay: 0s; }
 #preloader-svg #main-title-group .st0 { animation-delay: calc(var(--svg-stagger-delay) * 1); } /* W */
 #preloader-svg #main-title-group .st2 { animation-delay: calc(var(--svg-stagger-delay) * 2); }
-/* #preloader-svg #main-title-group .st3 { animation-delay: calc(var(--svg-stagger-delay) * ?); }  <- Only if st3 exists in main title */
+/* #preloader-svg #main-title-group .st3 { animation-delay: calc(var(--svg-stagger-delay) * ?); } */ /* Only if st3 exists in main title */
 #preloader-svg #main-title-group .st4 { animation-delay: calc(var(--svg-stagger-delay) * 3); }
 #preloader-svg #main-title-group .st5 { animation-delay: calc(var(--svg-stagger-delay) * 4); }
 /* Adjust the order of delays (* 1, * 2, etc.) based on desired visual sequence */
@@ -169,7 +177,7 @@ body {
     stroke-dashoffset: 0;
     stroke-width: 0;
     animation: none;
-    fill-opacity: 1;
+    fill-opacity: 1; /* Ensure fill is visible */
 }
 /* Specific fill color for .st3 within Chinese subtitle (if needed) */
 #preloader-svg #chn-subtitle-group .st3 {
