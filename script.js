@@ -28,7 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Constants ---
     // 從 CSS 獲取 Preloader Path 退場動畫時長
-    const PRELOADER_PATH_EXIT_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--preloader-path-exit-duration').replace('s','')) * 1000 || 800;
+    const PRELOADER_PATH_EXIT_DURATION_S = getComputedStyle(document.documentElement).getPropertyValue('--preloader-path-exit-duration').trim() || '0.8s';
+    const PRELOADER_PATH_EXIT_DURATION = parseFloat(PRELOADER_PATH_EXIT_DURATION_S.replace('s','')) * 1000 || 800;
     // 重新計算 Preloader 額外延遲 (SVG動畫完成後 + 短暫停留)
     const SVG_BASE_DRAW_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-base-draw-duration').replace('s','')) * 1000 || 2500;
     const SVG_STAGGER_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-stagger-delay').replace('s','')) * 1000 || 150;
@@ -127,7 +128,6 @@ document.addEventListener('DOMContentLoaded', function() {
                      clonedSvg.querySelectorAll('path, g').forEach(el => {
                          el.style.animation = 'none';
                          el.style.animationDelay = '0s';
-                         el.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down'); // Clean exit classes
                          el.style.transform = '';
                          el.style.filter = '';
                          el.style.opacity = '';
@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
          }
     }
 
-    // !! REVISED Function: triggerIntroTransition (恢復成隨機 Path 添加 Class 的邏輯)
+    // !! REVISED Function: triggerIntroTransition (移除直接設定 style)
     function triggerIntroTransition() {
         if (!DOM.containers.preloader || !DOM.containers.intro || !DOM.elements.preloaderSvg) {
             console.error("Preloader, Intro container, or Preloader SVG not found for transition.");
@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        console.log("開始 Preloader 到 Intro 的轉場 (隨機 Path 退場 - 添加 Class)...");
+        console.log("開始 Preloader 到 Intro 的轉場 (隨機 Path 退場 - 修正位移)...");
         state.isAnimating = true; // Lock state
 
         // 移除光暈 & 入場動畫
@@ -186,37 +186,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         let maxDelay = 0;
-        const baseExitDelay = 0; // 開始退場的基礎延遲 (ms)
-        const randomExitRange = 1000; // 隨機延遲的最大範圍 (ms) - 使用較大值
+        const baseExitDelay = 0;
+        const randomExitRange = 1000; // Keep the larger range
 
-        // 2. 為每個 Path 添加 is-exiting-* class 並設定隨機延遲
+        // 2. 為每個 Path 直接設定 animation style 並設定隨機延遲
         pathsToExit.forEach(path => {
-            // 清除可能殘留的繪製動畫 style
-            path.style.animation = '';
-            // 確保 path 可見
-            path.style.opacity = '1';
-            path.style.transform = 'scale(1.05)'; // 確保從放大狀態開始
-            path.style.filter = 'blur(0px)';
-            path.style.visibility = 'visible';
-
+            path.style.animation = ''; // Remove any previous animation inline style
+            void path.offsetWidth; // Force reflow
 
             const randomDelay = baseExitDelay + Math.random() * randomExitRange;
             maxDelay = Math.max(maxDelay, randomDelay);
 
-            const exitClass = Math.random() < 0.5 ? 'is-exiting-scale-up' : 'is-exiting-scale-down';
+            const animationName = Math.random() < 0.5 ? 'preloaderPathExitScaleUp' : 'preloaderPathExitScaleDown';
 
-            // 使用 setTimeout 延遲添加 class
-            setTimeout(() => {
-                 path.style.animationDelay = `${randomDelay.toFixed(0)}ms`; // 設定延遲
-                 path.classList.add(exitClass); // 添加 class 來觸發 CSS 動畫
-            }, 5); // 極短延遲確保樣式重置先生效
+            // !! MODIFIED: 只設定 animation 屬性，不設定其他初始 style
+            path.style.animation = `${animationName} ${PRELOADER_PATH_EXIT_DURATION_S} ease-out ${randomDelay.toFixed(0)}ms 1 normal forwards`;
 
         });
 
-        // 讓背景也淡出 (稍微延遲)
+        // 讓背景也淡出
         if(preloaderBg) {
             setTimeout(() => {
-                preloaderBg.classList.add('is-exiting-bg');
+                 preloaderBg.classList.add('is-exiting-bg');
             }, baseExitDelay + randomExitRange * 0.2);
         }
 
@@ -228,11 +219,10 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
             console.log("Preloader 所有 Path 退場動畫結束。");
             DOM.containers.preloader.classList.remove('active', 'is-exiting-bg');
-            // 清理 Path 上的 is-exiting class 和 JS 添加的 style
+            // 清理 Path 上的 JS 添加的 style
             pathsToExit.forEach(path => {
-                path.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
                 path.style.animation = '';
-                path.style.animationDelay = '';
+                path.style.animationDelay = ''; // Reset delay just in case
                 path.style.opacity = '';
                 path.style.transform = '';
                 path.style.filter = '';
@@ -275,10 +265,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         console.log("顯示 Preloader...");
-        // Ensure any previous exit classes/styles are removed on restart
+        // Ensure any previous exit styles/classes are removed on restart
         DOM.containers.preloader.classList.remove('is-exiting-bg');
         DOM.elements.preloaderSvg.querySelectorAll('path').forEach(p => {
-             p.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
              p.style.animation = '';
              p.style.animationDelay = '';
              p.style.opacity = '';
@@ -447,9 +436,7 @@ document.addEventListener('DOMContentLoaded', function() {
                      }
                      // Reset path styles on returning to intro
                      DOM.elements.preloaderSvg?.querySelectorAll('path').forEach(p => {
-                         p.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
                          p.style.animation = '';
-                         p.style.animationDelay = '';
                          p.style.opacity = '';
                          p.style.transform = '';
                          p.style.filter = '';
