@@ -83,6 +83,8 @@ body {
     from { transform: scale(1); }
     to { transform: scale(1.05); }
 }
+
+/* Preloader Path 退場動畫 Keyframes */
 @keyframes preloaderPathExitScaleUp {
     from { opacity: 1; transform: scale(1.05); filter: blur(0px); }
     to { opacity: 0; transform: scale(var(--preloader-path-exit-scale-up)); filter: blur(var(--preloader-path-exit-blur)); visibility: hidden; }
@@ -152,30 +154,55 @@ body {
 #preloader-svg #main-title-group .st5 { animation-delay: calc(var(--svg-stagger-delay) * 4); }
 
 /* --- Setup for Subtitle Groups (Drawing part) --- */
+/* Subtitle groups no longer need the fadeInGroup animation here, */
+/* because their paths will be animated by drawStrokeAndFill if needed, */
+/* or will fade in as part of the path exit logic later */
 #preloader-svg #eng-subtitle-group,
 #preloader-svg #chn-subtitle-group {
-    opacity: 0; will-change: opacity, transform, filter;
-    /* Fade in animation during drawing phase */
-    /* animation: fadeInGroup var(--svg-fade-in-duration) ease-in forwards; */
-    /* animation-delay: var(--svg-fade-in-delay); */
-    /* Note: Fade-in handled by paths now if they are part of exit animation */
-    transform-origin: center center;
+     opacity: 1; /* Start visible, let paths control appearance */
+     transform-origin: center center;
+     will-change: transform, filter, opacity; /* Still needed for children */
 }
-/* Default appearance for paths INSIDE subtitle groups */
+/* Paths within subtitles also need setup for drawing/exit */
 #preloader-svg #eng-subtitle-group path,
 #preloader-svg #chn-subtitle-group path {
-    opacity: 1; /* Start visible (drawing animation will handle initial opacity if applied) */
-    fill: #ffffff; stroke: none;
-    stroke-dasharray: none; stroke-dashoffset: 0; stroke-width: 0;
-    animation: none; fill-opacity: 1; /* Ensure fill is opaque */
+    stroke-width: 0.5px; /* Assuming subtitles might also animate stroke */
+    stroke: #ffffff;    /* Default stroke */
+    stroke-dasharray: 1500;
+    stroke-dashoffset: 1500;
+    fill: none; fill-opacity: 0; opacity: 0; /* Start hidden */
+    transform: translateZ(0);
+    will-change: stroke-dashoffset, fill, opacity, transform, filter;
+    animation-name: drawStrokeAndFill; /* Apply drawing animation */
+    animation-duration: var(--svg-base-draw-duration);
+    animation-timing-function: ease-out;
+    animation-fill-mode: forwards;
+    --svg-fill-color: #ffffff; /* Default fill */
     transform-origin: center center;
+    /* Apply delay based on group, could also stagger within group */
+    animation-delay: var(--svg-fade-in-delay); /* Use fade-in delay for subtitles */
+}
+/* Specific colors/styles for subtitle paths */
+#preloader-svg #eng-subtitle-group path { --svg-fill-color: #ffffff; stroke: #ffffff;}
+#preloader-svg #chn-subtitle-group path { --svg-fill-color: #f2f2f2; stroke: #f2f2f2; } /* Example: Grey */
+#preloader-svg #chn-subtitle-group .st3 { --svg-fill-color: #f2f2f2; stroke: #f2f2f2;} /* Be specific if needed */
+
+
+/* !! CORRECTED: Path 退場動畫應用 class (Make sure these exist!) */
+#preloader-svg path.is-exiting-scale-up {
+    transform-origin: center center;
+    animation: preloaderPathExitScaleUp var(--preloader-path-exit-duration) ease-out forwards;
+    opacity: 1 !important; /* Ensure visible for animation start */
+    visibility: visible !important;
     will-change: opacity, transform, filter;
 }
-#preloader-svg #chn-subtitle-group .st3 { fill: #f2f2f2; }
-
-/* !! REMOVED: Path 退場動畫應用 class (.is-exiting-*) as JS will set style directly */
-/* #preloader-svg path.is-exiting-scale-up { ... } */
-/* #preloader-svg path.is-exiting-scale-down { ... } */
+#preloader-svg path.is-exiting-scale-down {
+    transform-origin: center center;
+    animation: preloaderPathExitScaleDown var(--preloader-path-exit-duration) ease-out forwards;
+    opacity: 1 !important;
+    visibility: visible !important;
+    will-change: opacity, transform, filter;
+}
 
 
 /* ================= 通用屏幕容器 ================= */

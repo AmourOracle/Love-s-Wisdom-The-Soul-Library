@@ -128,6 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
                      clonedSvg.querySelectorAll('path, g').forEach(el => {
                          el.style.animation = 'none';
                          el.style.animationDelay = '0s';
+                         el.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
                          el.style.transform = '';
                          el.style.filter = '';
                          el.style.opacity = '';
@@ -148,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
          }
     }
 
-    // !! REVISED Function: triggerIntroTransition (隨機 Path 退場，加大延遲範圍)
+    // !! REVISED Function: triggerIntroTransition (隨機 Path 退場 - 添加 Class)
     function triggerIntroTransition() {
         if (!DOM.containers.preloader || !DOM.containers.intro || !DOM.elements.preloaderSvg) {
             console.error("Preloader, Intro container, or Preloader SVG not found for transition.");
@@ -160,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        console.log("開始 Preloader 到 Intro 的轉場 (隨機 Path 退場 - 加大延遲)...");
+        console.log("開始 Preloader 到 Intro 的轉場 (隨機 Path 退場 - 添加 Class)...");
         state.isAnimating = true; // Lock state
 
         // 移除光暈 & 入場動畫
@@ -190,24 +191,25 @@ document.addEventListener('DOMContentLoaded', function() {
         // !! INCREASED RANDOM RANGE !!
         const randomExitRange = 1000; // 隨機延遲的最大範圍 (ms) - 增加到 1000ms
 
-        // 2. 為每個 Path 直接設定 animation style 並設定隨機延遲
+        // 2. 為每個 Path 添加 is-exiting-* class 並設定隨機延遲
         pathsToExit.forEach(path => {
-            path.style.animation = 'none'; // Remove any previous animation inline style
-            void path.offsetWidth; // Force reflow
+            // 清除可能殘留的繪製動畫 style (如果有的話)
+            path.style.animation = '';
+            path.style.opacity = ''; // Ensure opacity is not stuck at 0 from drawing
+            path.style.visibility = 'visible'; // Ensure visible before starting exit
 
             const randomDelay = baseExitDelay + Math.random() * randomExitRange;
             maxDelay = Math.max(maxDelay, randomDelay);
 
-            // 隨機決定動畫名稱
-            const animationName = Math.random() < 0.5 ? 'preloaderPathExitScaleUp' : 'preloaderPathExitScaleDown';
+            const exitClass = Math.random() < 0.5 ? 'is-exiting-scale-up' : 'is-exiting-scale-down';
 
-            // 直接設定 style
-            path.style.opacity = '1'; // Make sure it's visible before exit animation starts
-            path.style.transform = 'scale(1.05)'; // Ensure starting scale
-            path.style.filter = 'blur(0px)'; // Ensure starting filter
-            path.style.visibility = 'visible';
-            // Apply animation with delay
-            path.style.animation = `${animationName} ${PRELOADER_PATH_EXIT_DURATION_S} ease-out ${randomDelay.toFixed(0)}ms 1 normal forwards`;
+            // 使用 setTimeout 延遲添加 class
+            setTimeout(() => {
+                path.classList.add(exitClass);
+                 // Apply animation delay directly via style for potentially more reliable timing
+                 // Although class is added, setting delay via style overrides CSS delay if any
+                 path.style.animationDelay = `${randomDelay.toFixed(0)}ms`;
+            }, 0); // SetTimeout 0 to queue it after potential reflows
 
         });
 
@@ -219,6 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // 3. 計算何時所有退場動畫都結束
+        // 注意：這裡的 totalExitTime 應該是 (最大隨機延遲 + 動畫本身時長)
         const totalExitTime = maxDelay + PRELOADER_PATH_EXIT_DURATION;
         console.log(`所有 Preloader Path 預計在 ${totalExitTime.toFixed(0)}ms 後完成退場動畫`);
 
@@ -226,14 +229,15 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
             console.log("Preloader 所有 Path 退場動畫結束。");
             DOM.containers.preloader.classList.remove('active', 'is-exiting-bg');
-            // 清理 Path 上的 JS 添加的 style
+            // 清理 Path 上的 is-exiting class 和 JS 添加的 style
             pathsToExit.forEach(path => {
+                path.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
                 path.style.animation = '';
-                path.style.animationDelay = ''; // Though not set directly, reset for safety
+                path.style.animationDelay = '';
                 path.style.opacity = '';
                 path.style.transform = '';
                 path.style.filter = '';
-                path.style.visibility = ''; // Reset visibility
+                path.style.visibility = '';
             });
              // 重置 SVG transform and animation state
              DOM.elements.preloaderSvg.style.animation = '';
@@ -272,10 +276,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         console.log("顯示 Preloader...");
-        // Ensure any previous exit styles/classes are removed on restart
+        // Ensure any previous exit classes/styles are removed on restart
         DOM.containers.preloader.classList.remove('is-exiting-bg');
         DOM.elements.preloaderSvg.querySelectorAll('path').forEach(p => {
-             p.style.animation = ''; // 清除 JS style
+             p.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
+             p.style.animation = '';
+             p.style.animationDelay = '';
              p.style.opacity = '';
              p.style.transform = '';
              p.style.filter = '';
@@ -283,10 +289,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         // Reset SVG entrance animation and glow
         DOM.elements.preloaderSvg.style.animation = '';
-        DOM.elements.preloaderSvg.style.transform = ''; // Reset scale
+        DOM.elements.preloaderSvg.style.transform = '';
         DOM.elements.preloaderSvg.classList.remove('glow-active');
 
-        DOM.containers.preloader.classList.add('active'); // 激活 preloader (觸發 SVG 入場動畫)
+        DOM.containers.preloader.classList.add('active'); // 激活 preloader
 
         // Start SVG glow after delay
         setTimeout(() => {
