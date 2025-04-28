@@ -8,11 +8,11 @@
     --shadow-color: rgba(0, 0, 0, 0.2);
     --card-padding: 24px;
     --border-radius: 12px;
-    --transition-duration: 0.6s; /* 屏幕切換時間 */
+    --transition-duration: 0.6s;
     --transition-timing: cubic-bezier(0.25, 0.1, 0.25, 1.0);
     --deep-blue-bg: #121824;
-    --intro-fadein-delay: 0.1s; /* Intro 內容淡入延遲 */
-    --intro-fadein-duration: 1s; /* Intro 內容淡入時長 */
+    --intro-fadein-delay: 0.1s;
+    --intro-fadein-duration: 1s;
 
     /* --- SVG Animation Timings --- */
     --svg-base-draw-duration: 2.5s;
@@ -21,11 +21,15 @@
     --svg-entrance-zoom-duration: calc(var(--svg-base-draw-duration) + var(--svg-stagger-delay) * var(--svg-max-stagger-steps));
     --svg-glow-delay: calc(var(--svg-entrance-zoom-duration) * 0.9);
     --svg-glow-duration: 2.5s;
-    --svg-fade-in-duration: 1.5s; /* 副標題繪製時淡入時長 */
-    --svg-fade-in-delay: 0.6s;  /* 副標題繪製時淡入延遲 */
+    --svg-fade-in-duration: 1.5s;
+    --svg-fade-in-delay: 0.6s;
 
-    /* !! NEW: 簡化的 Preloader 退場動畫時長 */
-    --preloader-simple-exit-duration: 0.7s;
+    /* Path 退場動畫相關變數 */
+    --preloader-path-exit-duration: 0.8s;
+    --preloader-path-exit-blur: 5px;
+    --preloader-path-exit-scale-up: 1.2;
+    --preloader-path-exit-scale-down: 0.8;
+    --preloader-bg-exit-duration: calc(var(--preloader-path-exit-duration) * 1.1);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -63,7 +67,7 @@ body {
     70% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 0; opacity: 1; }
     100% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 1; opacity: 1; }
 }
-@keyframes fadeInGroup { /* For subtitle groups during drawing */
+@keyframes fadeInGroup {
     from { opacity: 0; }
     to { opacity: 1; }
 }
@@ -75,20 +79,18 @@ body {
      from { filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)) drop-shadow(0 0 0px rgba(246, 71, 64, 0)); opacity: 0; }
      to { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4)); opacity: 1;}
 }
-@keyframes preloaderEntranceZoom { /* Entrance Zoom to 105% */
+@keyframes preloaderEntranceZoom {
     from { transform: scale(1); }
     to { transform: scale(1.05); }
 }
-
-/* !! NEW: 簡化的 Preloader 退場動畫 Keyframes */
-@keyframes preloaderSimpleFadeOut {
-    from { opacity: 1; }
-    to { opacity: 0; visibility: hidden; }
+@keyframes preloaderPathExitScaleUp {
+    from { opacity: 1; transform: scale(1.05); filter: blur(0px); }
+    to { opacity: 0; transform: scale(var(--preloader-path-exit-scale-up)); filter: blur(var(--preloader-path-exit-blur)); visibility: hidden; }
 }
-
-/* !! REMOVED: Path 退場動畫 Keyframes */
-/* @keyframes preloaderPathExitScaleUp { ... } */
-/* @keyframes preloaderPathExitScaleDown { ... } */
+@keyframes preloaderPathExitScaleDown {
+    from { opacity: 1; transform: scale(1.05); filter: blur(0px); }
+    to { opacity: 0; transform: scale(var(--preloader-path-exit-scale-down)); filter: blur(var(--preloader-path-exit-blur)); visibility: hidden; }
+}
 
 
 /* ================= 預加載畫面 ================= */
@@ -101,15 +103,16 @@ body {
     opacity: 1; visibility: visible; pointer-events: auto; transition: none;
     background-color: var(--deep-blue-bg);
 }
-/* !! REVISED: Preloader 退場 class */
-.preloader.transitioning-out {
-    animation: preloaderSimpleFadeOut var(--preloader-simple-exit-duration) ease-out forwards;
+/* Preloader 背景退場 class */
+.preloader.is-exiting-bg {
+    opacity: 0;
+    transition: opacity var(--preloader-bg-exit-duration) ease-out;
     pointer-events: none;
 }
-/* 不再需要 is-exiting-bg 或單獨控制 content */
-/* .preloader.is-exiting-bg { ... } */
-/* .preloader.transitioning-out .preloader-content { ... } */
-
+.preloader.is-exiting-bg .preloader-content {
+    opacity: 0;
+    transition: opacity calc(var(--preloader-bg-exit-duration) * 0.8) ease-out;
+}
 .preloader-content { text-align: center; color: var(--text-color); width: 90%; max-width: 450px; position: relative; }
 #preloader-svg-container { width: 100%; margin-bottom: 20px; }
 
@@ -119,7 +122,6 @@ body {
     animation: none; transform-origin: center center;
     will-change: filter, transform, opacity;
 }
-/* Apply entrance zoom when active */
 .preloader.active #preloader-svg {
     animation: preloaderEntranceZoom var(--svg-entrance-zoom-duration) ease-out forwards;
 }
@@ -134,7 +136,7 @@ body {
     stroke-width: 0.5px; stroke: #ffffff; stroke-dasharray: 1500; stroke-dashoffset: 1500;
     fill: none; fill-opacity: 0; opacity: 0;
     transform: translateZ(0);
-    will-change: stroke-dashoffset, fill, opacity; /* 移除 transform/filter */
+    will-change: stroke-dashoffset, fill, opacity, transform, filter;
     animation-name: drawStrokeAndFill;
     animation-duration: var(--svg-base-draw-duration);
     animation-timing-function: ease-out;
@@ -148,28 +150,51 @@ body {
 #preloader-svg #main-title-group .st4 { animation-delay: calc(var(--svg-stagger-delay) * 3); }
 #preloader-svg #main-title-group .st5 { animation-delay: calc(var(--svg-stagger-delay) * 4); }
 
-/* Subtitle Groups - 只需要繪製時的 fade-in */
+/* --- Setup for Subtitle Groups (Drawing part) --- */
 #preloader-svg #eng-subtitle-group,
 #preloader-svg #chn-subtitle-group {
-    opacity: 0; /* Start hidden */
-    will-change: opacity;
-    animation: fadeInGroup var(--svg-fade-in-duration) ease-in forwards;
-    animation-delay: var(--svg-fade-in-delay);
-    /* transform-origin: center center; */ /* 不再需要 */
+    opacity: 1; /* Group is visible, paths control drawing */
+    transform-origin: center center;
+    will-change: opacity, transform, filter;
 }
 #preloader-svg #eng-subtitle-group path,
 #preloader-svg #chn-subtitle-group path {
-    opacity: 1; fill: #ffffff; stroke: none;
-    stroke-dasharray: none; stroke-dashoffset: 0; stroke-width: 0;
-    animation: none; fill-opacity: 1;
-    /* transform-origin: center center; */ /* 不再需要 */
-    /* will-change: opacity, transform, filter; */ /* 不再需要 */
+    stroke-width: 0.5px;
+    stroke: #ffffff; /* Assuming subtitles also draw */
+    stroke-dasharray: 1500;
+    stroke-dashoffset: 1500;
+    fill: none; fill-opacity: 0; opacity: 0; /* Start hidden */
+    transform: translateZ(0);
+    will-change: stroke-dashoffset, fill, opacity, transform, filter;
+    animation-name: drawStrokeAndFill; /* Apply drawing animation */
+    animation-duration: var(--svg-base-draw-duration);
+    animation-timing-function: ease-out;
+    animation-fill-mode: forwards;
+    --svg-fill-color: #ffffff; /* Default fill */
+    transform-origin: center center;
+    animation-delay: var(--svg-fade-in-delay); /* Use fade-in delay for subtitles */
 }
-#preloader-svg #chn-subtitle-group .st3 { fill: #f2f2f2; }
+#preloader-svg #eng-subtitle-group path { --svg-fill-color: #ffffff; stroke: #ffffff;}
+#preloader-svg #chn-subtitle-group path { --svg-fill-color: #f2f2f2; stroke: #f2f2f2; }
+#preloader-svg #chn-subtitle-group .st3 { --svg-fill-color: #f2f2f2; stroke: #f2f2f2;}
 
-/* !! REMOVED: Path 退場動畫應用 class */
-/* #preloader-svg path.is-exiting-scale-up { ... } */
-/* #preloader-svg path.is-exiting-scale-down { ... } */
+/* !! CORRECTED: Path 退場動畫應用 class (確保這些規則存在) */
+#preloader-svg path.is-exiting-scale-up {
+    transform-origin: center center;
+    animation: preloaderPathExitScaleUp var(--preloader-path-exit-duration) ease-out forwards;
+    /* animation-delay is set by JS */
+    opacity: 1 !important; /* Override drawing end state opacity if needed */
+    visibility: visible !important;
+    will-change: opacity, transform, filter;
+}
+#preloader-svg path.is-exiting-scale-down {
+    transform-origin: center center;
+    animation: preloaderPathExitScaleDown var(--preloader-path-exit-duration) ease-out forwards;
+    /* animation-delay is set by JS */
+    opacity: 1 !important;
+    visibility: visible !important;
+    will-change: opacity, transform, filter;
+}
 
 
 /* ================= 通用屏幕容器 ================= */
