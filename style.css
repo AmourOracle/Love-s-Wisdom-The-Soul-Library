@@ -21,8 +21,11 @@
     --svg-glow-delay: calc(var(--svg-base-draw-duration) * 1.1);
     --svg-glow-duration: 2.5s;
     --svg-stagger-delay: 0.15s;
-    --svg-fade-in-duration: 1.5s;
-    --svg-fade-in-delay: 0.6s;
+    --svg-fade-in-duration: 1.5s; /* 副標題(繪製時)淡入時長 */
+    --svg-fade-in-delay: 0.6s;  /* 副標題(繪製時)淡入延遲 */
+    /* !! NEW: 單一元素退場動畫相關變數 */
+    --preloader-element-exit-duration: 0.7s; /* 每個元素退場動畫時長 */
+
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -59,15 +62,18 @@ body {
 }
 
 /* --- SVG Animation Keyframes --- */
+/* Keyframe for Stroke + Smooth Fill (for paths) */
 @keyframes drawStrokeAndFill {
     0% { stroke-dashoffset: 1500; fill: none; fill-opacity: 0; opacity: 1; }
     70% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 0; opacity: 1; }
     100% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 1; opacity: 1; }
 }
+/* Keyframe for simple fade-in (for groups) */
 @keyframes fadeInGroup {
     from { opacity: 0; }
     to { opacity: 1; }
 }
+/* --- SVG Glow Keyframes --- */
 @keyframes glow {
     from { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4)); }
     to { filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 15px rgba(246, 71, 64, 0.6)); }
@@ -77,8 +83,8 @@ body {
      to { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4)); opacity: 1;}
 }
 
-/* !! NEW: Preloader 退場動畫 Keyframes (放大+模糊+淡化) */
-@keyframes preloaderZoomBlurFadeOut {
+/* !! REVISED: Preloader 單一元素退場動畫 (放大+模糊+淡化) */
+@keyframes preloaderElementExit {
     0% {
         opacity: 1;
         transform: scale(1);
@@ -86,8 +92,8 @@ body {
     }
     100% {
         opacity: 0;
-        transform: scale(1.5); /* 放大效果 */
-        filter: blur(8px);   /* 模糊效果 */
+        transform: scale(1.2); /* 放大效果 (可改為 < 1 來縮小) */
+        filter: blur(6px);   /* 模糊效果 */
         visibility: hidden; /* 確保最終隱藏 */
     }
 }
@@ -98,19 +104,29 @@ body {
     z-index: 9999; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
     background-color: var(--deep-blue-bg); display: flex; justify-content: center; align-items: center;
     opacity: 0; visibility: hidden; pointer-events: none;
+    transition: background-color 0.3s ease-out; /* 背景色變化柔和 */
 }
 .preloader.active {
     opacity: 1; visibility: visible; pointer-events: auto; transition: none;
+    background-color: var(--deep-blue-bg); /* 確保激活時有背景色 */
 }
-/* !! MODIFIED: 使用新的 ZoomBlurFadeOut 退場動畫 */
-.preloader.transitioning-out {
-    /* 將動畫應用於整個 preloader */
-    animation: preloaderZoomBlurFadeOut var(--preloader-exit-duration) ease-out forwards;
-    pointer-events: none;
+
+/* !! NEW: 應用單一元素退場動畫的 class */
+/* 可以應用於 preloader 背景本身，或應用於 SVG 的 <g> 元素 */
+.preloader.is-exiting,
+#preloader-svg g.is-exiting {
+    animation: preloaderElementExit var(--preloader-element-exit-duration) ease-out forwards;
+    /* 確保動畫期間元素可見 */
+    opacity: 1 !important;
+    visibility: visible !important;
 }
-/* 不再需要單獨控制 content 或 svg 的退出 */
-.preloader.transitioning-out .preloader-content {}
-.preloader.transitioning-out #preloader-svg-container #preloader-svg {}
+
+/* 確保 preloader 內容在 is-exiting 時不會被意外隱藏 */
+.preloader.is-exiting .preloader-content {
+     opacity: 1 !important; /* 讓內容隨父容器動畫 */
+     visibility: visible !important;
+     background-color: transparent; /* 讓背景淡出 */
+}
 
 .preloader-content { text-align: center; color: var(--text-color); width: 90%; max-width: 450px; position: relative; }
 #preloader-svg-container { width: 100%; margin-bottom: 20px; }
@@ -119,13 +135,14 @@ body {
     width: 100%; height: auto; display: block; overflow: visible;
     will-change: filter, transform, opacity; transform: translateY(0) scale(1);
     opacity: 1; filter: none;
+    /* SVG 本身不再需要獨立的退出動畫 */
 }
 #preloader-svg.glow-active {
     animation: fadeInGlow calc(var(--svg-glow-duration) * 0.4) ease-out var(--svg-glow-delay) forwards,
                glow var(--svg-glow-duration) ease-in-out calc(var(--svg-glow-delay) + (var(--svg-glow-duration) * 0.4)) infinite alternate;
 }
 
-/* --- SVG Path/Group Animation Setup (Using Group IDs) --- */
+/* --- SVG Path/Group Animation Setup (Using Group IDs - 繪製部分) --- */
 /* Default setup for paths INSIDE the main title group that need stroke */
 #preloader-svg #main-title-group path {
     stroke-width: 0.5px; stroke: #ffffff; stroke-dasharray: 1500; stroke-dashoffset: 1500;
@@ -144,7 +161,7 @@ body {
 #preloader-svg #main-title-group .st4 { animation-delay: calc(var(--svg-stagger-delay) * 3); }
 #preloader-svg #main-title-group .st5 { animation-delay: calc(var(--svg-stagger-delay) * 4); }
 
-/* --- Setup for Subtitle Groups (Fade-in) --- */
+/* --- Setup for Subtitle Groups (繪製時的淡入) --- */
 #preloader-svg #eng-subtitle-group,
 #preloader-svg #chn-subtitle-group {
     opacity: 0; will-change: opacity;
@@ -159,6 +176,7 @@ body {
     animation: none; fill-opacity: 1;
 }
 #preloader-svg #chn-subtitle-group .st3 { fill: #f2f2f2; }
+
 
 /* ================= 通用屏幕容器 ================= */
 .screen-container {
