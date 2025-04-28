@@ -28,11 +28,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Constants ---
     // 從 CSS 獲取 Preloader Path 退場動畫時長
-    const PRELOADER_PATH_EXIT_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--preloader-path-exit-duration').replace('s','')) * 1000 || 700;
+    const PRELOADER_PATH_EXIT_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--preloader-path-exit-duration').replace('s','')) * 1000 || 800;
     // 重新計算 Preloader 額外延遲 (SVG動畫完成後 + 短暫停留)
     const SVG_BASE_DRAW_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-base-draw-duration').replace('s','')) * 1000 || 2500;
     const SVG_STAGGER_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-stagger-delay').replace('s','')) * 1000 || 150;
-    const MAX_STAGGER_STEPS = 4; // 假設最多交錯 4 步 (delay * 4)
+    const MAX_STAGGER_STEPS = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--svg-max-stagger-steps')) || 4; // Read from CSS or default to 4
     const SVG_ANIMATION_TOTAL_ESTIMATED_TIME = SVG_BASE_DRAW_DURATION + (MAX_STAGGER_STEPS * SVG_STAGGER_DELAY);
     const PRELOADER_PAUSE_AFTER_SVG = 400; // SVG 動畫後的停留時間 (ms)
     const PRELOADER_EXTRA_DELAY = SVG_ANIMATION_TOTAL_ESTIMATED_TIME + PRELOADER_PAUSE_AFTER_SVG;
@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const INTRO_ANIMATION_TOTAL_TIME = INTRO_FADEIN_DELAY + INTRO_FADEIN_DURATION;
 
     const SCREEN_TRANSITION_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--transition-duration').replace('s','')) * 1000 || 600;
-    const EXPLOSION_DURATION = 1000; // Matches CSS explodeForwardBlur animation
+    const EXPLOSION_DURATION = 1000;
     const SVG_GLOW_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-glow-delay').replace('s','')) * 1000 || 3000;
 
 
@@ -100,6 +100,14 @@ document.addEventListener('DOMContentLoaded', function() {
                  DOM.elements.preloaderSvg, DOM.elements.testBackground, DOM.elements.questionTitle,
                  DOM.elements.startBtnText, DOM.buttons.start
              ];
+             // Check if SVG Groups exist (optional but good)
+             const mainTitleGroup = DOM.elements.preloaderSvg?.querySelector('#main-title-group');
+             const engSubtitleGroup = DOM.elements.preloaderSvg?.querySelector('#eng-subtitle-group');
+             const chnSubtitleGroup = DOM.elements.preloaderSvg?.querySelector('#chn-subtitle-group');
+             if (!mainTitleGroup || !engSubtitleGroup || !chnSubtitleGroup) {
+                 console.warn("警告：未能找到所有的 SVG Group ID (main-title-group, eng-subtitle-group, chn-subtitle-group)。請檢查 index.html。");
+             }
+
              if (criticalElements.some(el => !el)) {
                  console.error("錯誤：未能找到所有必要的 HTML 元素。請檢查 HTML 結構和 ID。", DOM);
                  const missing = criticalElements.findIndex(el => !el);
@@ -115,10 +123,12 @@ document.addEventListener('DOMContentLoaded', function() {
                      const clonedSvg = DOM.elements.preloaderSvg.cloneNode(true);
                      clonedSvg.id = 'intro-title-svg';
                      clonedSvg.classList.remove('glow-active');
-                     // Remove potentially inherited animation styles from paths in clone
-                     clonedSvg.querySelectorAll('path').forEach(p => {
-                         p.style.animation = 'none';
-                         p.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
+                     // Remove potentially inherited animation styles from paths/groups in clone
+                     clonedSvg.style.animation = 'none'; // Remove animation from SVG itself
+                     clonedSvg.querySelectorAll('path, g').forEach(el => {
+                         el.style.animation = 'none';
+                         el.style.animationDelay = '0s';
+                         el.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
                      });
                      introTitlePlaceholder.innerHTML = '';
                      introTitlePlaceholder.appendChild(clonedSvg);
@@ -136,11 +146,11 @@ document.addEventListener('DOMContentLoaded', function() {
          }
     }
 
-    // !! MODIFIED Function: triggerIntroTransition (隨機 Path 退場)
+    // !! REVISED Function: triggerIntroTransition (隨機 Path 退場)
     function triggerIntroTransition() {
         if (!DOM.containers.preloader || !DOM.containers.intro || !DOM.elements.preloaderSvg) {
             console.error("Preloader, Intro container, or Preloader SVG not found for transition.");
-            state.isAnimating = false; // Release lock if essential elements missing
+            state.isAnimating = false;
             return;
         }
         if (state.isAnimating) {
@@ -153,36 +163,33 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 移除光暈
         DOM.elements.preloaderSvg.classList.remove('glow-active');
+        // 移除 SVG 入場動畫 (如果還在播放)
+        DOM.elements.preloaderSvg.style.animation = 'none';
 
-        // 1. 獲取所有需要參與退場動畫的 Path 元素
-        // (選擇所有已知的 st* class，確保只選取可見部分)
+
+        // 1. 獲取所有需要參與退場動畫的 Path 元素 (st0 to st5)
         const pathsToExit = DOM.elements.preloaderSvg.querySelectorAll(
-            '#main-title-group .st0, #main-title-group .st1, #main-title-group .st2, #main-title-group .st4, #main-title-group .st5, #eng-subtitle-group .st1, #chn-subtitle-group .st3'
+             '#main-title-group .st0, #main-title-group .st1, #main-title-group .st2, #main-title-group .st4, #main-title-group .st5, #eng-subtitle-group path, #chn-subtitle-group path'
         );
         // 同時讓背景也淡出
         const preloaderBg = DOM.containers.preloader;
 
-        if (pathsToExit.length === 0) {
-            console.warn("警告：未能找到任何需要退場的 Preloader SVG Path 元素。檢查 SVG 結構和 class 是否正確。");
-            // Fallback: Directly switch? Or fade out background only? Let's fade bg.
-            if (preloaderBg) {
-                preloaderBg.classList.add('is-exiting-bg'); // Assuming .is-exiting-bg exists in CSS for simple fade
-            } else {
-                DOM.containers.preloader.classList.remove('active'); // Simple remove if bg fade fails
-            }
-            // Continue to intro after a standard delay
-            setTimeout(() => {
-                 DOM.containers.preloader.classList.remove('active', 'is-exiting-bg');
-                 DOM.containers.intro.classList.add('active');
-                 state.introVisible = true;
-                 setTimeout(() => { state.isAnimating = false; }, INTRO_ANIMATION_TOTAL_TIME + 100);
-            }, PRELOADER_PATH_EXIT_DURATION); // Use path exit duration as fallback time
-            return;
+        if (pathsToExit.length === 0 && !preloaderBg) {
+            console.error("錯誤：找不到任何需要退場的 Preloader Path 或背景。");
+             // Fallback
+             DOM.containers.preloader.classList.remove('active');
+             DOM.containers.intro.classList.add('active');
+             state.introVisible = true;
+             state.isAnimating = false;
+             return;
+        }
+         if (pathsToExit.length === 0) {
+            console.warn("警告：未找到 SVG paths 進行退場動畫，將只淡出背景。");
         }
 
         let maxDelay = 0;
-        const baseExitDelay = 0; // Start almost immediately after pause
-        const randomExitRange = 300; // 隨機延遲範圍 (ms)，增加隨機感
+        const baseExitDelay = 0; // 開始退場的基礎延遲 (ms)
+        const randomExitRange = 400; // 隨機延遲的最大範圍 (ms)
 
         // 2. 為每個 Path 添加 is-exiting-* class 並設定隨機延遲
         pathsToExit.forEach(path => {
@@ -193,15 +200,18 @@ document.addEventListener('DOMContentLoaded', function() {
             const exitClass = Math.random() < 0.5 ? 'is-exiting-scale-up' : 'is-exiting-scale-down';
 
             setTimeout(() => {
+                // 確保清除舊動畫影響
+                path.style.animation = 'none';
+                // 添加新 class
                 path.classList.add(exitClass);
             }, randomDelay);
         });
 
-        // 讓背景也淡出 (可以稍微延遲一點開始)
+        // 讓背景也淡出 (稍微延遲)
         if(preloaderBg) {
             setTimeout(() => {
                 preloaderBg.classList.add('is-exiting-bg');
-            }, baseExitDelay + randomExitRange / 3); // Start bg fade slightly after first paths
+            }, baseExitDelay + randomExitRange * 0.2); // 背景延遲一點點開始淡出
         }
 
         // 3. 計算何時所有退場動畫都結束
@@ -211,21 +221,28 @@ document.addEventListener('DOMContentLoaded', function() {
         // 4. 在所有退場動畫結束後，激活 Intro
         setTimeout(() => {
             console.log("Preloader 所有 Path 退場動畫結束。");
-            DOM.containers.preloader.classList.remove('active', 'is-exiting-bg'); // 移除 active 和背景退出 class
+            DOM.containers.preloader.classList.remove('active', 'is-exiting-bg');
             // 清理 Path 上的 is-exiting class
             pathsToExit.forEach(path => {
                 path.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
+                // 重置樣式，以防萬一
+                path.style.animation = '';
+                path.style.opacity = ''; // 讓其恢復由 CSS 控制
             });
+             // 重置 SVG transform
+             DOM.elements.preloaderSvg.style.animation = '';
+             DOM.elements.preloaderSvg.style.transform = '';
+
 
             // 激活 Intro
             if (!state.introVisible) {
                  console.log("激活 Intro 容器...");
-                 DOM.containers.intro.classList.add('active'); // CSS handles intro fade-in
+                 DOM.containers.intro.classList.add('active');
                  state.introVisible = true;
             }
 
             // 5. 解鎖狀態 - 在 Intro 動畫完成後
-            const unlockDelay = INTRO_ANIMATION_TOTAL_TIME + 100; // Intro 動畫總時間 + buffer
+            const unlockDelay = INTRO_ANIMATION_TOTAL_TIME + 100;
             console.log(`預計在 ${unlockDelay}ms 後解除動畫鎖定`);
 
             setTimeout(() => {
@@ -253,15 +270,21 @@ document.addEventListener('DOMContentLoaded', function() {
         DOM.containers.preloader.classList.remove('is-exiting-bg');
         DOM.elements.preloaderSvg.querySelectorAll('path').forEach(p => {
              p.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
+             p.style.animation = ''; // 清除可能殘留的 JS style
+             p.style.animationDelay = '';
         });
+        // Reset SVG entrance animation
+        DOM.elements.preloaderSvg.style.animation = '';
+        DOM.elements.preloaderSvg.style.transform = ''; // Reset scale
         if(DOM.elements.preloaderSvg) DOM.elements.preloaderSvg.classList.remove('glow-active');
 
-        DOM.containers.preloader.classList.add('active');
+        DOM.containers.preloader.classList.add('active'); // 激活 preloader (觸發 SVG 入場動畫)
 
         if (DOM.containers.intro) DOM.containers.intro.classList.remove('active');
         if (DOM.containers.test) DOM.containers.test.classList.remove('active');
         if (DOM.containers.result) DOM.containers.result.classList.remove('active');
 
+        // Start SVG glow after delay (relative to start)
         setTimeout(() => {
             if (DOM.containers.preloader.classList.contains('active') && DOM.elements.preloaderSvg) {
                  console.log("為 preloader SVG 添加光暈效果");
@@ -339,7 +362,6 @@ document.addEventListener('DOMContentLoaded', function() {
             explosionContainer.appendChild(span);
             setTimeout(() => { if (span.parentNode === explosionContainer) { explosionContainer.removeChild(span); } }, EXPLOSION_DURATION + delay * 1000 + 300);
         });
-        // console.log(`文字爆裂已觸發 for: ${textToExplode}`);
     }
 
     function handleStartTestClick() {
@@ -414,11 +436,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         DOM.containers.startBtnExplosion.style.left = ''; DOM.containers.startBtnExplosion.style.width = '';
                         DOM.containers.startBtnExplosion.style.height = '';
                      }
-                     // Reset path classes on returning to intro
+                     // Reset path classes and styles on returning to intro
                      DOM.elements.preloaderSvg?.querySelectorAll('path').forEach(p => {
                          p.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
+                         p.style.animation = '';
+                         p.style.animationDelay = '';
+                         p.style.opacity = ''; // Reset opacity
                      });
                      DOM.containers.preloader?.classList.remove('is-exiting-bg');
+                     // Reset SVG zoom/glow
+                     if(DOM.elements.preloaderSvg) {
+                        DOM.elements.preloaderSvg.style.animation = '';
+                        DOM.elements.preloaderSvg.style.transform = '';
+                        DOM.elements.preloaderSvg.classList.remove('glow-active');
+                     }
                  }
                  setTimeout(() => {
                      state.isAnimating = false; state.isTransitioning = false;
