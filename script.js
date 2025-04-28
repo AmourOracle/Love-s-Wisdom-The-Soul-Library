@@ -28,8 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Constants ---
     // 從 CSS 獲取 Preloader Path 退場動畫時長
-    const PRELOADER_PATH_EXIT_DURATION_S = getComputedStyle(document.documentElement).getPropertyValue('--preloader-path-exit-duration').trim() || '0.8s';
-    const PRELOADER_PATH_EXIT_DURATION = parseFloat(PRELOADER_PATH_EXIT_DURATION_S.replace('s','')) * 1000 || 800;
+    const PRELOADER_PATH_EXIT_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--preloader-path-exit-duration').replace('s','')) * 1000 || 800;
     // 重新計算 Preloader 額外延遲 (SVG動畫完成後 + 短暫停留)
     const SVG_BASE_DRAW_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-base-draw-duration').replace('s','')) * 1000 || 2500;
     const SVG_STAGGER_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-stagger-delay').replace('s','')) * 1000 || 150;
@@ -128,7 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
                      clonedSvg.querySelectorAll('path, g').forEach(el => {
                          el.style.animation = 'none';
                          el.style.animationDelay = '0s';
-                         el.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
+                         el.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down'); // Clean exit classes
                          el.style.transform = '';
                          el.style.filter = '';
                          el.style.opacity = '';
@@ -149,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
          }
     }
 
-    // !! REVISED Function: triggerIntroTransition (隨機 Path 退場 - 添加 Class)
+    // !! REVISED Function: triggerIntroTransition (恢復成隨機 Path 添加 Class 的邏輯)
     function triggerIntroTransition() {
         if (!DOM.containers.preloader || !DOM.containers.intro || !DOM.elements.preloaderSvg) {
             console.error("Preloader, Intro container, or Preloader SVG not found for transition.");
@@ -188,15 +187,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let maxDelay = 0;
         const baseExitDelay = 0; // 開始退場的基礎延遲 (ms)
-        // !! INCREASED RANDOM RANGE !!
-        const randomExitRange = 1000; // 隨機延遲的最大範圍 (ms) - 增加到 1000ms
+        const randomExitRange = 1000; // 隨機延遲的最大範圍 (ms) - 使用較大值
 
         // 2. 為每個 Path 添加 is-exiting-* class 並設定隨機延遲
         pathsToExit.forEach(path => {
-            // 清除可能殘留的繪製動畫 style (如果有的話)
+            // 清除可能殘留的繪製動畫 style
             path.style.animation = '';
-            path.style.opacity = ''; // Ensure opacity is not stuck at 0 from drawing
-            path.style.visibility = 'visible'; // Ensure visible before starting exit
+            // 確保 path 可見
+            path.style.opacity = '1';
+            path.style.transform = 'scale(1.05)'; // 確保從放大狀態開始
+            path.style.filter = 'blur(0px)';
+            path.style.visibility = 'visible';
+
 
             const randomDelay = baseExitDelay + Math.random() * randomExitRange;
             maxDelay = Math.max(maxDelay, randomDelay);
@@ -205,11 +207,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 使用 setTimeout 延遲添加 class
             setTimeout(() => {
-                path.classList.add(exitClass);
-                 // Apply animation delay directly via style for potentially more reliable timing
-                 // Although class is added, setting delay via style overrides CSS delay if any
-                 path.style.animationDelay = `${randomDelay.toFixed(0)}ms`;
-            }, 0); // SetTimeout 0 to queue it after potential reflows
+                 path.style.animationDelay = `${randomDelay.toFixed(0)}ms`; // 設定延遲
+                 path.classList.add(exitClass); // 添加 class 來觸發 CSS 動畫
+            }, 5); // 極短延遲確保樣式重置先生效
 
         });
 
@@ -221,7 +221,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // 3. 計算何時所有退場動畫都結束
-        // 注意：這裡的 totalExitTime 應該是 (最大隨機延遲 + 動畫本身時長)
         const totalExitTime = maxDelay + PRELOADER_PATH_EXIT_DURATION;
         console.log(`所有 Preloader Path 預計在 ${totalExitTime.toFixed(0)}ms 後完成退場動畫`);
 
@@ -448,7 +447,9 @@ document.addEventListener('DOMContentLoaded', function() {
                      }
                      // Reset path styles on returning to intro
                      DOM.elements.preloaderSvg?.querySelectorAll('path').forEach(p => {
+                         p.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
                          p.style.animation = '';
+                         p.style.animationDelay = '';
                          p.style.opacity = '';
                          p.style.transform = '';
                          p.style.filter = '';
