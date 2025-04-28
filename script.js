@@ -100,12 +100,12 @@ document.addEventListener('DOMContentLoaded', function() {
                  DOM.elements.preloaderSvg, DOM.elements.testBackground, DOM.elements.questionTitle,
                  DOM.elements.startBtnText, DOM.buttons.start
              ];
-             // Check SVG Groups exist
+             // Check SVG Groups exist (optional but good practice)
              const mainTitleGroup = DOM.elements.preloaderSvg?.querySelector('#main-title-group');
              const engSubtitleGroup = DOM.elements.preloaderSvg?.querySelector('#eng-subtitle-group');
              const chnSubtitleGroup = DOM.elements.preloaderSvg?.querySelector('#chn-subtitle-group');
              if (!mainTitleGroup || !engSubtitleGroup || !chnSubtitleGroup) {
-                 console.warn("警告：未能找到所有的 SVG Group ID (main-title-group, eng-subtitle-group, chn-subtitle-group)。請檢查 index.html。");
+                 console.warn("警告：未能找到所有的 SVG Group ID (main-title-group, eng-subtitle-group, chn-subtitle-group)。請檢查 index.html。 Path 退場動畫可能無法完全按預期工作。");
              }
 
              if (criticalElements.some(el => !el)) {
@@ -124,12 +124,14 @@ document.addEventListener('DOMContentLoaded', function() {
                      clonedSvg.id = 'intro-title-svg';
                      clonedSvg.classList.remove('glow-active');
                      // Remove potentially inherited animation styles from paths/groups in clone
-                     clonedSvg.style.animation = 'none';
+                     clonedSvg.style.animation = 'none'; // Remove animation from SVG itself
                      clonedSvg.querySelectorAll('path, g').forEach(el => {
                          el.style.animation = 'none';
                          el.style.animationDelay = '0s';
                          el.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
                          el.style.transform = ''; // Reset transform too
+                         el.style.filter = ''; // Reset filter
+                         el.style.opacity = ''; // Reset opacity
                      });
                      introTitlePlaceholder.innerHTML = '';
                      introTitlePlaceholder.appendChild(clonedSvg);
@@ -164,18 +166,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 移除光暈 & 入場動畫
         DOM.elements.preloaderSvg.classList.remove('glow-active');
-        DOM.elements.preloaderSvg.style.animation = 'none'; // Stop entrance zoom
+        DOM.elements.preloaderSvg.style.animation = 'none'; // Stop entrance zoom immediately
 
 
-        // 1. 獲取所有需要參與退場動畫的 Path 元素 (st0 to st5)
+        // 1. 獲取所有需要參與退場動畫的 Path 元素
         const pathsToExit = DOM.elements.preloaderSvg.querySelectorAll(
              '#main-title-group .st0, #main-title-group .st1, #main-title-group .st2, #main-title-group .st4, #main-title-group .st5, #eng-subtitle-group path, #chn-subtitle-group path'
         );
-        const preloaderBg = DOM.containers.preloader; // Target the preloader itself for background fade
+        const preloaderBg = DOM.containers.preloader;
 
         if (pathsToExit.length === 0 && !preloaderBg) {
             console.error("錯誤：找不到任何需要退場的 Preloader Path 或背景。");
-             // Fallback
              DOM.containers.preloader.classList.remove('active');
              DOM.containers.intro.classList.add('active');
              state.introVisible = true;
@@ -192,15 +193,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 2. 為每個 Path 添加 is-exiting-* class 並設定隨機延遲
         pathsToExit.forEach(path => {
-            // 清除可能殘留的繪製動畫狀態 (防止干擾退場)
-            path.style.animation = 'none';
-            // 強制重繪以應用樣式清除
-            void path.offsetWidth;
+            // Ensure drawing animation is finished visually before applying exit animation
+            // This might require a very small delay or relying on the overall PRELOADER_EXTRA_DELAY
+            path.style.animation = 'none'; // Remove drawing animation if still running
+            void path.offsetWidth; // Force reflow
 
             const randomDelay = baseExitDelay + Math.random() * randomExitRange;
             maxDelay = Math.max(maxDelay, randomDelay);
 
-            // 隨機決定放大或縮小
             const exitClass = Math.random() < 0.5 ? 'is-exiting-scale-up' : 'is-exiting-scale-down';
 
             setTimeout(() => {
@@ -226,13 +226,13 @@ document.addEventListener('DOMContentLoaded', function() {
             // 清理 Path 上的 is-exiting class 和 JS 添加的 style
             pathsToExit.forEach(path => {
                 path.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
-                path.style.animation = ''; // Reset animation property
+                path.style.animation = '';
                 path.style.animationDelay = '';
-                path.style.opacity = ''; // Let CSS control opacity again
-                path.style.transform = ''; // Reset transform
-                path.style.filter = ''; // Reset filter
+                path.style.opacity = '';
+                path.style.transform = '';
+                path.style.filter = '';
             });
-             // 重置 SVG transform
+             // 重置 SVG transform and animation state
              DOM.elements.preloaderSvg.style.animation = '';
              DOM.elements.preloaderSvg.style.transform = '';
 
@@ -395,7 +395,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 switchScreen('intro', 'test');
                 setTimeout(() => {
                     buttonElement.classList.remove('exploded'); buttonElement.style.pointerEvents = '';
-                    explosionContainer.style.position = ''; // Reset position
+                    explosionContainer.style.position = '';
                     explosionContainer.style.top = ''; explosionContainer.style.left = '';
                     explosionContainer.style.width = ''; explosionContainer.style.height = '';
                 }, SCREEN_TRANSITION_DURATION + 100);
@@ -475,7 +475,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayQuestion(index, isInitialDisplay = false) {
         if (index < 0 || index >= questions.length) { return; }
         const questionData = questions[index]; const questionNumber = index + 1;
-        state.isTransitioning = true; // Lock until enter animation completes
+        state.isTransitioning = true;
 
         if (DOM.elements.testBackground) {
             const imageUrl = `./images/Q${questionNumber}.webp`;
@@ -699,7 +699,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.addEventListener('error', function(event) {
          console.error("Global error caught:", event.error, "at:", event.filename, ":", event.lineno);
-         // Attempt to reset state locks to prevent getting stuck
          state.isAnimating = false;
          state.isTransitioning = false;
     });
@@ -709,9 +708,8 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('resize', setViewportHeight);
 
     if (cacheDOMElements()) {
-        preloadImages(); // Starts preloading and the whole sequence
+        preloadImages();
         bindOtherButtons();
-        // bindStartButton() is called within preloadImages -> triggerIntroTransition
     } else {
         console.error("DOM element caching failed, initialization incomplete.");
     }

@@ -18,19 +18,18 @@
     --svg-base-draw-duration: 2.5s;
     --svg-stagger-delay: 0.15s;
     --svg-max-stagger-steps: 4; /* Corresponds to delay * 4 */
-    /* Entrance Zoom duration matches draw duration + max stagger */
-    --svg-entrance-zoom-duration: calc(var(--svg-base-draw-duration) + var(--svg-stagger-delay) * var(--svg-max-stagger-steps));
+    --svg-entrance-zoom-duration: calc(var(--svg-base-draw-duration) + var(--svg-stagger-delay) * var(--svg-max-stagger-steps)); /* Entrance Zoom duration */
     --svg-glow-delay: calc(var(--svg-entrance-zoom-duration) * 0.9);
     --svg-glow-duration: 2.5s;
     --svg-fade-in-duration: 1.5s; /* Subtitle fade-in during draw */
     --svg-fade-in-delay: 0.6s;
 
-    /* Path 退場動畫相關變數 */
+    /* !! Path 退場動畫相關變數 */
     --preloader-path-exit-duration: 0.8s;
     --preloader-path-exit-blur: 5px;
     --preloader-path-exit-scale-up: 1.2;
     --preloader-path-exit-scale-down: 0.8;
-    --preloader-bg-exit-duration: calc(var(--preloader-path-exit-duration) * 1.1);
+    --preloader-bg-exit-duration: calc(var(--preloader-path-exit-duration) * 1.1); /* Background fade slightly longer */
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -68,7 +67,7 @@ body {
     70% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 0; opacity: 1; }
     100% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 1; opacity: 1; }
 }
-@keyframes fadeInGroup {
+@keyframes fadeInGroup { /* For subtitle groups during drawing */
     from { opacity: 0; }
     to { opacity: 1; }
 }
@@ -80,39 +79,19 @@ body {
      from { filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)) drop-shadow(0 0 0px rgba(246, 71, 64, 0)); opacity: 0; }
      to { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4)); opacity: 1;}
 }
-
-/* !! MODIFIED: Preloader SVG 入場放大動畫 (105%) */
-@keyframes preloaderEntranceZoom {
+@keyframes preloaderEntranceZoom { /* Entrance Zoom */
     from { transform: scale(1); }
-    to { transform: scale(1.05); } /* 放大到 105% */
+    to { transform: scale(1.05); }
 }
 
-/* !! MODIFIED: Preloader Path 退場動畫 Keyframes (起始 scale 1.05) */
+/* !! REVISED: Preloader Path 退場動畫 Keyframes */
 @keyframes preloaderPathExitScaleUp {
-    from {
-        opacity: 1;
-        transform: scale(1.05); /* 起始大小 */
-        filter: blur(0px);
-    }
-    to {
-        opacity: 0;
-        transform: scale(var(--preloader-path-exit-scale-up)); /* 放大 */
-        filter: blur(var(--preloader-path-exit-blur));      /* 模糊 */
-        visibility: hidden;
-    }
+    from { opacity: 1; transform: scale(1.05); filter: blur(0px); } /* Start from 105% */
+    to { opacity: 0; transform: scale(var(--preloader-path-exit-scale-up)); filter: blur(var(--preloader-path-exit-blur)); visibility: hidden; }
 }
 @keyframes preloaderPathExitScaleDown {
-    from {
-        opacity: 1;
-        transform: scale(1.05); /* 起始大小 */
-        filter: blur(0px);
-    }
-    to {
-        opacity: 0;
-        transform: scale(var(--preloader-path-exit-scale-down)); /* 縮小 */
-        filter: blur(var(--preloader-path-exit-blur));         /* 模糊 */
-        visibility: hidden;
-    }
+    from { opacity: 1; transform: scale(1.05); filter: blur(0px); } /* Start from 105% */
+    to { opacity: 0; transform: scale(var(--preloader-path-exit-scale-down)); filter: blur(var(--preloader-path-exit-blur)); visibility: hidden; }
 }
 
 
@@ -121,12 +100,12 @@ body {
     z-index: 9999; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
     background-color: var(--deep-blue-bg); display: flex; justify-content: center; align-items: center;
     opacity: 0; visibility: hidden; pointer-events: none;
-    transition: background-color 0.3s ease-out;
 }
 .preloader.active {
     opacity: 1; visibility: visible; pointer-events: auto; transition: none;
     background-color: var(--deep-blue-bg);
 }
+/* Preloader 背景退場 class */
 .preloader.is-exiting-bg {
     opacity: 0;
     transition: opacity var(--preloader-bg-exit-duration) ease-out;
@@ -141,18 +120,15 @@ body {
 
 #preloader-svg {
     width: 100%; height: auto; display: block; overflow: visible;
-    transform: scale(1); /* Ensure initial scale is 1 before animation */
-    opacity: 1; filter: none;
-    animation: none; /* Default no animation */
-    transform-origin: center center; /* Set origin for zoom */
+    transform: scale(1); opacity: 1; filter: none;
+    animation: none; transform-origin: center center;
     will-change: filter, transform, opacity;
 }
-/* !! MODIFIED: Apply entrance zoom when active */
+/* Apply entrance zoom when active */
 .preloader.active #preloader-svg {
     animation: preloaderEntranceZoom var(--svg-entrance-zoom-duration) ease-out forwards;
 }
 #preloader-svg.glow-active {
-    /* Apply entrance zoom AND glow */
     animation: preloaderEntranceZoom var(--svg-entrance-zoom-duration) ease-out forwards,
                fadeInGlow calc(var(--svg-glow-duration) * 0.4) ease-out var(--svg-glow-delay) forwards,
                glow var(--svg-glow-duration) ease-in-out calc(var(--svg-glow-delay) + (var(--svg-glow-duration) * 0.4)) infinite alternate;
@@ -163,13 +139,13 @@ body {
     stroke-width: 0.5px; stroke: #ffffff; stroke-dasharray: 1500; stroke-dashoffset: 1500;
     fill: none; fill-opacity: 0; opacity: 0;
     transform: translateZ(0);
-    will-change: stroke-dashoffset, fill, opacity, transform, filter; /* Added transform/filter */
+    will-change: stroke-dashoffset, fill, opacity, transform, filter;
     animation-name: drawStrokeAndFill;
     animation-duration: var(--svg-base-draw-duration);
     animation-timing-function: ease-out;
     animation-fill-mode: forwards;
     --svg-fill-color: #ffffff;
-    transform-origin: center center; /* Set origin for exit scale */
+    transform-origin: center center;
 }
 #preloader-svg #main-title-group .st1 { animation-delay: 0s; }
 #preloader-svg #main-title-group .st0 { animation-delay: calc(var(--svg-stagger-delay) * 1); }
@@ -177,7 +153,6 @@ body {
 #preloader-svg #main-title-group .st4 { animation-delay: calc(var(--svg-stagger-delay) * 3); }
 #preloader-svg #main-title-group .st5 { animation-delay: calc(var(--svg-stagger-delay) * 4); }
 
-/* --- Setup for Subtitle Groups (Drawing part) --- */
 #preloader-svg #eng-subtitle-group,
 #preloader-svg #chn-subtitle-group {
     opacity: 0; will-change: opacity, transform, filter;
@@ -185,18 +160,17 @@ body {
     animation-delay: var(--svg-fade-in-delay);
     transform-origin: center center;
 }
-/* Paths within subtitles also need transform-origin for the exit animation */
 #preloader-svg #eng-subtitle-group path,
 #preloader-svg #chn-subtitle-group path {
     opacity: 1; fill: #ffffff; stroke: none;
     stroke-dasharray: none; stroke-dashoffset: 0; stroke-width: 0;
     animation: none; fill-opacity: 1;
     transform-origin: center center;
-    will-change: opacity, transform, filter; /* Add will-change here too */
+    will-change: opacity, transform, filter;
 }
 #preloader-svg #chn-subtitle-group .st3 { fill: #f2f2f2; }
 
-/* !! MODIFIED: Path 退場動畫應用 class */
+/* !! REVISED: Path 退場動畫應用 class */
 #preloader-svg path.is-exiting-scale-up {
     transform-origin: center center;
     animation: preloaderPathExitScaleUp var(--preloader-path-exit-duration) ease-out forwards;
@@ -243,7 +217,7 @@ body {
 #intro-container.active .card-body,
 #intro-container.active .card-footer { opacity: 0; animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--intro-fadein-delay) + 0.4s) forwards; }
 .intro-title-placeholder { position: absolute; top: 5%; left: 50%; transform: translateX(-50%); width: 60%; max-width: 300px; z-index: 4; display: flex; justify-content: center; align-items: center; }
-/* !! MODIFIED: Static Intro title scale to match preloader end state */
+/* !! MODIFIED: Static Intro title scale to match preloader end state (105%) */
 #intro-title-svg { width: 100%; height: auto; filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4)); transition: filter 0.5s ease-in-out; transform: scale(1.05); transform-origin: center center;}
 #intro-title-svg g path { fill: #ffffff; stroke: none; opacity: 1; animation: none !important; stroke-dasharray: none !important; stroke-dashoffset: 0 !important; fill-opacity: 1 !important; transform: none !important; filter: none !important;}
 #intro-title-svg #main-title-group path { fill: #ffffff; }
