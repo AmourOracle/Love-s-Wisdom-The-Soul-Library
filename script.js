@@ -372,42 +372,28 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function handleStartTestClick() {
-        if (!state.preloadComplete || !state.introVisible || state.isAnimating || state.isTransitioning) {
-             console.warn("無法開始：狀態不符或動畫進行中");
-             return;
-         }
-        state.isAnimating = true; state.isTransitioning = true;
-        const buttonElement = DOM.buttons.start;
-        const textElement = DOM.elements.startBtnText;
-        const explosionContainer = DOM.containers.startBtnExplosion;
-        const buttonText = textElement ? textElement.textContent : '開始測驗';
-        if (!buttonElement || !explosionContainer) {
-             console.error("啟動按鈕或爆炸容器缺失");
-             state.isAnimating = false; state.isTransitioning = false; return;
-         }
-        buttonElement.classList.add('exploded'); buttonElement.style.pointerEvents = 'none';
-        const buttonRect = buttonElement.getBoundingClientRect();
-        const parentRect = explosionContainer.offsetParent ? explosionContainer.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
-        explosionContainer.style.position = 'absolute';
-        explosionContainer.style.top = `${buttonRect.top - parentRect.top}px`;
-        explosionContainer.style.left = `${buttonRect.left - parentRect.left}px`;
-        explosionContainer.style.width = `${buttonRect.width}px`;
-        explosionContainer.style.height = `${buttonRect.height}px`;
-        requestAnimationFrame(() => {
-            triggerExplosion(buttonElement, buttonText, explosionContainer);
-            const switchDelay = EXPLOSION_DURATION * 0.8;
-            setTimeout(() => {
-                switchScreen('intro', 'test');
-                setTimeout(() => {
-                    buttonElement.classList.remove('exploded'); buttonElement.style.pointerEvents = '';
-                    explosionContainer.style.position = '';
-                    explosionContainer.style.top = ''; explosionContainer.style.left = '';
-                    explosionContainer.style.width = ''; explosionContainer.style.height = '';
-                }, SCREEN_TRANSITION_DURATION + 100);
-            }, switchDelay);
-        });
-    }
+// 簡化後的按鈕點擊處理函數
+function handleStartTestClick() {
+    // 檢查：確保圖片預載入完成、Intro 可見，且沒有其他動畫或轉場正在進行
+    if (!state.preloadComplete || !state.introVisible || state.isAnimating || state.isTransitioning) {
+         console.warn("無法開始：狀態不符或動畫進行中 (preloadComplete:", state.preloadComplete, ", introVisible:", state.introVisible, ", isAnimating:", state.isAnimating, ", isTransitioning:", state.isTransitioning, ")");
+         return; // 如果條件不符，則不執行後續操作
+     }
+
+    console.log("開始按鈕被點擊，準備切換畫面..."); // 添加日誌方便追蹤
+
+    // 設置狀態旗標，表示即將開始轉場
+    state.isAnimating = true;
+    state.isTransitioning = true;
+
+    // 直接調用畫面切換函數，從 'intro' 切換到 'test'
+    // switchScreen 函數內部會處理畫面的顯示/隱藏動畫，並在動畫結束後解除狀態鎖定
+    switchScreen('intro', 'test');
+
+    // 注意：原版的按鈕 'exploded' class 和 triggerExplosion 調用已被移除
+    // 原版的延遲切換和按鈕狀態恢復邏輯也因不再需要而移除
+    // 狀態的解除現在完全由 switchScreen 函數負責
+}
 
     function switchScreen(fromScreenId, toScreenId) {
         const fromScreen = DOM.containers[fromScreenId];
