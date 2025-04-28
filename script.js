@@ -4,15 +4,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- 狀態管理 ---
     const state = {
-        isAnimating: false, // General lock for transitions like screen switching, button clicks
-        isTransitioning: false, // Specific lock for question-to-question transitions
+        isAnimating: false,
+        isTransitioning: false,
         currentQuestionIndex: 0,
         userAnswers: [],
         preloadComplete: false,
         introVisible: false,
         resultShowing: false,
         contentRendered: false,
-        finalScores: {}
+        finalScores: {},
+        lastLockTime: null // 新增：用於追蹤狀態鎖定的時間戳
     };
 
     // --- DOM 元素快取 ---
@@ -27,25 +28,30 @@ document.addEventListener('DOMContentLoaded', function() {
     const traitNames = testData.traitNames || {};
 
     // --- Constants ---
-    const PRELOADER_EXTRA_DELAY = 5000; // <<--- 增加延遲時間 (5秒)
-    const PRELOADER_EXIT_DURATION = 1200;
-    const INTRO_FADEIN_DURATION = 1000;
-    const SCREEN_TRANSITION_DURATION = 600; // Matches CSS --transition-duration
-    const EXPLOSION_DURATION = 1000; // Matches CSS explodeForwardBlur animation
-    // Get timing from CSS variables - ensure they are defined in :root
+    const PRELOADER_PATH_EXIT_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--preloader-path-exit-duration').replace('s','')) * 1000 || 800;
+    const SVG_BASE_DRAW_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-base-draw-duration').replace('s','')) * 1000 || 2500;
+    const SVG_STAGGER_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-stagger-delay').replace('s','')) * 1000 || 150;
+    const MAX_STAGGER_STEPS = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--svg-max-stagger-steps')) || 4;
+    const SVG_ANIMATION_TOTAL_ESTIMATED_TIME = SVG_BASE_DRAW_DURATION + (MAX_STAGGER_STEPS * SVG_STAGGER_DELAY);
+    const PRELOADER_PAUSE_AFTER_SVG = 400;
+    const PRELOADER_EXTRA_DELAY = SVG_ANIMATION_TOTAL_ESTIMATED_TIME + PRELOADER_PAUSE_AFTER_SVG;
+    const INTRO_FADEIN_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-fadein-delay').replace('s','')) * 1000 || 100;
+    const INTRO_FADEIN_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-fadein-duration').replace('s','')) * 1000 || 1000;
+    const INTRO_ANIMATION_TOTAL_TIME = INTRO_FADEIN_DELAY + INTRO_FADEIN_DURATION;
+    const SCREEN_TRANSITION_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--transition-duration').replace('s','')) * 1000 || 600;
+    const EXPLOSION_DURATION = 1000;
     const SVG_GLOW_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-glow-delay').replace('s','')) * 1000 || 3000;
 
 
     // --- 輔助函數 ---
     function setViewportHeight() { try { let vh = window.innerHeight * 0.01; document.documentElement.style.setProperty('--vh', `${vh}px`); } catch (e) { console.warn("設置視口高度錯誤:", e); } }
-
     function displayInitializationError(message) {
         const preloaderContent = document.querySelector('.preloader-content');
         if (preloaderContent) {
-            preloaderContent.innerHTML = `<p style="color: red; padding: 20px;">${message}</p>`; // Show error in preloader
+            preloaderContent.innerHTML = `<p style="color: red; padding: 20px;">${message}</p>`;
             const preloader = document.getElementById('preloader');
-            if (preloader) preloader.classList.add('active'); // Make sure preloader is visible
-        } else { document.body.innerHTML = `<p style="color: red; padding: 20px;">${message}</p>`; } // Fallback
+            if (preloader) preloader.classList.add('active');
+        } else { document.body.innerHTML = `<p style="color: red; padding: 20px;">${message}</p>`; }
     }
 
     function cacheDOMElements() {
@@ -59,7 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
                      options: document.getElementById('options-container'),
                      explosion: document.getElementById('explosion-container'),
                      startBtnExplosion: document.getElementById('start-btn-explosion-container'),
-                     preloaderSvgContainer: document.getElementById('preloader-svg-container') // Reference container
+                     preloaderSvgContainer: document.getElementById('preloader-svg-container')
                  },
                  elements: {
                      testBackground: document.getElementById('test-background'),
@@ -72,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
                      similarBooks: document.getElementById('similar-books'),
                      complementaryBooks: document.getElementById('complementary-books'),
                      shareText: document.getElementById('share-text'),
-                     preloaderSvg: document.getElementById('preloader-svg'), // Use correct ID
+                     preloaderSvg: document.getElementById('preloader-svg'),
                      startBtnText: document.querySelector('#start-test .btn-text')
                  },
                  buttons: {
@@ -89,13 +95,45 @@ document.addEventListener('DOMContentLoaded', function() {
                  DOM.elements.preloaderSvg, DOM.elements.testBackground, DOM.elements.questionTitle,
                  DOM.elements.startBtnText, DOM.buttons.start
              ];
+             // Check SVG Groups exist
+             const mainTitleGroup = DOM.elements.preloaderSvg?.querySelector('#main-title-group');
+             const engSubtitleGroup = DOM.elements.preloaderSvg?.querySelector('#eng-subtitle-group');
+             const chnSubtitleGroup = DOM.elements.preloaderSvg?.querySelector('#chn-subtitle-group');
+             if (!mainTitleGroup || !engSubtitleGroup || !chnSubtitleGroup) {
+                 console.warn("警告：未能找到所有的 SVG Group ID (main-title-group, eng-subtitle-group, chn-subtitle-group)。請檢查 index.html。");
+             }
+
              if (criticalElements.some(el => !el)) {
-                 console.error("錯誤：未能找到所有必要的 HTML 元素。請檢查 HTML 結構和 ID/Class。", DOM);
+                 console.error("錯誤：未能找到所有必要的 HTML 元素。請檢查 HTML 結構和 ID。", DOM);
                  const missing = criticalElements.findIndex(el => !el);
-                 console.error("Missing element index:", missing, "Check corresponding key in DOM cache setup.");
+                 console.error("Missing element index:", missing);
                  displayInitializationError("頁面結構錯誤，無法啟動測驗。");
                  return false;
              }
+
+             // --- Clone Preloader SVG for Intro Title ---
+             if (DOM.elements.preloaderSvg && DOM.containers.intro) {
+                 const introTitlePlaceholder = DOM.containers.intro.querySelector('.intro-title-placeholder');
+                 if (introTitlePlaceholder) {
+                     const clonedSvg = DOM.elements.preloaderSvg.cloneNode(true);
+                     clonedSvg.id = 'intro-title-svg';
+                     clonedSvg.classList.remove('glow-active');
+                     clonedSvg.style.animation = 'none';
+                     clonedSvg.querySelectorAll('path, g').forEach(el => {
+                         el.style.animation = 'none';
+                         el.style.animationDelay = '0s';
+                         el.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
+                         el.style.transform = '';
+                         el.style.filter = '';
+                         el.style.opacity = '';
+                     });
+                     introTitlePlaceholder.innerHTML = '';
+                     introTitlePlaceholder.appendChild(clonedSvg);
+                     console.log("Intro title SVG 已從 Preloader SVG 複製並插入");
+                 } else { console.error("找不到 Intro title placeholder (.intro-title-placeholder)"); }
+             } else { console.error("無法複製 SVG：找不到 Preloader SVG 或 Intro container"); }
+             // --- End SVG Cloning ---
+
              console.log("DOM 元素已快取");
              return true;
          } catch (error) {
@@ -105,46 +143,127 @@ document.addEventListener('DOMContentLoaded', function() {
          }
     }
 
+    // *** 使用者提供的修改後的 triggerIntroTransition ***
     function triggerIntroTransition() {
-        if (!DOM.containers.preloader || !DOM.containers.intro) {
-            console.error("Preloader or Intro container not found for transition.");
+        if (!DOM.containers.preloader || !DOM.containers.intro || !DOM.elements.preloaderSvg) {
+            console.error("Preloader, Intro container, or Preloader SVG not found for transition.");
+            state.isAnimating = false; state.isTransitioning = false; // 確保解鎖
             return;
         }
-        // Use the general lock as this is a major screen transition
-        if (state.isAnimating) {
+        // 檢查是否已在動畫中
+        if (state.isAnimating || state.isTransitioning) {
             console.log("正在轉換 Intro，忽略重複觸發");
             return;
         }
 
         console.log("開始 Preloader 到 Intro 的轉場...");
-        state.isAnimating = true; // Lock state
+        state.isAnimating = true;
+        state.isTransitioning = true;
+        state.lastLockTime = new Date().getTime(); // 記錄鎖定時間
 
-        // Start preloader exit animation (CSS handles it)
-        DOM.containers.preloader.classList.add('transitioning-out');
+        // 移除光暈 & 入場動畫
+        DOM.elements.preloaderSvg.classList.remove('glow-active');
+        DOM.elements.preloaderSvg.style.animation = 'none';
 
-        // After preloader exit animation duration, remove preloader active state and make intro active
-        setTimeout(() => {
-            console.log("Preloader 動畫結束，移除 Preloader active 狀態，啟動 Intro。");
-            DOM.containers.preloader.classList.remove('active', 'transitioning-out');
-            DOM.elements.preloaderSvg.classList.remove('glow-active'); // Ensure glow class is removed
+        const pathsToExit = DOM.elements.preloaderSvg.querySelectorAll(
+             '#main-title-group path, #eng-subtitle-group path, #chn-subtitle-group path' // 簡化選擇器
+        );
+        const preloaderBg = DOM.containers.preloader;
 
-            // Activate intro screen (CSS handles fade-in)
-            DOM.containers.intro.classList.add('active');
-            state.introVisible = true; // Mark intro as logically visible
+        if (pathsToExit.length === 0 && !preloaderBg) {
+            console.error("錯誤：找不到任何需要退場的 Preloader Path 或背景。");
+             if (DOM.containers.preloader) {
+                 DOM.containers.preloader.classList.remove('active');
+                 DOM.containers.preloader.style.display = 'none';
+             }
+             if (DOM.containers.intro) DOM.containers.intro.classList.add('active');
+             state.introVisible = true;
+             state.isAnimating = false; state.isTransitioning = false; // 解鎖
+             return;
+        }
+         if (pathsToExit.length === 0) {
+            console.warn("警告：未找到 SVG paths 進行退場動畫，將只淡出背景。");
+        }
 
-            // Unlock state after intro fade-in is complete
+        let maxDelay = 0;
+        const baseExitDelay = 0;
+        const randomExitRange = 1000;
+
+        // Path 退場動畫
+        pathsToExit.forEach(path => {
+            path.style.animation = ''; path.style.opacity = '';
+            path.style.transform = ''; path.style.filter = '';
+            path.style.visibility = '';
+            const randomDelay = baseExitDelay + Math.random() * randomExitRange;
+            maxDelay = Math.max(maxDelay, randomDelay);
+            const exitClass = Math.random() < 0.5 ? 'is-exiting-scale-up' : 'is-exiting-scale-down';
             setTimeout(() => {
-                 state.isAnimating = false; // Unlock state
-                 console.log("Intro 轉場完成。");
-            }, INTRO_FADEIN_DURATION);
+                path.style.animationDelay = `${randomDelay.toFixed(0)}ms`;
+                path.classList.add(exitClass);
+            }, 5);
+        });
 
-        }, PRELOADER_EXIT_DURATION);
+        // 背景淡出
+        if(preloaderBg) {
+            setTimeout(() => {
+                preloaderBg.classList.add('is-exiting-bg');
+            }, baseExitDelay + randomExitRange * 0.2);
+        }
+
+        const totalExitTime = maxDelay + PRELOADER_PATH_EXIT_DURATION;
+        console.log(`所有 Preloader Path 預計在 ${totalExitTime.toFixed(0)}ms 後完成退場動畫`);
+
+        // 在 Preloader 退場後執行
+        setTimeout(() => {
+            console.log("Preloader 所有 Path 退場動畫結束。");
+            if (DOM.containers.preloader) {
+                 DOM.containers.preloader.classList.remove('active', 'is-exiting-bg');
+                 DOM.containers.preloader.style.display = 'none'; // 確保隱藏
+            }
+            // 清理 Path 樣式
+            pathsToExit.forEach(path => {
+                path.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
+                path.style.animation = ''; path.style.animationDelay = '';
+                path.style.opacity = ''; path.style.transform = '';
+                path.style.filter = ''; path.style.visibility = '';
+            });
+            // 重置 SVG 樣式
+             if(DOM.elements.preloaderSvg) {
+                DOM.elements.preloaderSvg.style.animation = '';
+                DOM.elements.preloaderSvg.style.transform = '';
+             }
+
+            // 激活 Intro
+            if (!state.introVisible && DOM.containers.intro) {
+                 console.log("激活 Intro 容器...");
+                 DOM.containers.intro.classList.add('active');
+                 state.introVisible = true;
+            }
+        }, totalExitTime);
+
+        // *** 修改后的解鎖邏輯：使用單一的計時器確保解鎖 ***
+        const totalTransitionTime = totalExitTime + INTRO_ANIMATION_TOTAL_TIME + 100; // Preloader退場 + Intro入場 + 緩衝
+        console.log(`[修復] 預計在 ${totalTransitionTime}ms 後執行最終解鎖`);
+
+        setTimeout(() => {
+            // 檢查是否仍然需要解鎖
+            if (state.isAnimating || state.isTransitioning) {
+                 console.log("[修復] 確保解除所有狀態鎖 (來自 triggerIntroTransition 計時器)...");
+                 console.log(`[修復] 解鎖前狀態: isAnimating=${state.isAnimating}, isTransitioning=${state.isTransitioning}`);
+                 state.isAnimating = false;
+                 state.isTransitioning = false;
+                 console.log(`[修復] 解鎖後狀態: isAnimating=${state.isAnimating}, isTransitioning=${state.isTransitioning}`);
+            } else {
+                console.log("[修復] 狀態已被提前解除，無需操作 (來自 triggerIntroTransition 計時器)");
+            }
+        }, totalTransitionTime);
     }
 
+    // *** 使用者提供的修改後的 preloadImages ***
     function preloadImages() {
         if (!DOM.containers?.preloader || !DOM.elements.preloaderSvg) {
-            console.warn("找不到 preloader 或 preloader SVG...");
-            state.preloadComplete = true; bindStartButton(); return;
+             console.warn("找不到 preloader 或 preloader SVG...");
+             state.preloadComplete = true; bindStartButton(); return;
         }
         if (!questions || questions.length === 0) {
             console.warn("無法預載入圖片：缺少 questions...");
@@ -152,23 +271,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         console.log("顯示 Preloader...");
-        // Reset preloader state if needed
-        DOM.containers.preloader.classList.remove('transitioning-out');
-        DOM.elements.preloaderSvg.classList.remove('glow-active');
-        DOM.containers.preloader.classList.add('active'); // Show preloader
-
-        // Ensure other screens start inactive
-        if (DOM.containers.intro) DOM.containers.intro.classList.remove('active');
-        if (DOM.containers.test) DOM.containers.test.classList.remove('active');
-        if (DOM.containers.result) DOM.containers.result.classList.remove('active');
-
-        // Add glow effect after a delay based on CSS variable
+        // 重置樣式
+        if(DOM.containers.preloader) {
+            DOM.containers.preloader.classList.remove('is-exiting-bg');
+            DOM.containers.preloader.style.display = '';
+        }
+        if (DOM.elements.preloaderSvg) {
+            DOM.elements.preloaderSvg.querySelectorAll('path').forEach(p => {
+                 p.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
+                 p.style.animation = ''; p.style.animationDelay = '';
+                 p.style.opacity = ''; p.style.transform = '';
+                 p.style.filter = ''; p.style.visibility = '';
+            });
+            DOM.elements.preloaderSvg.style.animation = '';
+            DOM.elements.preloaderSvg.style.transform = '';
+            DOM.elements.preloaderSvg.classList.remove('glow-active');
+        }
+        DOM.containers.preloader.classList.add('active');
         setTimeout(() => {
-            // Check if preloader is still active before adding glow
-            if (DOM.containers.preloader.classList.contains('active') && DOM.elements.preloaderSvg) {
+             if (DOM.containers.preloader?.classList.contains('active') && DOM.elements.preloaderSvg) {
                  console.log("為 preloader SVG 添加光暈效果");
                  DOM.elements.preloaderSvg.classList.add('glow-active');
-            }
+             }
         }, SVG_GLOW_DELAY);
 
         const imageUrls = ['./images/Intro.webp'];
@@ -180,66 +304,62 @@ document.addEventListener('DOMContentLoaded', function() {
         function updateProgress(isError = false) {
             loadedCount++;
             if (isError) errorOccurred = true;
-
             if (loadedCount >= totalImages) {
                 state.preloadComplete = true;
                 console.log(`圖片預載入處理完成 ${errorOccurred ? '（有錯誤）' : ''}`);
-
-                // Use the updated constant PRELOADER_EXTRA_DELAY
                 const totalDelay = errorOccurred ? 500 : PRELOADER_EXTRA_DELAY;
-                console.log(`等待額外延遲 ${totalDelay}ms...`);
-
+                console.log(`等待 SVG 動畫 + 停留 ${totalDelay.toFixed(0)}ms...`);
                 setTimeout(() => {
-                    // Check if preloader is STILL active before transitioning
-                    if (DOM.containers.preloader && DOM.containers.preloader.classList.contains('active')) {
-                        triggerIntroTransition();
-                        bindStartButton(); // Ensure button is bound after delay too
+                    if (DOM.containers.preloader?.classList.contains('active')) {
+                        triggerIntroTransition(); // *** 調用修改後的轉場函數 ***
+                        bindStartButton();
                     } else {
                         console.log("Preloader no longer active, skipping transition.");
+                         if (!state.introVisible && DOM.containers.intro) {
+                             DOM.containers.intro.classList.add('active');
+                             state.introVisible = true;
+                             state.isAnimating = false; state.isTransitioning = false; // 確保解鎖
+                             console.log("直接顯示 Intro，解除鎖定。");
+                             bindStartButton();
+                        }
                     }
-                }, totalDelay); // Use the calculated totalDelay here
+                }, totalDelay);
             }
         }
-
-        // Start image loading
         imageUrls.forEach(url => {
              const img = new Image(); img.src = url;
              img.onload = () => updateProgress(false);
              img.onerror = () => { console.warn(`圖片載入失敗: ${url}`); updateProgress(true); };
         });
+
+        // *** 添加全局計時器，確保無論如何在合理時間後解除所有鎖 ***
+        setTimeout(() => {
+            if (state.isAnimating || state.isTransitioning) {
+                console.log("[全局安全機制] 預載入後20秒仍有狀態鎖，強制解除");
+                state.isAnimating = false;
+                state.isTransitioning = false;
+            }
+        }, 20000); // 20秒後強制解除
     }
 
     function triggerExplosion(targetElement, textToExplode, explosionContainer) {
-        if (!explosionContainer || !targetElement) {
-            console.error("Explosion failed: Missing container or target element.");
-            return;
-        }
-
-        explosionContainer.innerHTML = ''; // Clear previous
-        let startX, startY;
-
-        // Calculate start position based on container type
-        // For both options and start button, position relative to the target element itself
-        startX = targetElement.offsetWidth / 2;
-        startY = targetElement.offsetHeight / 2;
-
-
+        if (!explosionContainer || !targetElement) { console.error("Explosion failed: Missing container or target element."); return; }
+        explosionContainer.innerHTML = '';
+        let startX = targetElement.offsetWidth / 2;
+        let startY = targetElement.offsetHeight / 2;
         textToExplode.split('').forEach((char) => {
             if (char.trim() === '') return;
-
             const span = document.createElement('span');
             span.textContent = char;
             span.className = `char-explode`;
-
             const angle = Math.random() * Math.PI * 2;
-            const radius = Math.random() * (Math.min(window.innerWidth, window.innerHeight) * 0.5); // Slightly smaller radius
+            const radius = Math.random() * (Math.min(window.innerWidth, window.innerHeight) * 0.5);
             const translateX = Math.cos(angle) * radius;
             const translateY = Math.sin(angle) * radius;
-            const translateZ = Math.random() * 350 + 250; // Slightly adjusted Z
-            const rotateZ = (Math.random() - 0.5) * 480; // Slightly adjusted rotation
-            const scale = Math.random() * 3.5 + 2.5; // Slightly adjusted scale
-            const delay = Math.random() * 0.15; // Slightly reduced delay variation
-
+            const translateZ = Math.random() * 350 + 250;
+            const rotateZ = (Math.random() - 0.5) * 480;
+            const scale = Math.random() * 3.5 + 2.5;
+            const delay = Math.random() * 0.15;
             span.style.left = `${startX}px`;
             span.style.top = `${startY}px`;
             span.style.setProperty('--tx', `${translateX}px`);
@@ -248,118 +368,81 @@ document.addEventListener('DOMContentLoaded', function() {
             span.style.setProperty('--rz', `${rotateZ}deg`);
             span.style.setProperty('--sc', `${scale}`);
             span.style.animationDelay = `${delay}s`;
-
             explosionContainer.appendChild(span);
-
-            setTimeout(() => {
-                if (span.parentNode === explosionContainer) {
-                     explosionContainer.removeChild(span);
-                }
-            }, EXPLOSION_DURATION + delay * 1000 + 300); // Reduced buffer
+            setTimeout(() => { if (span.parentNode === explosionContainer) { explosionContainer.removeChild(span); } }, EXPLOSION_DURATION + delay * 1000 + 300);
         });
-        console.log(`文字爆裂已觸發 for: ${textToExplode}`);
     }
 
-    // --- Updated handleStartTestClick function ---
+    // *** 使用者提供的修改後的 handleStartTestClick ***
     function handleStartTestClick() {
-        console.log("handleStartTestClick triggered.");
-        console.log("State check: preloadComplete =", state.preloadComplete, ", introVisible =", state.introVisible, ", isAnimating =", state.isAnimating);
+        console.log("開始按鈕被點擊，準備切換畫面...");
 
-        if (!state.preloadComplete || !state.introVisible) {
-             console.warn("內容尚未準備好或 Intro 未顯示。");
-             return;
+        // 判斷條件優化，增加更詳細的日誌輸出
+        if (!state.preloadComplete) {
+            console.warn("點擊無效：圖片預載尚未完成");
+            // 強行設置為完成，嘗試恢復功能 (注意：這可能隱藏問題)
+            state.preloadComplete = true;
+            console.log("[修復嘗試] 強制設定 preloadComplete = true");
         }
-        // Use the general animation lock, same as options
+
+        if (!state.introVisible) {
+            console.warn("點擊無效：介紹頁面未顯示");
+            // 強行將介紹頁面設為可見 (注意：這可能隱藏問題)
+            state.introVisible = true;
+             if (DOM.containers.intro) DOM.containers.intro.classList.add('active'); // 同步 DOM
+             console.log("[修復嘗試] 強制設定 introVisible = true");
+        }
+
+        // 關鍵修改：如果發現鎖定狀態過長，則強制解除
+        const currentTime = new Date().getTime();
         if (state.isAnimating || state.isTransitioning) {
-            console.log("動畫或轉換進行中...");
-            return;
+            const lockTime = state.lastLockTime ? (currentTime - state.lastLockTime) : 0;
+            console.warn(`點擊時發現狀態鎖，已鎖定時間: ${lockTime}ms`);
+
+            // 如果鎖定時間超過10秒 (10000ms)，強制解除鎖定
+            if (lockTime > 10000) { // 檢查 lockTime > 0 確保 lastLockTime 有效
+                console.log("[緊急修復] 強制解除長時間狀態鎖");
+                state.isAnimating = false;
+                state.isTransitioning = false;
+            } else {
+                // 如果鎖定時間不長，仍然阻止點擊
+                 console.log("狀態鎖仍在短時間內，點擊無效");
+                 return;
+            }
         }
 
-        console.log("Start button clicked, processing effect...");
-        state.isAnimating = true; // Lock state for the entire process
-        state.isTransitioning = true; // Also lock transition state
+        // 設置鎖定狀態和時間戳
+        console.log("設置狀態鎖並準備切換屏幕...");
+        state.isAnimating = true;
+        state.isTransitioning = true;
+        state.lastLockTime = currentTime; // 更新最後鎖定時間
 
-        const buttonElement = DOM.buttons.start;
-        const textElement = DOM.elements.startBtnText; // Keep reference if needed
-        const explosionContainer = DOM.containers.startBtnExplosion; // Use the dedicated container
-        const buttonText = textElement ? textElement.textContent : '開始測驗';
-
-        if (!buttonElement || !explosionContainer) {
-            console.error("Start button or explosion container missing!");
-            state.isAnimating = false;
-            state.isTransitioning = false;
-            return;
-        }
-
-        // --- Make button visually react like an option being clicked ---
-        // Add 'exploded' class to hide the original text via opacity/scale (CSS handles this)
-        buttonElement.classList.add('exploded');
-        // Ensure the button cannot be clicked again immediately
-        buttonElement.style.pointerEvents = 'none';
-
-        // --- Position the explosion container dynamically (important for absolute positioning of particles) ---
-        const buttonRect = buttonElement.getBoundingClientRect();
-        // Get the parent container where the explosion container lives
-        const parentRect = explosionContainer.offsetParent ? explosionContainer.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
-        explosionContainer.style.position = 'absolute';
-        explosionContainer.style.top = `${buttonRect.top - parentRect.top}px`;
-        explosionContainer.style.left = `${buttonRect.left - parentRect.left}px`;
-        explosionContainer.style.width = `${buttonRect.width}px`;
-        explosionContainer.style.height = `${buttonRect.height}px`;
-        // --- End positioning ---
-
-        // Use rAF to ensure styles are applied before triggering explosion
-        requestAnimationFrame(() => {
-            console.log("Triggering start button explosion (option style)");
-            // Trigger the same explosion effect
-            triggerExplosion(buttonElement, buttonText, explosionContainer);
-
-             // Wait for explosion animation before switching screen
-             // Use EXPLOSION_DURATION or a slightly shorter time
-             const switchDelay = EXPLOSION_DURATION * 0.8; // Start transition slightly before explosion fully ends
-             console.log(`Waiting ${switchDelay}ms for explosion before screen switch.`);
-
-             setTimeout(() => {
-                 console.log("Switching from intro to test after explosion delay");
-                 switchScreen('intro', 'test'); // switchScreen will unlock state.isAnimating and state.isTransitioning
-
-                 // Reset button appearance after transition
-                 setTimeout(() => {
-                     buttonElement.classList.remove('exploded');
-                     buttonElement.style.pointerEvents = ''; // Re-enable clicks
-                     // Reset explosion container position if needed
-                     explosionContainer.style.top = '0';
-                     explosionContainer.style.left = '0';
-                     explosionContainer.style.width = '100%';
-                     explosionContainer.style.height = '100%';
-                 }, SCREEN_TRANSITION_DURATION + 100);
-
-             }, switchDelay);
-        });
+        // 切換到測驗頁面
+        switchScreen('intro', 'test');
     }
 
-
+    // *** 使用者提供的修改後的 switchScreen ***
     function switchScreen(fromScreenId, toScreenId) {
         const fromScreen = DOM.containers[fromScreenId];
         const toScreen = DOM.containers[toScreenId];
         if (!fromScreen || !toScreen) {
-            console.error(`切換屏幕失敗: ID ${fromScreenId} 或 ${toScreenId} 無效`);
-            state.isAnimating = false; // Unlock if error
-            state.isTransitioning = false; // Also unlock transition state on error
-            return;
-        }
-        // Allow switching if animating from preloader OR if not currently animating/transitioning
-        if ((state.isAnimating || state.isTransitioning) && fromScreenId !== 'preloader') {
-            console.log("屏幕切換或問題轉換已在進行中... 忽略重複請求");
-            return;
-        }
+             console.error(`屏幕切換失敗: ${fromScreenId} -> ${toScreenId}`);
+             state.isAnimating = false; state.isTransitioning = false; return;
+         }
 
-        console.log(`切換屏幕從 ${fromScreenId} 到 ${toScreenId}...`);
-        state.isAnimating = true; // Lock global animation state
-        state.isTransitioning = true; // Lock transition state during screen switch
+        // 這裡的檢查很重要，防止動畫過程中重複觸發
+        if ((state.isAnimating || state.isTransitioning) && fromScreenId !== 'preloader') {
+             const lockTime = state.lastLockTime ? (new Date().getTime() - state.lastLockTime) : 0;
+             console.log(`忽略屏幕切換：動畫/轉換進行中 (已鎖定 ${lockTime}ms)`);
+             return;
+         }
+        console.log(`切換屏幕: ${fromScreenId} -> ${toScreenId}`);
+        state.isAnimating = true; state.isTransitioning = true;
+        state.lastLockTime = new Date().getTime(); // 記錄鎖定時間
 
         fromScreen.classList.remove('active');
 
+        // 基本轉場時間後的操作
         setTimeout(() => {
             toScreen.classList.add('active');
             document.body.style.overflow = (toScreenId === 'result') ? 'auto' : 'hidden';
@@ -367,59 +450,92 @@ document.addEventListener('DOMContentLoaded', function() {
             state.introVisible = (toScreenId === 'intro');
 
             if (toScreenId === 'test') {
-                 initializeTestScreen(); // Will reset its own transition lock
+                 initializeTestScreen();
                  state.contentRendered = true;
+                 // Test 屏幕的 isTransitioning 由其內部動畫管理，這裡主要解 isAnimating
+                 setTimeout(() => {
+                     if (state.isAnimating) { // 檢查是否仍需解鎖
+                         console.log(`屏幕切換至 Test 完成，解除 isAnimating (來自 switchScreen)`);
+                         state.isAnimating = false;
+                     }
+                 }, SCREEN_TRANSITION_DURATION);
             } else if (toScreenId === 'intro') {
-                // Reset test/result states
-                state.currentQuestionIndex = 0;
-                state.userAnswers = [];
-                state.finalScores = {};
-                state.contentRendered = false;
-                if(DOM.elements.traitsContainer) DOM.elements.traitsContainer.innerHTML = '';
-                if(DOM.elements.progressFill) DOM.elements.progressFill.style.width = '0%';
-                 if(DOM.containers.startBtnExplosion) { // Reset explosion container style
-                    DOM.containers.startBtnExplosion.style.position = ''; // Reset positioning
-                    DOM.containers.startBtnExplosion.style.top = '';
-                    DOM.containers.startBtnExplosion.style.left = '';
-                    DOM.containers.startBtnExplosion.style.width = '';
+                 // 重置操作
+                 state.currentQuestionIndex = 0; state.userAnswers = []; state.finalScores = {};
+                 state.contentRendered = false;
+                 if(DOM.elements.traitsContainer) DOM.elements.traitsContainer.innerHTML = '';
+                 if(DOM.elements.progressFill) DOM.elements.progressFill.style.width = '0%';
+                 if(DOM.containers.startBtnExplosion) {
+                    DOM.containers.startBtnExplosion.style.position = ''; DOM.containers.startBtnExplosion.style.top = '';
+                    DOM.containers.startBtnExplosion.style.left = ''; DOM.containers.startBtnExplosion.style.width = '';
                     DOM.containers.startBtnExplosion.style.height = '';
                  }
-            }
-
-            // Unlock states after the new screen's fade-in is complete
-            setTimeout(() => {
-                 state.isAnimating = false;
-                 // Only unlock transition state if NOT going to the test screen (test screen manages its own lock)
-                 if (toScreenId !== 'test') {
-                     state.isTransitioning = false;
+                 if(DOM.containers.preloader) DOM.containers.preloader.style.display = '';
+                 // 重置 Preloader SVG 樣式
+                 DOM.elements.preloaderSvg?.querySelectorAll('path').forEach(p => {
+                     p.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
+                     p.style.animation = ''; p.style.animationDelay = '';
+                     p.style.opacity = ''; p.style.transform = '';
+                     p.style.filter = ''; p.style.visibility = '';
+                 });
+                 DOM.containers.preloader?.classList.remove('is-exiting-bg');
+                 if(DOM.elements.preloaderSvg) {
+                    DOM.elements.preloaderSvg.style.animation = '';
+                    DOM.elements.preloaderSvg.style.transform = '';
+                    DOM.elements.preloaderSvg.classList.remove('glow-active');
                  }
-                 console.log(`屏幕切換完成，當前屏幕: ${toScreenId}`);
-            }, SCREEN_TRANSITION_DURATION);
+                 // 解鎖
+                 setTimeout(() => {
+                     if (state.isAnimating || state.isTransitioning) {
+                         console.log(`屏幕切換至 ${toScreenId} 完成，解除鎖定 (來自 switchScreen)`);
+                         state.isAnimating = false; state.isTransitioning = false;
+                     }
+                 }, SCREEN_TRANSITION_DURATION);
+            } else { // 其他屏幕 (result)
+                 setTimeout(() => {
+                     if (state.isAnimating || state.isTransitioning) {
+                         console.log(`屏幕切換至 ${toScreenId} 完成，解除鎖定 (來自 switchScreen)`);
+                         state.isAnimating = false; state.isTransitioning = false;
+                     }
+                 }, SCREEN_TRANSITION_DURATION);
+            }
+        }, SCREEN_TRANSITION_DURATION);
 
-        }, SCREEN_TRANSITION_DURATION); // Wait for the fromScreen fade-out
+        // *** 添加額外的安全機制：確保在最長的預期轉場時間後解除所有鎖 ***
+        const maxExpectedTransitionTime = SCREEN_TRANSITION_DURATION * 2 + 1000; // 舊屏隱藏+新屏顯示+緩衝
+        console.log(`[安全機制] 預計在 ${maxExpectedTransitionTime}ms 後檢查並解除可能遺留的狀態鎖`);
+        setTimeout(() => {
+            if (state.isAnimating || state.isTransitioning) {
+                console.log("[安全機制] 確保解除可能遺留的狀態鎖 (來自 switchScreen 安全計時器)");
+                console.log(`[安全機制] 解鎖前狀態: isAnimating=${state.isAnimating}, isTransitioning=${state.isTransitioning}`);
+                state.isAnimating = false;
+                state.isTransitioning = false;
+                console.log(`[安全機制] 解鎖後狀態: isAnimating=${state.isAnimating}, isTransitioning=${state.isTransitioning}`);
+            }
+        }, maxExpectedTransitionTime);
     }
 
-    // --- Test Logic ---
     function initializeTestScreen() {
-        if (!DOM.elements.questionTitle || !DOM.containers.options || !DOM.elements.testBackground) {
-            console.error("初始化測驗屏幕失敗：缺少必要元素。"); return;
-        }
+        if (!DOM.elements.questionTitle || !DOM.containers.options || !DOM.elements.testBackground) { return; }
         console.log("初始化測驗屏幕...");
-        state.currentQuestionIndex = 0;
-        state.userAnswers = [];
-        state.isTransitioning = false; // Reset question transition lock for the first question
-        updateProgressBar(0); // Reset progress bar initially
-        displayQuestion(state.currentQuestionIndex, true); // Display first question
-        updateProgressBar(1); // Set progress for first question
+        state.currentQuestionIndex = 0; state.userAnswers = [];
+        updateProgressBar(0); // 重置進度條
+        displayQuestion(state.currentQuestionIndex, true); // 顯示第一題 (標記為首次顯示)
+        updateProgressBar(1); // 更新進度條到第一題
      }
 
     function displayQuestion(index, isInitialDisplay = false) {
-        if (index < 0 || index >= questions.length) { console.error(`無效的問題索引: ${index}`); return; }
+        if (index < 0 || index >= questions.length) {
+            console.error("無效的問題索引:", index);
+            return;
+        }
         const questionData = questions[index];
         const questionNumber = index + 1;
-        state.isTransitioning = true; // Lock during question display
+        console.log(`顯示問題 ${questionNumber}`);
+        state.isTransitioning = true; // 開始問題轉換
+        state.lastLockTime = new Date().getTime(); // 記錄鎖定時間
 
-        // Update background
+        // 更新背景圖片
         if (DOM.elements.testBackground) {
             const imageUrl = `./images/Q${questionNumber}.webp`;
             if (!isInitialDisplay) {
@@ -427,35 +543,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 setTimeout(() => {
                     DOM.elements.testBackground.style.backgroundImage = `url('${imageUrl}')`;
                     requestAnimationFrame(() => { DOM.elements.testBackground.classList.remove('is-hidden'); });
-                    console.log(`背景設置為: ${imageUrl}`);
-                }, 500); // Delay background change during transitions
+                }, 500);
             } else {
                 DOM.elements.testBackground.style.backgroundImage = `url('${imageUrl}')`;
-                DOM.elements.testBackground.classList.remove('is-hidden'); // Ensure visible initially
-                console.log(`初始背景設置為: ${imageUrl}`);
+                DOM.elements.testBackground.classList.remove('is-hidden');
             }
         }
 
-        // Update Title
+        // 更新問題標題
         if (DOM.elements.questionTitle) {
-             DOM.elements.questionTitle.classList.add('is-hidden'); // Always hide before changing
-             // Use timeout for smooth transition even for initial display
+             DOM.elements.questionTitle.classList.add('is-hidden');
              setTimeout(() => {
                  DOM.elements.questionTitle.innerText = questionData.question.replace(/^\d+\.\s*/, '');
-                 requestAnimationFrame(() => {
-                     DOM.elements.questionTitle.style.transition = ''; // Ensure transitions apply
-                     DOM.elements.questionTitle.classList.remove('is-hidden');
-                 });
-             }, isInitialDisplay ? 100 : 500); // Shorter delay for initial display
+                 requestAnimationFrame(() => { DOM.elements.questionTitle.classList.remove('is-hidden'); });
+             }, isInitialDisplay ? 100 : 500);
         }
 
-        // Update Options
+        // 生成選項
         if (DOM.containers.options) {
             DOM.containers.options.innerHTML = '';
             questionData.options.forEach((optionData, optIndex) => {
                 const optionElement = document.createElement('div');
-                optionElement.className = 'option is-hidden'; // Start hidden
-                optionElement.style.transition = 'none'; // Prevent initial transition
+                optionElement.className = 'option is-hidden';
+                optionElement.style.transition = 'none';
                 optionElement.dataset.text = optionData.text;
                 optionElement.dataset.index = optIndex;
                 optionElement.innerText = optionData.text;
@@ -466,11 +576,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 DOM.containers.options.appendChild(optionElement);
             });
             allOptions = Array.from(DOM.containers.options.querySelectorAll('.option'));
-            // Trigger enter animation after a brief delay
-             setTimeout(() => triggerQuestionEnterAnimation(), isInitialDisplay ? 150 : 0); // Adjust delay if needed
+            setTimeout(() => triggerQuestionEnterAnimation(), isInitialDisplay ? 150 : 0);
         } else {
-             console.error("找不到 options-container");
-             state.isTransitioning = false; // Unlock if options container missing
+            state.isTransitioning = false; // 如果沒有選項容器，直接解除鎖定
+            console.error("找不到選項容器 #options-container");
         }
     }
 
@@ -479,17 +588,16 @@ document.addEventListener('DOMContentLoaded', function() {
          const optionIndex = parseInt(clickedOption.dataset.index);
          const questionIndex = state.currentQuestionIndex;
 
-         if (isNaN(optionIndex) || isNaN(questionIndex)) return;
-         // Use question transition lock
-         if (state.isTransitioning || clickedOption.classList.contains('exploded') || clickedOption.classList.contains('fade-out')) {
-             console.log("正在轉換問題或選項已點擊..."); return;
+         if (isNaN(optionIndex) || isNaN(questionIndex) || state.isTransitioning || clickedOption.classList.contains('exploded') || clickedOption.classList.contains('fade-out')) {
+             console.log("忽略選項點擊：狀態不符或動畫進行中");
+             return;
          }
 
-         state.isTransitioning = true; // Lock
          console.log(`問題 ${questionIndex + 1} 選擇了選項 ${optionIndex + 1}`);
-         state.userAnswers[questionIndex] = optionIndex;
+         state.isTransitioning = true; // 開始轉換
+         state.lastLockTime = new Date().getTime(); // 記錄鎖定時間
+         state.userAnswers[questionIndex] = optionIndex; // 記錄答案
 
-         // --- Position the main explosion container dynamically ---
          const optionRect = clickedOption.getBoundingClientRect();
          const parentRect = DOM.containers.explosion.offsetParent ? DOM.containers.explosion.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
          DOM.containers.explosion.style.position = 'absolute';
@@ -497,237 +605,319 @@ document.addEventListener('DOMContentLoaded', function() {
          DOM.containers.explosion.style.left = `${optionRect.left - parentRect.left}px`;
          DOM.containers.explosion.style.width = `${optionRect.width}px`;
          DOM.containers.explosion.style.height = `${optionRect.height}px`;
-         // --- End positioning ---
 
+         triggerQuestionFadeOut(clickedOption);
+         triggerExplosion(clickedOption, clickedOption.dataset.text || clickedOption.innerText, DOM.containers.explosion);
 
-         triggerQuestionFadeOut(clickedOption); // Visually hide options and title
-         triggerExplosion(clickedOption, clickedOption.dataset.text || clickedOption.innerText, DOM.containers.explosion); // Trigger particle effect
-
-         const transitionDelay = EXPLOSION_DURATION + 100; // Wait for explosion
-
+         const transitionDelay = EXPLOSION_DURATION + 100;
          setTimeout(() => {
              if (state.currentQuestionIndex < questions.length - 1) {
                  prepareNextQuestion();
-             } else {
-                 console.log("最後一題完成，顯示結果");
+             }
+             else {
                  showResults();
              }
-             // state.isTransitioning is reset by displayQuestion or showResults
+             DOM.containers.explosion.style.position = ''; DOM.containers.explosion.style.top = '';
+             DOM.containers.explosion.style.left = ''; DOM.containers.explosion.style.width = '';
+             DOM.containers.explosion.style.height = '';
          }, transitionDelay);
      }
 
      function triggerQuestionFadeOut(clickedOptionElement) {
+        console.log("觸發問題退場動畫");
         if (DOM.elements.testBackground) { DOM.elements.testBackground.classList.add('is-hidden'); }
         if (DOM.elements.questionTitle) { DOM.elements.questionTitle.classList.add('is-hidden'); }
         allOptions.forEach(option => {
             option.style.transitionDelay = '';
-            if (option === clickedOptionElement) { option.classList.add('exploded'); } // Clicked option visually explodes (hides via CSS)
-            else { option.classList.add('fade-out'); } // Others just fade
+            if (option === clickedOptionElement) {
+                option.classList.add('exploded');
+            } else {
+                option.classList.add('fade-out');
+            }
             option.style.pointerEvents = 'none';
         });
-        console.log("舊內容淡出已觸發");
      }
 
      function prepareNextQuestion() {
+        console.log("準備下一題");
         state.currentQuestionIndex++;
-        console.log(`準備顯示問題 ${state.currentQuestionIndex + 1}`);
         updateProgressBar(state.currentQuestionIndex + 1);
-        displayQuestion(state.currentQuestionIndex, false); // Non-initial display
+        displayQuestion(state.currentQuestionIndex, false);
      }
 
      function triggerQuestionEnterAnimation() {
-         console.log("觸發新內容進場動畫");
-         // Ensure title is visible (it fades in via its own timeout in displayQuestion)
+         console.log("觸發問題入場動畫");
          if (DOM.elements.questionTitle) {
              DOM.elements.questionTitle.classList.remove('is-hidden');
          }
-
-         const optionsEnterStartDelay = 200; // Delay slightly more
+         const optionsEnterStartDelay = 200;
          const optionStaggerDelay = 80;
          const optionEnterDuration = 500;
 
          allOptions.forEach((option, index) => {
-             option.style.transition = ''; // Ensure CSS transitions apply
+             option.style.transition = '';
              option.style.transitionDelay = `${optionsEnterStartDelay + index * optionStaggerDelay}ms`;
-             // Reset classes before making visible
              option.classList.remove('is-hidden', 'fade-out', 'exploded');
-             requestAnimationFrame(() => { // Use rAF for smoother start
-                 option.style.pointerEvents = ''; // Re-enable pointer events
-             });
+             requestAnimationFrame(() => { option.style.pointerEvents = ''; });
          });
 
          const totalOptionsDelay = (allOptions.length - 1) * optionStaggerDelay;
          const finalResetDelay = optionsEnterStartDelay + totalOptionsDelay + optionEnterDuration + 100;
 
          setTimeout(() => {
-             console.log("所有進場動畫完成");
              allOptions.forEach(option => { option.style.transitionDelay = ''; });
-             state.isTransitioning = false; // Unlock question transition
-             console.log("問題轉換完成，解除鎖定。");
+             // 確保解除轉換鎖
+             if (state.isTransitioning) {
+                 console.log("問題進場動畫完成，解除 isTransitioning");
+                 state.isTransitioning = false;
+             }
          }, finalResetDelay);
     }
 
      function updateProgressBar(questionNumber) {
          if (DOM.elements.progressFill) {
              const progress = (questionNumber / questions.length) * 100;
-             DOM.elements.progressFill.style.width = `${Math.max(0, Math.min(progress, 100))}%`; // Clamp between 0-100
+             DOM.elements.progressFill.style.width = `${Math.max(0, Math.min(progress, 100))}%`;
          }
     }
 
-    // --- Result Logic (Unchanged from previous versions) ---
     function calculateResult() {
         try {
             const scores = { 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0 };
             if (state.userAnswers.length !== questions.length) {
-                 console.warn(`Answers (${state.userAnswers.length}) mismatch questions (${questions.length})! Padding...`);
-                 for (let i = 0; i < questions.length; i++) { if (state.userAnswers[i] === undefined) state.userAnswers[i] = 0; }
+                console.warn("用戶答案數量與問題數量不符，可能未完成測驗。");
+                for (let i = 0; i < questions.length; i++) {
+                    if (state.userAnswers[i] === undefined) state.userAnswers[i] = 0;
+                }
             }
             state.userAnswers.forEach((answerIndex, questionIndex) => {
                 const question = questions[questionIndex];
                 if (question?.options?.[answerIndex]?.scores) {
                     const optionScores = question.options[answerIndex].scores;
-                    for (const type in optionScores) { if (scores.hasOwnProperty(type)) { scores[type] += optionScores[type]; } }
-                } else { console.warn(`Invalid data for Q${questionIndex + 1}, Option ${answerIndex}, skipping score.`); }
+                    for (const type in optionScores) {
+                        if (scores.hasOwnProperty(type)) {
+                            scores[type] += optionScores[type];
+                        }
+                    }
+                } else {
+                     console.warn(`問題 ${questionIndex + 1} 的選項 ${answerIndex + 1} 缺少分數數據。`);
+                }
             });
-            state.finalScores = scores; console.log("Final Scores:", state.finalScores);
-            const scoreValues = Object.values(scores); const scoreFrequency = {};
-            scoreValues.forEach(score => { const roundedScore = Math.round(score * 10) / 10; scoreFrequency[roundedScore] = (scoreFrequency[roundedScore] || 0) + 1; });
-            for (const score in scoreFrequency) { if (scoreFrequency[score] >= 4) { console.log("SPECIAL result condition (4+ same scores)"); return results["SPECIAL"]; } }
-            let maxScore = -Infinity; let highestTypes = [];
-            for (const type in scores) { if (Math.abs(scores[type] - maxScore) < 0.01) { highestTypes.push(type); } else if (scores[type] > maxScore) { maxScore = scores[type]; highestTypes = [type]; } }
-             console.log("Highest type(s):", highestTypes, "Score:", maxScore);
+            state.finalScores = scores;
+            console.log("計算出的原始分數:", scores);
+
+            const scoreValues = Object.values(scores);
+            const scoreFrequency = {};
+            scoreValues.forEach(score => {
+                const roundedScore = Math.round(score * 10) / 10;
+                scoreFrequency[roundedScore] = (scoreFrequency[roundedScore] || 0) + 1;
+            });
+            console.log("分數頻率:", scoreFrequency);
+            for (const score in scoreFrequency) {
+                if (scoreFrequency[score] >= 4) {
+                    console.log("觸發特殊結果：分數高度集中");
+                    return results["SPECIAL"];
+                }
+            }
+
+            let maxScore = -Infinity;
+            let highestTypes = [];
+            for (const type in scores) {
+                if (Math.abs(scores[type] - maxScore) < 0.01) {
+                    highestTypes.push(type);
+                } else if (scores[type] > maxScore) {
+                    maxScore = scores[type];
+                    highestTypes = [type];
+                }
+            }
+            console.log("最高分類型:", highestTypes, "最高分:", maxScore);
+
             if (highestTypes.length === 1) { return results[highestTypes[0]]; }
-            if (highestTypes.length >= 3) { console.log("SPECIAL result condition (3+ tied max scores)"); return results["SPECIAL"]; }
+            if (highestTypes.length >= 3) { console.log("觸發特殊結果：多個類型同為最高分 (>=3)"); return results["SPECIAL"]; }
             if (highestTypes.length === 2) {
-                 console.log("Tiebreaker needed (2 types tied)");
+                console.log("兩個類型同為最高分，使用 Tie-breaker...");
                 const tiebreakQuestionIndex = 8;
-                if (state.userAnswers[tiebreakQuestionIndex] === undefined) { console.warn("Tiebreaker question unanswered, selecting first tied type."); return results[highestTypes[0]]; }
+                if (state.userAnswers[tiebreakQuestionIndex] === undefined) {
+                    console.warn("Tie-breaker 問題未回答，默認選擇第一個最高分類型");
+                    return results[highestTypes[0]];
+                }
                 const tiebreakAnswerIndex = state.userAnswers[tiebreakQuestionIndex];
                 const tiebreakPrimaryType = questions[tiebreakQuestionIndex]?.options?.[tiebreakAnswerIndex]?.primary;
-                 console.log(`Tiebreaker Q9 primary type: ${tiebreakPrimaryType}`);
-                if (tiebreakPrimaryType && highestTypes.includes(tiebreakPrimaryType)) { console.log(`Tiebreaker success: ${tiebreakPrimaryType}`); return results[tiebreakPrimaryType]; }
-                else { console.log("Tiebreaker failed or type not in tie, selecting first tied type."); return results[highestTypes[0]]; }
+                if (tiebreakPrimaryType && highestTypes.includes(tiebreakPrimaryType)) {
+                    console.log("Tie-breaker 解決，結果為:", tiebreakPrimaryType);
+                    return results[tiebreakPrimaryType];
+                } else {
+                    console.log("Tie-breaker 未解決或無效，默認選擇第一個最高分類型");
+                    return results[highestTypes[0]];
+                }
             }
-            console.warn("Scoring logic fallback, returning default A"); return results['A'];
-        } catch (error) { console.error("Error calculating result:", error); return results['A']; }
+            console.warn("無法確定最高分類型，返回默認結果 A");
+            return results['A'];
+        } catch (error) {
+            console.error("計算結果時出錯:", error);
+            return results['A'];
+        }
      }
+
     function prepareResultData(resultData) {
-        if (!resultData || !DOM.elements.resultTitle || !DOM.elements.resultSubtitle || !DOM.elements.resultDescription || !DOM.elements.traitsContainer || !DOM.elements.similarBooks || !DOM.elements.complementaryBooks || !DOM.elements.shareText) { console.error("Failed to prepare result data: Missing DOM elements."); return false; }
+        if (!resultData || !DOM.elements.resultTitle || !DOM.elements.resultSubtitle || !DOM.elements.resultDescription || !DOM.elements.traitsContainer || !DOM.elements.similarBooks || !DOM.elements.complementaryBooks || !DOM.elements.shareText) {
+             console.error("準備結果數據失敗：缺少必要的 DOM 元素或結果數據。");
+             return false;
+        }
         try {
             DOM.elements.resultTitle.textContent = resultData.title ? (resultData.title.includes('管理員') ? `你是：${resultData.title}` : `你的靈魂之書是：${resultData.title}`) : '結果未知';
             DOM.elements.resultSubtitle.textContent = resultData.subtitle || '';
             DOM.elements.resultDescription.textContent = resultData.description || '無法載入描述。';
             DOM.elements.traitsContainer.innerHTML = '';
             const typeScores = state.finalScores;
-            if (!typeScores || Object.keys(typeScores).length === 0) { console.warn("Cannot get final scores for traits."); }
-            else if (resultData.title && resultData.title.includes('管理員')) { Object.keys(traitNames).forEach(type => addTraitElement(type, 3)); }
-            else { Object.keys(traitNames).forEach(type => { const score = typeScores[type] || 0; let stars = 1; if (score >= 7) stars = 5; else if (score >= 5) stars = 4; else if (score >= 3) stars = 3; else if (score >= 1) stars = 2; addTraitElement(type, stars); }); }
+            if (!typeScores || Object.keys(typeScores).length === 0) {
+                console.warn("無法顯示特質分數：缺少分數數據");
+            } else if (resultData.title && resultData.title.includes('管理員')) {
+                Object.keys(traitNames).forEach(type => addTraitElement(type, 3));
+            } else {
+                Object.keys(traitNames).forEach(type => {
+                    const score = typeScores[type] || 0;
+                    let stars = 1;
+                    if (score >= 7) stars = 5;
+                    else if (score >= 5) stars = 4;
+                    else if (score >= 3) stars = 3;
+                    else if (score >= 1) stars = 2;
+                    addTraitElement(type, stars);
+                });
+            }
             DOM.elements.similarBooks.innerHTML = (resultData.similar?.length) ? resultData.similar.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>';
             DOM.elements.complementaryBooks.innerHTML = (resultData.complementary?.length) ? resultData.complementary.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>';
             DOM.elements.shareText.textContent = resultData.shareText || '快來測測你的靈魂之書吧！#靈魂藏書閣 #AmourOracle';
-            console.log("Result data prepared."); return true;
-        } catch (error) { console.error("Error preparing result data:", error); DOM.elements.resultTitle.textContent = "顯示結果時發生錯誤"; return false; }
-     }
-    function showResults() {
-        console.log("顯示結果頁面...");
-        // Check both locks before proceeding
-        if (state.isAnimating || state.isTransitioning) {
-             console.log("Cannot show results while animating or transitioning.");
-             return;
-        }
-        // Lock transition state immediately
-        state.isTransitioning = true;
-        try {
-            const resultData = calculateResult(); if (!resultData) throw new Error("Result calculation failed");
-            if (prepareResultData(resultData)) {
-                // switchScreen handles unlocking state.isAnimating and state.isTransitioning
-                switchScreen('test', 'result');
-            } else { throw new Error("Result data preparation failed"); }
+            console.log("結果數據已準備並填充到頁面");
+            return true;
         } catch (error) {
-            console.error("Error showing results:", error); alert(`抱歉，顯示結果時發生錯誤: ${error.message} 請重試。`);
-            // Ensure locks are released on error before attempting to switch back
-            state.isTransitioning = false;
-            state.isAnimating = false;
+            console.error("準備結果數據時發生錯誤:", error);
+            if (DOM.elements.resultTitle) DOM.elements.resultTitle.textContent = "顯示結果時發生錯誤";
+            return false;
+        }
+     }
+
+    function showResults() {
+        console.log("測驗結束，準備顯示結果...");
+        if (state.isAnimating || state.isTransitioning) {
+            console.warn("忽略顯示結果：動畫/轉換進行中");
+            return;
+        }
+        state.isTransitioning = true; // 開始顯示結果的轉換過程
+        state.lastLockTime = new Date().getTime(); // 記錄鎖定時間
+
+        try {
+            const resultData = calculateResult();
+            if (!resultData) { throw new Error("結果計算失敗，返回了無效數據"); }
+            if (prepareResultData(resultData)) {
+                switchScreen('test', 'result');
+            } else { throw new Error("結果數據準備或填充失敗"); }
+        } catch (error) {
+            console.error("顯示結果時出錯:", error);
+            alert(`抱歉，顯示結果時發生錯誤: ${error.message} 請重試。`);
+            state.isTransitioning = false; state.isAnimating = false;
             switchScreen('test', 'intro');
         }
-     }
+    }
+
     function addTraitElement(type, starCount) {
         if (!DOM.elements.traitsContainer) return;
         try {
-            const traitElement = document.createElement('div'); traitElement.className = 'trait-item';
-            const traitName = document.createElement('span'); traitName.className = 'trait-name'; traitName.textContent = traitNames[type] || type;
-            const traitStars = document.createElement('span'); traitStars.className = 'trait-stars';
+            const traitElement = document.createElement('div');
+            traitElement.className = 'trait-item';
+            const traitName = document.createElement('span');
+            traitName.className = 'trait-name';
+            traitName.textContent = traitNames[type] || type;
+            const traitStars = document.createElement('span');
+            traitStars.className = 'trait-stars';
             const validStars = Math.max(0, Math.min(5, Math.round(starCount)));
             traitStars.textContent = '★'.repeat(validStars) + '☆'.repeat(5 - validStars);
             traitElement.appendChild(traitName); traitElement.appendChild(traitStars);
             DOM.elements.traitsContainer.appendChild(traitElement);
-        } catch (error) { console.error(`Error adding trait ${type}:`, error); }
+        } catch (error) { console.error(`添加特質 ${type} 時出錯:`, error); }
      }
+
     function copyShareText() {
         if (!DOM.elements.shareText || !DOM.buttons.copy) return;
          try {
             const textToCopy = DOM.elements.shareText.textContent;
             if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(textToCopy).then(() => { DOM.buttons.copy.textContent = '已複製!'; setTimeout(() => { DOM.buttons.copy.textContent = '複製'; }, 2000); }).catch(err => { console.warn('Clipboard API copy failed:', err); fallbackCopyText(textToCopy); });
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    DOM.buttons.copy.textContent = '已複製!';
+                    setTimeout(() => { if(DOM.buttons.copy) DOM.buttons.copy.textContent = '複製'; }, 2000);
+                }).catch(err => { fallbackCopyText(textToCopy); });
             } else { fallbackCopyText(textToCopy); }
-         } catch (error) { console.error("Copy operation error:", error); alert('複製失敗，請手動複製。'); DOM.buttons.copy.textContent = '複製'; }
+         } catch (error) { console.error("複製分享文本時出錯:", error); if(DOM.buttons.copy) DOM.buttons.copy.textContent = '複製'; }
      }
+
     function fallbackCopyText(text) {
         const textArea = document.createElement("textarea");
         textArea.value = text;
-        textArea.style.position = 'fixed'; textArea.style.left = '-9999px'; textArea.style.opacity = '0'; textArea.setAttribute('readonly', '');
+        textArea.style.position = 'fixed'; textArea.style.left = '-9999px';
+        textArea.style.opacity = '0'; textArea.setAttribute('readonly', '');
         document.body.appendChild(textArea);
         textArea.select(); textArea.setSelectionRange(0, 99999);
         let success = false;
         try {
             success = document.execCommand('copy');
-            if (success) { DOM.buttons.copy.textContent = '已複製!'; setTimeout(() => { DOM.buttons.copy.textContent = '複製'; }, 2000); }
-            else { console.error('Fallback copy (execCommand) failed'); alert('複製失敗，瀏覽器不支援此操作。'); }
-        } catch (err) { console.error('Fallback copy error:', err); alert('複製失敗，請手動複製。'); }
+            if (success) { if(DOM.buttons.copy) { DOM.buttons.copy.textContent = '已複製!'; setTimeout(() => { if(DOM.buttons.copy) DOM.buttons.copy.textContent = '複製'; }, 2000); } }
+            else { alert('複製失敗，您的瀏覽器可能不支援此操作。'); }
+        } catch (err) { console.error("fallbackCopyText 錯誤:", err); alert('複製失敗，請手動複製文本。'); }
         document.body.removeChild(textArea);
      }
 
-    // --- Event Listeners ---
     function bindStartButton() {
         if (DOM.buttons.start) {
-            DOM.buttons.start.removeEventListener('click', handleStartTestClick); // Remove first to prevent duplicates
+            DOM.buttons.start.removeEventListener('click', handleStartTestClick);
             DOM.buttons.start.addEventListener('click', handleStartTestClick);
-            console.log("Start button event bound.");
-        } else { console.error("Failed to bind start button event."); displayInitializationError("無法啟動測驗，按鈕丟失。"); }
-    }
-    function bindOtherButtons() {
-        if (DOM.buttons.restart) { DOM.buttons.restart.removeEventListener('click', handleRestartClick); DOM.buttons.restart.addEventListener('click', handleRestartClick); console.log("Restart button event bound."); }
-        else { console.error("Cannot bind restart button."); }
-        if (DOM.buttons.copy) { DOM.buttons.copy.removeEventListener('click', copyShareText); DOM.buttons.copy.addEventListener('click', copyShareText); console.log("Copy button event bound."); }
-        else { console.error("Cannot bind copy button."); }
-     }
-     function handleRestartClick() {
-        // Check general animation lock
-        if (state.isAnimating) {
-            console.log("Animation in progress, cannot restart yet."); return;
+            console.log("開始測驗按鈕事件已綁定。");
+        } else {
+            console.error("無法綁定開始按鈕事件：按鈕元素未找到。");
+            displayInitializationError("無法啟動測驗，關鍵按鈕丟失。");
         }
-        switchScreen('result', 'intro'); // switchScreen handles locks
+    }
+
+    function bindOtherButtons() {
+        if (DOM.buttons.restart) {
+            DOM.buttons.restart.removeEventListener('click', handleRestartClick);
+            DOM.buttons.restart.addEventListener('click', handleRestartClick);
+        }
+        if (DOM.buttons.copy) {
+            DOM.buttons.copy.removeEventListener('click', copyShareText);
+            DOM.buttons.copy.addEventListener('click', copyShareText);
+        }
+        console.log("其他按鈕事件已綁定。");
      }
 
-    // --- Global Error Handler ---
+     function handleRestartClick() {
+        if (state.isAnimating || state.isTransitioning) {
+            console.log("動畫/轉換進行中，暫時無法重新開始。");
+            return;
+        }
+        console.log("重新開始測驗...");
+        switchScreen('result', 'intro');
+     }
+
     window.addEventListener('error', function(event) {
-         console.error("Global error caught:", event.error, "at:", event.filename, ":", event.lineno);
-         // Attempt to reset state locks to prevent getting stuck
-         state.isAnimating = false;
-         state.isTransitioning = false;
+         console.error("捕獲到全局錯誤:", event.error, "發生在:", event.filename, ":", event.lineno);
+         state.isAnimating = false; state.isTransitioning = false;
+    });
+    window.addEventListener('unhandledrejection', function(event) {
+        console.error('捕獲到未處理的 Promise rejection:', event.reason);
+        state.isAnimating = false; state.isTransitioning = false;
     });
 
     // --- Initialization ---
+    console.log("開始初始化...");
     setViewportHeight();
     window.addEventListener('resize', setViewportHeight);
 
     if (cacheDOMElements()) {
-        preloadImages(); // Starts preloading and the whole sequence
+        preloadImages(); // *** 調用修改後的 preloadImages ***
         bindOtherButtons();
-        // bindStartButton() is now called within preloadImages after the delay
     } else {
-        console.error("DOM element caching failed, initialization incomplete.");
+        console.error("DOM 元素緩存失敗，初始化中止。");
     }
 
-    console.log("Script initialization complete.");
+    console.log("腳本初始化流程結束。");
 });
