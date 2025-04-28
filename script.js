@@ -249,16 +249,27 @@ document.addEventListener('DOMContentLoaded', function() {
                  state.introVisible = true;
             }
 
-            // 5. 解鎖狀態 - 在 Intro 動畫完成後
-            const unlockDelay = INTRO_ANIMATION_TOTAL_TIME + 100;
-            console.log(`預計在 ${unlockDelay}ms 後解除動畫鎖定`);
-
-            setTimeout(() => {
-                state.isAnimating = false; // Unlock state
-                console.log("Intro 轉場完成且動畫應已結束，解除鎖定。");
-            }, unlockDelay);
-
-        }, totalExitTime); // 等待最長的元素退場時間結束
+             // 5. 解鎖狀態 - 在 Intro 動畫完成後
+             const unlockDelay = INTRO_ANIMATION_TOTAL_TIME + 100;
+             // ***** 新增這行除錯訊息 *****
+             console.log(`[DEBUG] 預計在 ${unlockDelay}ms 後解除狀態鎖。目前狀態: isAnimating=${state.isAnimating}, isTransitioning=${state.isTransitioning}`);
+ 
+             setTimeout(() => {
+                 // ***** 新增這些除錯訊息 *****
+                 console.log("[DEBUG] 嘗試解除狀態鎖...");
+                 console.log(`[DEBUG] 解鎖前狀態: isAnimating=${state.isAnimating}, isTransitioning=${state.isTransitioning}`);
+ 
+                 state.isAnimating = false; // 解除動畫鎖定
+ 
+                 // 試著也解除 isTransitioning，雖然理論上應該由 switchScreen 處理，但以防萬一
+                 // state.isTransitioning = false; // 你可以試著取消這行的註解看看是否有幫助
+ 
+                 console.log(`[DEBUG] 解鎖後狀態: isAnimating=${state.isAnimating}, isTransitioning=${state.isTransitioning}`);
+                 console.log("Intro 轉場完成且動畫應已結束，解除鎖定。");
+                 // ***** 結束新增的除錯訊息 *****
+             }, unlockDelay);
+ 
+         }, totalExitTime); // 等待最長的元素退場時間結束
     }
 
 
