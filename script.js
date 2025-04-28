@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
                  DOM.elements.preloaderSvg, DOM.elements.testBackground, DOM.elements.questionTitle,
                  DOM.elements.startBtnText, DOM.buttons.start
              ];
-             // Check SVG Groups exist (optional but good practice)
+             // Check SVG Groups exist
              const mainTitleGroup = DOM.elements.preloaderSvg?.querySelector('#main-title-group');
              const engSubtitleGroup = DOM.elements.preloaderSvg?.querySelector('#eng-subtitle-group');
              const chnSubtitleGroup = DOM.elements.preloaderSvg?.querySelector('#chn-subtitle-group');
@@ -123,15 +123,14 @@ document.addEventListener('DOMContentLoaded', function() {
                      const clonedSvg = DOM.elements.preloaderSvg.cloneNode(true);
                      clonedSvg.id = 'intro-title-svg';
                      clonedSvg.classList.remove('glow-active');
-                     // Remove potentially inherited animation styles from paths/groups in clone
-                     clonedSvg.style.animation = 'none'; // Remove animation from SVG itself
+                     clonedSvg.style.animation = 'none';
                      clonedSvg.querySelectorAll('path, g').forEach(el => {
                          el.style.animation = 'none';
                          el.style.animationDelay = '0s';
                          el.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
-                         el.style.transform = ''; // Reset transform too
-                         el.style.filter = ''; // Reset filter
-                         el.style.opacity = ''; // Reset opacity
+                         el.style.transform = '';
+                         el.style.filter = '';
+                         el.style.opacity = '';
                      });
                      introTitlePlaceholder.innerHTML = '';
                      introTitlePlaceholder.appendChild(clonedSvg);
@@ -168,7 +167,6 @@ document.addEventListener('DOMContentLoaded', function() {
         DOM.elements.preloaderSvg.classList.remove('glow-active');
         DOM.elements.preloaderSvg.style.animation = 'none'; // Stop entrance zoom immediately
 
-
         // 1. 獲取所有需要參與退場動畫的 Path 元素
         const pathsToExit = DOM.elements.preloaderSvg.querySelectorAll(
              '#main-title-group .st0, #main-title-group .st1, #main-title-group .st2, #main-title-group .st4, #main-title-group .st5, #eng-subtitle-group path, #chn-subtitle-group path'
@@ -188,14 +186,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         let maxDelay = 0;
-        const baseExitDelay = 0; // 開始退場的基礎延遲 (ms)
+        const baseExitDelay = 0; // Start almost immediately after pause
         const randomExitRange = 400; // 隨機延遲的最大範圍 (ms)
 
         // 2. 為每個 Path 添加 is-exiting-* class 並設定隨機延遲
         pathsToExit.forEach(path => {
-            // Ensure drawing animation is finished visually before applying exit animation
-            // This might require a very small delay or relying on the overall PRELOADER_EXTRA_DELAY
-            path.style.animation = 'none'; // Remove drawing animation if still running
+            path.style.animation = 'none'; // Remove any previous animation inline style
             void path.offsetWidth; // Force reflow
 
             const randomDelay = baseExitDelay + Math.random() * randomExitRange;
@@ -273,7 +269,7 @@ document.addEventListener('DOMContentLoaded', function() {
         DOM.containers.preloader.classList.remove('is-exiting-bg');
         DOM.elements.preloaderSvg.querySelectorAll('path').forEach(p => {
              p.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
-             p.style.animation = ''; // 清除可能殘留的 JS style
+             p.style.animation = '';
              p.style.animationDelay = '';
              p.style.opacity = '';
              p.style.transform = '';
@@ -281,12 +277,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         // Reset SVG entrance animation and glow
         DOM.elements.preloaderSvg.style.animation = '';
-        DOM.elements.preloaderSvg.style.transform = ''; // Reset scale
+        DOM.elements.preloaderSvg.style.transform = '';
         DOM.elements.preloaderSvg.classList.remove('glow-active');
 
         DOM.containers.preloader.classList.add('active'); // 激活 preloader (觸發 SVG 入場動畫)
 
-        // Start SVG glow after delay (relative to start)
+        // Start SVG glow after delay
         setTimeout(() => {
             if (DOM.containers.preloader.classList.contains('active') && DOM.elements.preloaderSvg) {
                  console.log("為 preloader SVG 添加光暈效果");
