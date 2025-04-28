@@ -128,7 +128,6 @@ document.addEventListener('DOMContentLoaded', function() {
                      clonedSvg.querySelectorAll('path, g').forEach(el => {
                          el.style.animation = 'none';
                          el.style.animationDelay = '0s';
-                         // No need to remove exit classes here as they won't be added
                          el.style.transform = '';
                          el.style.filter = '';
                          el.style.opacity = '';
@@ -149,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
          }
     }
 
-    // !! REVISED Function: triggerIntroTransition (直接設定 Path Style 退場)
+    // !! REVISED Function: triggerIntroTransition (隨機 Path 退場，加大延遲範圍)
     function triggerIntroTransition() {
         if (!DOM.containers.preloader || !DOM.containers.intro || !DOM.elements.preloaderSvg) {
             console.error("Preloader, Intro container, or Preloader SVG not found for transition.");
@@ -161,13 +160,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        console.log("開始 Preloader 到 Intro 的轉場 (直接設定 Path Style 退場)...");
+        console.log("開始 Preloader 到 Intro 的轉場 (隨機 Path 退場 - 加大延遲)...");
         state.isAnimating = true; // Lock state
 
         // 移除光暈 & 入場動畫
         DOM.elements.preloaderSvg.classList.remove('glow-active');
         DOM.elements.preloaderSvg.style.animation = 'none'; // Stop entrance zoom immediately
-
 
         // 1. 獲取所有需要參與退場動畫的 Path 元素
         const pathsToExit = DOM.elements.preloaderSvg.querySelectorAll(
@@ -189,11 +187,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let maxDelay = 0;
         const baseExitDelay = 0; // 開始退場的基礎延遲 (ms)
-        const randomExitRange = 800; // !! 增大隨機延遲範圍，讓效果更明顯
+        // !! INCREASED RANDOM RANGE !!
+        const randomExitRange = 1000; // 隨機延遲的最大範圍 (ms) - 增加到 1000ms
 
         // 2. 為每個 Path 直接設定 animation style 並設定隨機延遲
         pathsToExit.forEach(path => {
-            path.style.animation = 'none'; // Remove drawing animation
+            path.style.animation = 'none'; // Remove any previous animation inline style
             void path.offsetWidth; // Force reflow
 
             const randomDelay = baseExitDelay + Math.random() * randomExitRange;
@@ -203,21 +202,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const animationName = Math.random() < 0.5 ? 'preloaderPathExitScaleUp' : 'preloaderPathExitScaleDown';
 
             // 直接設定 style
-            // Format: animation: name duration timing-function delay iteration-count direction fill-mode;
+            path.style.opacity = '1'; // Make sure it's visible before exit animation starts
+            path.style.transform = 'scale(1.05)'; // Ensure starting scale
+            path.style.filter = 'blur(0px)'; // Ensure starting filter
+            path.style.visibility = 'visible';
+            // Apply animation with delay
             path.style.animation = `${animationName} ${PRELOADER_PATH_EXIT_DURATION_S} ease-out ${randomDelay.toFixed(0)}ms 1 normal forwards`;
-            // 確保 path 在動畫開始前可見 (因為 drawStrokeAndFill 的 forwards 可能設為 opacity: 0)
-             path.style.opacity = '1'; // Make sure it's visible before exit animation starts
-             path.style.transform = 'scale(1.05)'; // Ensure starting scale
-             path.style.filter = 'blur(0px)'; // Ensure starting filter
-             path.style.visibility = 'visible';
 
         });
 
-        // 讓背景也淡出
+        // 讓背景也淡出 (稍微延遲)
         if(preloaderBg) {
             setTimeout(() => {
-                 // Use a class for background fade for simplicity
-                 preloaderBg.classList.add('is-exiting-bg');
+                preloaderBg.classList.add('is-exiting-bg');
             }, baseExitDelay + randomExitRange * 0.2);
         }
 
@@ -232,6 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 清理 Path 上的 JS 添加的 style
             pathsToExit.forEach(path => {
                 path.style.animation = '';
+                path.style.animationDelay = ''; // Though not set directly, reset for safety
                 path.style.opacity = '';
                 path.style.transform = '';
                 path.style.filter = '';
@@ -285,10 +283,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         // Reset SVG entrance animation and glow
         DOM.elements.preloaderSvg.style.animation = '';
-        DOM.elements.preloaderSvg.style.transform = '';
+        DOM.elements.preloaderSvg.style.transform = ''; // Reset scale
         DOM.elements.preloaderSvg.classList.remove('glow-active');
 
-        DOM.containers.preloader.classList.add('active'); // 激活 preloader
+        DOM.containers.preloader.classList.add('active'); // 激活 preloader (觸發 SVG 入場動畫)
 
         // Start SVG glow after delay
         setTimeout(() => {
