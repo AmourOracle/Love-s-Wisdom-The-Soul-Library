@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 重新計算 Preloader 額外延遲 (SVG動畫完成後 + 短暫停留)
     const SVG_BASE_DRAW_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-base-draw-duration').replace('s','')) * 1000 || 2500;
     const SVG_STAGGER_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-stagger-delay').replace('s','')) * 1000 || 150;
-    const MAX_STAGGER_STEPS = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--svg-max-stagger-steps')) || 4; // Read from CSS or default to 4
+    const MAX_STAGGER_STEPS = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--svg-max-stagger-steps')) || 4;
     const SVG_ANIMATION_TOTAL_ESTIMATED_TIME = SVG_BASE_DRAW_DURATION + (MAX_STAGGER_STEPS * SVG_STAGGER_DELAY);
     const PRELOADER_PAUSE_AFTER_SVG = 400; // SVG 動畫後的停留時間 (ms)
     const PRELOADER_EXTRA_DELAY = SVG_ANIMATION_TOTAL_ESTIMATED_TIME + PRELOADER_PAUSE_AFTER_SVG;
@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
                  DOM.elements.preloaderSvg, DOM.elements.testBackground, DOM.elements.questionTitle,
                  DOM.elements.startBtnText, DOM.buttons.start
              ];
-             // Check if SVG Groups exist (optional but good)
+             // Check SVG Groups exist
              const mainTitleGroup = DOM.elements.preloaderSvg?.querySelector('#main-title-group');
              const engSubtitleGroup = DOM.elements.preloaderSvg?.querySelector('#eng-subtitle-group');
              const chnSubtitleGroup = DOM.elements.preloaderSvg?.querySelector('#chn-subtitle-group');
@@ -124,11 +124,12 @@ document.addEventListener('DOMContentLoaded', function() {
                      clonedSvg.id = 'intro-title-svg';
                      clonedSvg.classList.remove('glow-active');
                      // Remove potentially inherited animation styles from paths/groups in clone
-                     clonedSvg.style.animation = 'none'; // Remove animation from SVG itself
+                     clonedSvg.style.animation = 'none';
                      clonedSvg.querySelectorAll('path, g').forEach(el => {
                          el.style.animation = 'none';
                          el.style.animationDelay = '0s';
                          el.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
+                         el.style.transform = ''; // Reset transform too
                      });
                      introTitlePlaceholder.innerHTML = '';
                      introTitlePlaceholder.appendChild(clonedSvg);
@@ -161,18 +162,16 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("開始 Preloader 到 Intro 的轉場 (隨機 Path 退場)...");
         state.isAnimating = true; // Lock state
 
-        // 移除光暈
+        // 移除光暈 & 入場動畫
         DOM.elements.preloaderSvg.classList.remove('glow-active');
-        // 移除 SVG 入場動畫 (如果還在播放)
-        DOM.elements.preloaderSvg.style.animation = 'none';
+        DOM.elements.preloaderSvg.style.animation = 'none'; // Stop entrance zoom
 
 
         // 1. 獲取所有需要參與退場動畫的 Path 元素 (st0 to st5)
         const pathsToExit = DOM.elements.preloaderSvg.querySelectorAll(
              '#main-title-group .st0, #main-title-group .st1, #main-title-group .st2, #main-title-group .st4, #main-title-group .st5, #eng-subtitle-group path, #chn-subtitle-group path'
         );
-        // 同時讓背景也淡出
-        const preloaderBg = DOM.containers.preloader;
+        const preloaderBg = DOM.containers.preloader; // Target the preloader itself for background fade
 
         if (pathsToExit.length === 0 && !preloaderBg) {
             console.error("錯誤：找不到任何需要退場的 Preloader Path 或背景。");
@@ -193,6 +192,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 2. 為每個 Path 添加 is-exiting-* class 並設定隨機延遲
         pathsToExit.forEach(path => {
+            // 清除可能殘留的繪製動畫狀態 (防止干擾退場)
+            path.style.animation = 'none';
+            // 強制重繪以應用樣式清除
+            void path.offsetWidth;
+
             const randomDelay = baseExitDelay + Math.random() * randomExitRange;
             maxDelay = Math.max(maxDelay, randomDelay);
 
@@ -200,9 +204,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const exitClass = Math.random() < 0.5 ? 'is-exiting-scale-up' : 'is-exiting-scale-down';
 
             setTimeout(() => {
-                // 確保清除舊動畫影響
-                path.style.animation = 'none';
-                // 添加新 class
                 path.classList.add(exitClass);
             }, randomDelay);
         });
@@ -211,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if(preloaderBg) {
             setTimeout(() => {
                 preloaderBg.classList.add('is-exiting-bg');
-            }, baseExitDelay + randomExitRange * 0.2); // 背景延遲一點點開始淡出
+            }, baseExitDelay + randomExitRange * 0.2);
         }
 
         // 3. 計算何時所有退場動畫都結束
@@ -222,12 +223,14 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
             console.log("Preloader 所有 Path 退場動畫結束。");
             DOM.containers.preloader.classList.remove('active', 'is-exiting-bg');
-            // 清理 Path 上的 is-exiting class
+            // 清理 Path 上的 is-exiting class 和 JS 添加的 style
             pathsToExit.forEach(path => {
                 path.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
-                // 重置樣式，以防萬一
-                path.style.animation = '';
-                path.style.opacity = ''; // 讓其恢復由 CSS 控制
+                path.style.animation = ''; // Reset animation property
+                path.style.animationDelay = '';
+                path.style.opacity = ''; // Let CSS control opacity again
+                path.style.transform = ''; // Reset transform
+                path.style.filter = ''; // Reset filter
             });
              // 重置 SVG transform
              DOM.elements.preloaderSvg.style.animation = '';
@@ -272,17 +275,16 @@ document.addEventListener('DOMContentLoaded', function() {
              p.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
              p.style.animation = ''; // 清除可能殘留的 JS style
              p.style.animationDelay = '';
+             p.style.opacity = '';
+             p.style.transform = '';
+             p.style.filter = '';
         });
-        // Reset SVG entrance animation
+        // Reset SVG entrance animation and glow
         DOM.elements.preloaderSvg.style.animation = '';
         DOM.elements.preloaderSvg.style.transform = ''; // Reset scale
-        if(DOM.elements.preloaderSvg) DOM.elements.preloaderSvg.classList.remove('glow-active');
+        DOM.elements.preloaderSvg.classList.remove('glow-active');
 
         DOM.containers.preloader.classList.add('active'); // 激活 preloader (觸發 SVG 入場動畫)
-
-        if (DOM.containers.intro) DOM.containers.intro.classList.remove('active');
-        if (DOM.containers.test) DOM.containers.test.classList.remove('active');
-        if (DOM.containers.result) DOM.containers.result.classList.remove('active');
 
         // Start SVG glow after delay (relative to start)
         setTimeout(() => {
@@ -441,7 +443,9 @@ document.addEventListener('DOMContentLoaded', function() {
                          p.classList.remove('is-exiting-scale-up', 'is-exiting-scale-down');
                          p.style.animation = '';
                          p.style.animationDelay = '';
-                         p.style.opacity = ''; // Reset opacity
+                         p.style.opacity = '';
+                         p.style.transform = ''; // Add transform reset
+                         p.style.filter = ''; // Add filter reset
                      });
                      DOM.containers.preloader?.classList.remove('is-exiting-bg');
                      // Reset SVG zoom/glow
@@ -464,7 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("初始化測驗屏幕...");
         state.currentQuestionIndex = 0; state.userAnswers = [];
         updateProgressBar(0);
-        displayQuestion(state.currentQuestionIndex, true); // Will set isTransitioning = true
+        displayQuestion(state.currentQuestionIndex, true);
         updateProgressBar(1);
      }
 
@@ -507,7 +511,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             allOptions = Array.from(DOM.containers.options.querySelectorAll('.option'));
             setTimeout(() => triggerQuestionEnterAnimation(), isInitialDisplay ? 150 : 0);
-        } else { state.isTransitioning = false; } // Unlock if options container missing
+        } else { state.isTransitioning = false; }
     }
 
      function handleOptionClick(event) {
@@ -515,7 +519,7 @@ document.addEventListener('DOMContentLoaded', function() {
          const optionIndex = parseInt(clickedOption.dataset.index);
          const questionIndex = state.currentQuestionIndex;
          if (isNaN(optionIndex) || isNaN(questionIndex) || state.isTransitioning || clickedOption.classList.contains('exploded') || clickedOption.classList.contains('fade-out')) { return; }
-         state.isTransitioning = true; // Lock for the transition
+         state.isTransitioning = true;
          state.userAnswers[questionIndex] = optionIndex;
          const optionRect = clickedOption.getBoundingClientRect();
          const parentRect = DOM.containers.explosion.offsetParent ? DOM.containers.explosion.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
@@ -530,7 +534,6 @@ document.addEventListener('DOMContentLoaded', function() {
          setTimeout(() => {
              if (state.currentQuestionIndex < questions.length - 1) { prepareNextQuestion(); }
              else { showResults(); }
-             // isTransitioning is unlocked by displayQuestion or showResults flow
          }, transitionDelay);
      }
 
@@ -548,7 +551,7 @@ document.addEventListener('DOMContentLoaded', function() {
      function prepareNextQuestion() {
         state.currentQuestionIndex++;
         updateProgressBar(state.currentQuestionIndex + 1);
-        displayQuestion(state.currentQuestionIndex, false); // displayQuestion sets isTransitioning = true
+        displayQuestion(state.currentQuestionIndex, false);
      }
 
      function triggerQuestionEnterAnimation() {
@@ -564,7 +567,7 @@ document.addEventListener('DOMContentLoaded', function() {
          const finalResetDelay = optionsEnterStartDelay + totalOptionsDelay + optionEnterDuration + 100;
          setTimeout(() => {
              allOptions.forEach(option => { option.style.transitionDelay = ''; });
-             state.isTransitioning = false; // Unlock AFTER enter animation completes
+             state.isTransitioning = false;
              console.log("問題進場動畫完成，解除 isTransitioning");
          }, finalResetDelay);
     }
@@ -627,17 +630,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function showResults() {
         if (state.isAnimating || state.isTransitioning) { return; }
-        state.isTransitioning = true; // Lock until screen transition finishes
+        state.isTransitioning = true;
         try {
             const resultData = calculateResult(); if (!resultData) throw new Error("Result calculation failed");
-            if (prepareResultData(resultData)) {
-                // switchScreen handles unlocking locks after transition
-                switchScreen('test', 'result');
-            } else { throw new Error("Result data preparation failed"); }
+            if (prepareResultData(resultData)) { switchScreen('test', 'result'); }
+            else { throw new Error("Result data preparation failed"); }
         } catch (error) {
             console.error("Error showing results:", error); alert(`抱歉，顯示結果時發生錯誤: ${error.message} 請重試。`);
-            state.isTransitioning = false; state.isAnimating = false; // Unlock on error
-            switchScreen('test', 'intro'); // Attempt to go back
+            state.isTransitioning = false; state.isAnimating = false;
+            switchScreen('test', 'intro');
         }
      }
 
