@@ -24,12 +24,10 @@
     --svg-fade-in-duration: 1.5s; /* Subtitle fade-in during draw */
     --svg-fade-in-delay: 0.6s;
 
-    /* !! Path 退場動畫相關變數 */
-    --preloader-path-exit-duration: 0.8s;
-    --preloader-path-exit-blur: 5px;
-    --preloader-path-exit-scale-up: 1.2;
-    --preloader-path-exit-scale-down: 0.8;
-    --preloader-bg-exit-duration: calc(var(--preloader-path-exit-duration) * 1.1); /* Background fade slightly longer */
+    /* !! NEW: Preloader Wipe 退場動畫相關變數 */
+    --preloader-wipe-duration: 0.9s; /* Duration for the wipe effect */
+    --preloader-wipe-timing: cubic-bezier(0.65, 0, 0.35, 1); /* Timing function for wipe */
+    --preloader-content-fade-duration: calc(var(--preloader-wipe-duration) * 0.5); /* Content fades faster */
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -84,38 +82,51 @@ body {
     to { transform: scale(1.05); }
 }
 
-/* !! CORRECTED: Preloader Path 退場動畫 Keyframes */
-@keyframes preloaderPathExitScaleUp {
-    from { opacity: 1; transform: scale(1.05); filter: blur(0px); } /* Start from 105% */
-    to { opacity: 0; transform: scale(var(--preloader-path-exit-scale-up)); filter: blur(var(--preloader-path-exit-blur)); visibility: hidden; }
+/* !! NEW: Preloader Wipe 退場動畫 Keyframe */
+@keyframes preloaderWipeOutCircle {
+    /* The animation makes the element appear */
+    from { clip-path: circle(0% at center); }
+    to   { clip-path: circle(150% at center); } /* 150% ensures full coverage */
 }
-@keyframes preloaderPathExitScaleDown {
-    from { opacity: 1; transform: scale(1.05); filter: blur(0px); } /* Start from 105% */
-    to { opacity: 0; transform: scale(var(--preloader-path-exit-scale-down)); filter: blur(var(--preloader-path-exit-blur)); visibility: hidden; }
-}
-
 
 /* ================= 預加載畫面 ================= */
 .preloader {
     z-index: 9999; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
     background-color: var(--deep-blue-bg); display: flex; justify-content: center; align-items: center;
     opacity: 0; visibility: hidden; pointer-events: none;
+    /* Prepare for clip-path animation */
+    clip-path: circle(0% at center);
+    will-change: clip-path, opacity;
 }
 .preloader.active {
     opacity: 1; visibility: visible; pointer-events: auto; transition: none;
     background-color: var(--deep-blue-bg);
+    /* Start fully visible (clipped to show everything) */
+    clip-path: circle(150% at center);
 }
-/* Preloader 背景退場 class */
-.preloader.is-exiting-bg {
-    opacity: 0;
-    transition: opacity var(--preloader-bg-exit-duration) ease-out;
+
+/* !! NEW: Preloader 退場 (Wipe) Class */
+.preloader.is-exiting {
+    /* Apply wipe-out animation (reverse direction makes it shrink) */
+    animation: preloaderWipeOutCircle var(--preloader-wipe-duration) var(--preloader-wipe-timing) forwards reverse;
+    /* Prevent clicks during exit */
     pointer-events: none;
+    /* We use clip-path for hiding, so keep opacity at 1 until clipped */
+    opacity: 1;
 }
-.preloader.is-exiting-bg .preloader-content {
+
+/* Fade out content slightly faster than the wipe */
+.preloader.is-exiting .preloader-content {
     opacity: 0;
-    transition: opacity calc(var(--preloader-bg-exit-duration) * 0.8) ease-out;
+    transition: opacity var(--preloader-content-fade-duration) ease-out;
 }
-.preloader-content { text-align: center; color: var(--text-color); width: 90%; max-width: 450px; position: relative; }
+
+/* Make sure content starts visible */
+.preloader-content {
+    text-align: center; color: var(--text-color); width: 90%; max-width: 450px; position: relative;
+    opacity: 1;
+    transition: opacity 0.3s ease-out; /* Default fade for content */
+}
 #preloader-svg-container { width: 100%; margin-bottom: 20px; }
 
 #preloader-svg {
@@ -170,27 +181,12 @@ body {
     stroke-dasharray: none; stroke-dashoffset: 0; stroke-width: 0;
     animation: none; fill-opacity: 1;
     transform-origin: center center; /* Ensure scaling is centered */
-    will-change: opacity, transform, filter; /* Needed for exit animation */
+    /* No longer need will-change here as the parent .preloader handles exit */
+    /* will-change: opacity, transform, filter; */
 }
 #preloader-svg #chn-subtitle-group .st3 { fill: #f2f2f2; }
 
-/* !! CORRECTED: Path 退場動畫應用 class */
-#preloader-svg path.is-exiting-scale-up {
-    transform-origin: center center;
-    animation: preloaderPathExitScaleUp var(--preloader-path-exit-duration) ease-out forwards;
-    /* Ensure path remains visible until animation fades it */
-    opacity: 1 !important;
-    visibility: visible !important;
-    will-change: opacity, transform, filter;
-}
-#preloader-svg path.is-exiting-scale-down {
-    transform-origin: center center;
-    animation: preloaderPathExitScaleDown var(--preloader-path-exit-duration) ease-out forwards;
-    opacity: 1 !important;
-    visibility: visible !important;
-    will-change: opacity, transform, filter;
-}
-/* !! REMOVED: 舊的 #preloader-svg g.is-exiting 規則 */
+/* !! REMOVED: Old Path 退場動畫應用 class (is-exiting-scale-up/down) */
 
 
 /* ================= 通用屏幕容器 ================= */
