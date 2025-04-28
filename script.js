@@ -187,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let maxDelay = 0;
         const baseExitDelay = 0; // Start almost immediately after pause
-        const randomExitRange = 400; // 隨機延遲的最大範圍 (ms)
+        const randomExitRange = 1000; // 隨機延遲的最大範圍 (ms)
 
         // 2. 為每個 Path 添加 is-exiting-* class 並設定隨機延遲
         pathsToExit.forEach(path => {
