@@ -263,9 +263,9 @@ body {
 .card-footer { /* ... (保持不變) ... */
     margin-bottom: 40px; text-align: center; position: relative;
 }
-.card-meta { /* ... (保持不變) ... */
+/*.card-meta {
     margin-top: 20px; font-size: 12px; opacity: 0.7; text-align: center;
-}
+}*/
 
 /* ================= 按鈕樣式 ================= */
 .btn { /* ... (保持不變) ... */
