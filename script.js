@@ -99,7 +99,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                     result: document.getElementById('result-container'),
                     preloader: document.getElementById('preloader'),
                     options: document.getElementById('options-container'),
-                    explosion: document.getElementById('explosion-container'), // 主爆炸容器
+                    explosion: document.getElementById('explosion-container'), // 主爆炸容器 (用於選項)
+                    startBtnExplosion: document.getElementById('start-btn-explosion-container'), // *** 恢復快取開始按鈕爆炸容器 ***
                     preloaderSvgContainer: document.getElementById('preloader-svg-container')
                 },
                 elements: {
@@ -124,9 +125,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                 }
             };
 
+            // 定義必須存在的關鍵元素列表 (恢復 startBtnExplosion)
             const criticalElements = [
                 DOM.containers.intro, DOM.containers.test, DOM.containers.result,
                 DOM.containers.preloader, DOM.containers.options, DOM.containers.explosion,
+                DOM.containers.startBtnExplosion, // *** 恢復檢查 ***
                 DOM.containers.preloaderSvgContainer,
                 DOM.elements.preloaderSvg, DOM.elements.testBackground, DOM.elements.questionTitle,
                 DOM.elements.startBtnText, DOM.buttons.start, DOM.elements.introTitlePlaceholder
@@ -135,11 +138,19 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (criticalElements.some(el => !el)) {
                 console.error("錯誤：未能找到所有必要的 HTML 元素。請檢查 HTML 結構和 ID。", DOM);
                 const missingIndex = criticalElements.findIndex(el => !el);
-                console.error(`缺失元素的索引: ${missingIndex}`);
+                // 找到第一個缺失的元素並打印其預期 ID (如果可能)
+                const expectedIds = [
+                    'intro-container', 'test-container', 'result-container', 'preloader',
+                    'options-container', 'explosion-container', 'start-btn-explosion-container',
+                    'preloader-svg-container', 'preloader-svg', 'test-background',
+                    'question-title', '#start-test .btn-text', 'start-test', '.intro-title-placeholder'
+                ];
+                console.error(`缺失元素的索引: ${missingIndex}, 預期 ID/選擇器: ${expectedIds[missingIndex] || '未知'}`);
                 displayInitializationError("頁面結構錯誤，無法啟動測驗。");
                 return false;
             }
 
+            // 檢查 SVG Group
             const mainTitleGroup = DOM.elements.preloaderSvg?.querySelector('#main-title-group');
             const engSubtitleGroup = DOM.elements.preloaderSvg?.querySelector('#eng-subtitle-group');
             const chnSubtitleGroup = DOM.elements.preloaderSvg?.querySelector('#chn-subtitle-group');
@@ -147,6 +158,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 console.warn("警告：未能找到所有的 SVG Group ID (main-title-group, eng-subtitle-group, chn-subtitle-group)。請檢查 index.html。");
             }
 
+            // 複製 SVG
             if (DOM.elements.preloaderSvg && DOM.elements.introTitlePlaceholder) {
                  const clonedSvg = DOM.elements.preloaderSvg.cloneNode(true);
                  clonedSvg.id = 'intro-title-svg';
@@ -174,7 +186,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             return false;
         }
     }
-
     function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
     function nextFrame() { return new Promise(resolve => requestAnimationFrame(resolve)); }
     function triggerIntroTransition() {
@@ -245,6 +256,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     function preloadAndAnimate() {
         return new Promise(async (resolve, reject) => {
+            const startTime = performance.now(); // *** 需要在這裡定義 startTime ***
             if (!DOM.containers?.preloader || !DOM.elements.preloaderSvg) { reject(new Error("Preloader 或 SVG 元素未找到。")); return; }
             if (!questions || questions.length === 0) { reject(new Error("問題數據無效。")); return; }
             console.log("顯示 Preloader 並開始動畫...");
@@ -289,7 +301,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             state.preloadComplete = true;
             console.log(`圖片預載入處理完成 ${errorOccurred ? '（有錯誤）' : ''}`);
             const preloadDuration = performance.now() - preloadStartTime;
-            const estimatedSvgEndTime = initializationStartTime + SVG_ANIMATION_TOTAL_ESTIMATED_TIME + PRELOADER_PAUSE_AFTER_SVG;
+            // *** initializationStartTime 應從外部傳入或在此處定義 ***
+            const estimatedSvgEndTime = startTime + SVG_ANIMATION_TOTAL_ESTIMATED_TIME + PRELOADER_PAUSE_AFTER_SVG;
             const now = performance.now();
             const remainingDelay = Math.max(0, estimatedSvgEndTime - now);
             console.log(`圖片載入耗時: ${preloadDuration.toFixed(0)}ms`);
@@ -305,7 +318,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
             explosionContainer.innerHTML = '';
             const targetRect = targetElement.getBoundingClientRect();
-            const containerRect = explosionContainer.getBoundingClientRect();
+            // *** 修正：爆炸容器的 offsetParent 可能不是 body，需要正確計算相對位置 ***
+            const containerRect = explosionContainer.getBoundingClientRect(); // 使用 getBoundingClientRect 獲取容器位置
             let startX = targetRect.left - containerRect.left + targetRect.width / 2;
             let startY = targetRect.top - containerRect.top + targetRect.height / 2;
             const chars = textToExplode.split('');
@@ -326,19 +340,28 @@ document.addEventListener('DOMContentLoaded', async function() {
                 span.style.animationDuration = `${EXPLOSION_DURATION}ms`;
                 explosionContainer.appendChild(span); animationsPending++;
                 span.addEventListener('animationend', () => {
-                    if (span.parentNode === explosionContainer) { explosionContainer.removeChild(span); }
-                    animationsPending--; if (animationsPending === 0) { resolve(); }
+                    // *** 修正：檢查父節點是否存在再移除 ***
+                    if (span.parentElement === explosionContainer) {
+                       try { explosionContainer.removeChild(span); } catch(e) { /* ignore if already removed */ }
+                    }
+                    animationsPending--;
+                    if (animationsPending === 0) { resolve(); }
                 }, { once: true });
             });
              if (animationsPending === 0) { resolve(); }
             setTimeout(() => {
-                if (animationsPending > 0) { console.warn("Explosion animation timeout, forcing resolve."); explosionContainer.innerHTML = ''; resolve(); }
+                if (animationsPending > 0) {
+                    console.warn("Explosion animation timeout, forcing resolve.");
+                    // *** 修正：確保清理時容器還存在 ***
+                    if(explosionContainer) explosionContainer.innerHTML = '';
+                    resolve();
+                }
             }, EXPLOSION_DURATION + 500);
         });
     }
 
     /**
-     * 處理「開始測驗」按鈕的點擊事件 (修改為使用主爆炸容器)
+     * 處理「開始測驗」按鈕的點擊事件 (恢復使用專用爆炸容器)
      */
     async function handleStartTestClick() {
         console.log(`[Click] 開始測驗按鈕被點擊，isBusy: ${state.isBusy}`);
@@ -350,28 +373,32 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.log("[Lock] handleStartTestClick set isBusy = true");
 
         try {
-            if (DOM.buttons.start && DOM.elements.startBtnText && DOM.containers.explosion) {
+            // *** 恢復使用 DOM.containers.startBtnExplosion ***
+            if (DOM.buttons.start && DOM.elements.startBtnText && DOM.containers.startBtnExplosion) {
                 const buttonText = DOM.elements.startBtnText.textContent;
                 DOM.elements.startBtnText.classList.add('hidden');
 
-                const buttonRect = DOM.buttons.start.getBoundingClientRect();
-                const parentRect = DOM.containers.explosion.offsetParent ? DOM.containers.explosion.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
-                DOM.containers.explosion.style.position = 'absolute';
-                DOM.containers.explosion.style.top = `${buttonRect.top - parentRect.top}px`;
-                DOM.containers.explosion.style.left = `${buttonRect.left - parentRect.left}px`;
-                DOM.containers.explosion.style.width = `${buttonRect.width}px`;
-                DOM.containers.explosion.style.height = `${buttonRect.height}px`;
+                // *** 不再需要定位主容器，直接使用按鈕自己的容器 ***
+                // const buttonRect = DOM.buttons.start.getBoundingClientRect();
+                // const parentRect = DOM.containers.explosion.offsetParent ? DOM.containers.explosion.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
+                // DOM.containers.explosion.style.position = 'absolute';
+                // DOM.containers.explosion.style.top = `${buttonRect.top - parentRect.top}px`;
+                // DOM.containers.explosion.style.left = `${buttonRect.left - parentRect.left}px`;
+                // DOM.containers.explosion.style.width = `${buttonRect.width}px`;
+                // DOM.containers.explosion.style.height = `${buttonRect.height}px`;
 
-                await triggerExplosion(DOM.buttons.start, buttonText, DOM.containers.explosion);
+                // *** 恢復調用 triggerExplosion 時傳遞 startBtnExplosion ***
+                await triggerExplosion(DOM.buttons.start, buttonText, DOM.containers.startBtnExplosion);
                 DOM.buttons.start.classList.add('exploded');
 
-                DOM.containers.explosion.style.position = '';
-                DOM.containers.explosion.style.top = '';
-                DOM.containers.explosion.style.left = '';
-                DOM.containers.explosion.style.width = '';
-                DOM.containers.explosion.style.height = '';
+                // *** 不再需要清理主容器樣式 ***
+                // DOM.containers.explosion.style.position = '';
+                // ...
 
                 await delay(100);
+            } else {
+                 // 添加錯誤處理，如果找不到開始按鈕的爆炸容器
+                 console.error("無法觸發開始按鈕爆炸效果：缺少按鈕、文字或 startBtnExplosion 容器。");
             }
 
             await switchScreen('intro', 'test');
@@ -386,15 +413,40 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
+    /**
+     * 異步切換顯示的屏幕容器 (修正閃爍問題)
+     * @param {string} fromScreenId - 要隱藏的屏幕 ID ('intro', 'test', 'result')
+     * @param {string} toScreenId - 要顯示的屏幕 ID ('intro', 'test', 'result')
+     * @returns {Promise<void>} 屏幕切換動畫完成時 resolve
+     */
     function switchScreen(fromScreenId, toScreenId) {
         return new Promise(async (resolve) => {
-            const fromScreen = DOM.containers[fromScreenId]; const toScreen = DOM.containers[toScreenId];
-            if (!fromScreen || !toScreen) { console.error(`屏幕切換失敗: 找不到 ${fromScreenId} 或 ${toScreenId}`); resolve(); return; }
+            const fromScreen = DOM.containers[fromScreenId];
+            const toScreen = DOM.containers[toScreenId];
+
+            if (!fromScreen || !toScreen) {
+                console.error(`屏幕切換失敗: 找不到 ${fromScreenId} 或 ${toScreenId}`);
+                resolve(); return;
+            }
+
             console.log(`切換屏幕: ${fromScreenId} -> ${toScreenId}`);
+
+            // 1. 移除來源屏幕的 active class，觸發其 CSS 淡出
             fromScreen.classList.remove('active');
+
+            // 2. *** 確保目標屏幕在添加 active 前是可見的 ***
+            toScreen.style.visibility = 'visible'; // Make it visible but opacity 0
+            await nextFrame(); // Ensure visibility change is registered
+
+            // 3. 添加 active class 觸發目標屏幕的 CSS 淡入
             toScreen.classList.add('active');
             document.body.style.overflow = (toScreenId === 'result') ? 'auto' : 'hidden';
-            state.resultShowing = (toScreenId === 'result'); state.introVisible = (toScreenId === 'intro');
+
+            // --- 更新內部狀態 ---
+            state.resultShowing = (toScreenId === 'result');
+            state.introVisible = (toScreenId === 'intro');
+
+            // --- 如果切換回 Intro 頁面，重置相關狀態 ---
             if (toScreenId === 'intro') {
                 state.currentQuestionIndex = 0; state.userAnswers = [];
                 state.finalScores = {}; state.contentRendered = false;
@@ -402,11 +454,26 @@ document.addEventListener('DOMContentLoaded', async function() {
                     DOM.buttons.start.classList.remove('exploded');
                     DOM.elements.startBtnText.classList.remove('hidden');
                 }
+                 // *** 清理 startBtnExplosion 容器內容 ***
+                 if(DOM.containers.startBtnExplosion) {
+                     DOM.containers.startBtnExplosion.innerHTML = '';
+                 }
             }
-            await delay(SCREEN_TRANSITION_DURATION);
-            console.log(`屏幕切換至 ${toScreenId} 完成`); resolve();
+
+            // 4. 等待 CSS 過渡動畫完成
+            await delay(SCREEN_TRANSITION_DURATION + 50); // 加一點緩衝確保動畫結束
+
+            // 5. *** 確保來源屏幕徹底隱藏 (以防萬一) ***
+            if (!fromScreen.classList.contains('active')) {
+                 fromScreen.style.visibility = 'hidden';
+            }
+
+
+            console.log(`屏幕切換至 ${toScreenId} 完成`);
+            resolve(); // 切換完成
         });
     }
+
     async function initializeTestScreen() {
         if (!DOM.elements.questionTitle || !DOM.containers.options || !DOM.elements.testBackground) {
             console.error("無法初始化測驗屏幕，缺少必要元素。"); state.isBusy = false; console.log("[Unlock] initializeTestScreen error, set isBusy = false"); return;
@@ -480,7 +547,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     /**
-     * 處理選項點擊事件 (確保使用主爆炸容器)
+     * 處理選項點擊事件 (恢復使用主爆炸容器)
      * @param {Event} event - 點擊或鍵盤事件對象
      */
     async function handleOptionClick(event) {
@@ -500,6 +567,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (DOM.elements.testBackground) DOM.elements.testBackground.classList.add('is-hidden');
         if (DOM.elements.questionTitle) DOM.elements.questionTitle.classList.add('is-hidden');
 
+        // *** 定位主爆炸容器到選項位置 ***
         const optionRect = clickedOption.getBoundingClientRect();
         const parentRect = DOM.containers.explosion.offsetParent ? DOM.containers.explosion.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
         DOM.containers.explosion.style.position = 'absolute';
@@ -508,18 +576,20 @@ document.addEventListener('DOMContentLoaded', async function() {
         DOM.containers.explosion.style.width = `${optionRect.width}px`;
         DOM.containers.explosion.style.height = `${optionRect.height}px`;
 
+        // *** 觸發爆炸，使用主容器 ***
         const explosionPromise = triggerExplosion(clickedOption, clickedOption.dataset.text || clickedOption.innerText, DOM.containers.explosion);
-        triggerQuestionFadeOut(clickedOption);
+        triggerQuestionFadeOut(clickedOption); // 同步觸發其他選項淡出
 
-        await explosionPromise;
+        await explosionPromise; // 等待爆炸完成
 
+        // *** 清理主爆炸容器定位樣式 ***
         DOM.containers.explosion.style.position = '';
         DOM.containers.explosion.style.top = '';
         DOM.containers.explosion.style.left = '';
         DOM.containers.explosion.style.width = '';
         DOM.containers.explosion.style.height = '';
 
-        await delay(QUESTION_FADE_DURATION);
+        await delay(QUESTION_FADE_DURATION); // 等待淡出
 
         try {
             if (state.currentQuestionIndex < totalQuestions - 1) {
@@ -552,11 +622,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.log("準備下一題"); state.currentQuestionIndex++; updateProgressBar(state.currentQuestionIndex + 1);
         await displayQuestion(state.currentQuestionIndex, false);
     }
-
-    /**
-     * 觸發當前問題選項的入場動畫（交錯效果）
-     * @returns {Promise<void>} 所有選項入場動畫完成時 resolve
-     */
     function triggerQuestionEnterAnimation() {
         return new Promise(async (resolve) => {
             console.log("觸發問題入場動畫");
@@ -569,30 +634,25 @@ document.addEventListener('DOMContentLoaded', async function() {
             allOptions.forEach((option, index) => {
                 const delay = OPTIONS_ENTER_START_DELAY + index * OPTION_STAGGER_DELAY;
                 maxDelay = Math.max(maxDelay, delay);
-                option.style.transition = ''; // 確保使用 CSS 動畫
-                option.style.transitionDelay = `${delay}ms`; // 設置 CSS 過渡延遲（備用）
-                option.style.animationDelay = `${delay}ms`; // 設置 CSS 動畫延遲
-                // 移除隱藏和退場相關的 class，觸發 CSS 中定義的入場動畫
+                option.style.transition = '';
+                option.style.transitionDelay = `${delay}ms`;
+                option.style.animationDelay = `${delay}ms`;
                 option.classList.remove('is-hidden', 'fade-out', 'exploded');
-                option.style.pointerEvents = ''; // 恢復選項的交互性
+                option.style.pointerEvents = '';
             });
 
-            // 計算動畫總時間（最長延遲 + 單個選項動畫時長）
             const totalAnimationTime = maxDelay + OPTION_ENTER_DURATION;
-            // 等待動畫完成，並增加一點緩衝時間
             await delay(totalAnimationTime + 100);
 
-            // 動畫完成後，清理選項上的延遲樣式
             allOptions.forEach(option => {
                  option.style.transitionDelay = '';
-                 option.style.animationDelay = ''; // 也清理動畫延遲
+                 option.style.animationDelay = '';
             });
 
             console.log("問題入場動畫完成");
             resolve();
         });
     }
-
     function updateProgressBar(questionNumber) {
          if (DOM.elements.progressFill) {
              const progress = (questionNumber / totalQuestions) * 100;
@@ -814,7 +874,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // --- 初始化流程 ---
     console.log("開始執行初始化流程...");
-    const startTime = performance.now(); // startTime 在 preloadAndAnimate 中也用到
+    // const startTime = performance.now(); // startTime 在 preloadAndAnimate 中也用到
     setViewportHeight(); window.addEventListener('resize', setViewportHeight);
     if (!cacheDOMElements()) { console.error("DOM 元素緩存失敗，初始化中止。"); return; }
     try {
@@ -823,7 +883,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         bindStartButton(); bindOtherButtons();
         state.isBusy = false; console.log("[Unlock] Initialization finished, set isBusy = false");
         const initializationEndTime = performance.now();
-        console.log(`初始化流程完成，總耗時: ${(initializationEndTime - startTime).toFixed(0)}ms`);
+        console.log(`初始化流程完成，總耗時: ${(initializationEndTime - initializationStartTime).toFixed(0)}ms`);
     } catch (error) {
         console.error("初始化過程中發生錯誤:", error);
         displayInitializationError(`初始化失敗: ${error.message || '未知錯誤'}`);
