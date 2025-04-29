@@ -28,12 +28,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Constants ---
     const PRELOADER_EXTRA_DELAY = 5000; // Minimum display time for preloader
-    const PRELOADER_EXIT_DURATION = 800; // Matches CSS --preloader-exit-duration (in ms)
-    const INTRO_FADEIN_DURATION = 1000; // Matches CSS --intro-fadein-duration (in ms)
-    const SCREEN_TRANSITION_DURATION = 600; // Matches CSS --transition-duration (in ms)
+    // 更新: 從 CSS 變數獲取動畫時間 (毫秒)
+    const PRELOADER_SVG_EXIT_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--preloader-svg-exit-duration').replace('s','')) * 1000 || 1200;
+    const PRELOADER_EXIT_DURATION = PRELOADER_SVG_EXIT_DURATION; // 讓容器消失時間與 SVG 動畫同步
+    const INTRO_FADEIN_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-fadein-duration').replace('s','')) * 1000 || 1000;
+    const SCREEN_TRANSITION_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--transition-duration').replace('s','')) * 1000 || 600;
     const EXPLOSION_DURATION = 1000; // Matches CSS explodeForwardBlur animation
-    // Get timing from CSS variables - ensure they are defined in :root
     const SVG_GLOW_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-glow-delay').replace('s','')) * 1000 || 3000;
+    const INTRO_TITLE_GLOW_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-title-glow-delay').replace('s','')) * 1000 || 700; // 光暈延遲
 
 
     // --- 輔助函數 ---
@@ -42,10 +44,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayInitializationError(message) {
         const preloaderContent = document.querySelector('.preloader-content');
         if (preloaderContent) {
-            preloaderContent.innerHTML = `<p style="color: red; padding: 20px;">${message}</p>`; // Show error in preloader
+            preloaderContent.innerHTML = `<p style="color: red; padding: 20px;">${message}</p>`;
             const preloader = document.getElementById('preloader');
-            if (preloader) preloader.classList.add('active'); // Make sure preloader is visible
-        } else { document.body.innerHTML = `<p style="color: red; padding: 20px;">${message}</p>`; } // Fallback
+            if (preloader) preloader.classList.add('active');
+        } else { document.body.innerHTML = `<p style="color: red; padding: 20px;">${message}</p>`; }
     }
 
     function cacheDOMElements() {
@@ -59,7 +61,8 @@ document.addEventListener('DOMContentLoaded', function() {
                      options: document.getElementById('options-container'),
                      explosion: document.getElementById('explosion-container'),
                      startBtnExplosion: document.getElementById('start-btn-explosion-container'),
-                     preloaderSvgContainer: document.getElementById('preloader-svg-container')
+                     preloaderSvgContainer: document.getElementById('preloader-svg-container'),
+                     introTitlePlaceholder: document.querySelector('#intro-container .intro-title-placeholder') // 快取標題佔位符
                  },
                  elements: {
                      testBackground: document.getElementById('test-background'),
@@ -72,8 +75,9 @@ document.addEventListener('DOMContentLoaded', function() {
                      similarBooks: document.getElementById('similar-books'),
                      complementaryBooks: document.getElementById('complementary-books'),
                      shareText: document.getElementById('share-text'),
-                     preloaderSvg: document.getElementById('preloader-svg'), // Still needed for entrance animation
+                     preloaderSvg: document.getElementById('preloader-svg'), // Preloader 的 SVG
                      startBtnText: document.querySelector('#start-test .btn-text')
+                     // introTitleSvg: null // 將在下面動態創建和賦值
                  },
                  buttons: {
                      start: document.getElementById('start-test'),
@@ -86,22 +90,44 @@ document.addEventListener('DOMContentLoaded', function() {
                  DOM.containers.intro, DOM.containers.test, DOM.containers.result,
                  DOM.containers.preloader, DOM.containers.options, DOM.containers.explosion,
                  DOM.containers.startBtnExplosion, DOM.containers.preloaderSvgContainer,
-                 DOM.elements.preloaderSvg, // Still need preloader SVG element
+                 DOM.elements.preloaderSvg, DOM.containers.introTitlePlaceholder, // 確保佔位符存在
                  DOM.elements.testBackground, DOM.elements.questionTitle,
                  DOM.elements.startBtnText, DOM.buttons.start
              ];
              if (criticalElements.some(el => !el)) {
                  console.error("錯誤：未能找到所有必要的 HTML 元素。請檢查 HTML 結構和 ID/Class。", DOM);
                  const missing = criticalElements.findIndex(el => !el);
-                 console.error("Missing element index:", missing, "Check corresponding key in DOM cache setup.");
+                 console.error("Missing element:", criticalElements[missing] ? 'Unknown' : 'Element at index ' + missing);
                  displayInitializationError("頁面結構錯誤，無法啟動測驗。");
                  return false;
              }
 
-            // --- Removed SVG Cloning Block ---
-            // No longer need to clone SVG as the title is static HTML now.
+            // --- 重新加入: 複製 Preloader SVG 作為 Intro Title ---
+             if (DOM.elements.preloaderSvg && DOM.containers.introTitlePlaceholder) {
+                console.log("準備複製 Preloader SVG 到 Intro...");
+                const clonedSvg = DOM.elements.preloaderSvg.cloneNode(true);
+                clonedSvg.id = 'intro-title-svg'; // 為複製的 SVG 設置新 ID
+                // 清除可能殘留的 preloader 動畫 class
+                clonedSvg.classList.remove('glow-active', 'svg-exiting');
+                // 可選：更徹底地移除內聯動畫樣式 (如果有的話)
+                // clonedSvg.style.animation = 'none';
+                // clonedSvg.querySelectorAll('*').forEach(el => el.style.animation = 'none');
 
-            console.log("DOM 元素已快取");
+                DOM.containers.introTitlePlaceholder.innerHTML = ''; // 清空佔位符
+                DOM.containers.introTitlePlaceholder.appendChild(clonedSvg);
+                DOM.elements.introTitleSvg = clonedSvg; // 將複製的 SVG 存儲到 DOM 快取中
+                console.log("Intro title SVG 已從 Preloader SVG 複製並插入");
+            } else {
+                console.error("無法複製 SVG：找不到 Preloader SVG 或 Intro title placeholder");
+                // 可以在此處添加備用標題，以防 SVG 複製失敗
+                if (DOM.containers.introTitlePlaceholder) {
+                    DOM.containers.introTitlePlaceholder.innerHTML = '<h1 style="color:red;">Title Error</h1>';
+                }
+                // return false; // 可以考慮是否因為此錯誤而終止初始化
+            }
+            // --- End SVG Cloning ---
+
+             console.log("DOM 元素已快取");
              return true;
          } catch (error) {
              console.error("快取 DOM 元素時出錯:", error);
@@ -110,47 +136,88 @@ document.addEventListener('DOMContentLoaded', function() {
          }
     }
 
+    // --- 更新: Preloader 到 Intro 的轉場函數 ---
     function triggerIntroTransition() {
-        if (!DOM.containers.preloader || !DOM.containers.intro) {
-            console.error("Preloader or Intro container not found for transition.");
-            state.isAnimating = false; // Unlock state if elements are missing
+        // 增加對 introTitlePlaceholder 的檢查
+        if (!DOM.containers.preloader || !DOM.containers.intro || !DOM.elements.preloaderSvg || !DOM.containers.introTitlePlaceholder) {
+            console.error("Preloader/Intro/SVG/Title placeholder not found for transition.");
+            state.isAnimating = false; // 解鎖
             return;
         }
-        // Use the general lock as this is a major screen transition
         if (state.isAnimating) {
             console.log("正在轉換 Intro，忽略重複觸發");
             return;
         }
 
-        console.log("開始 Preloader 到 Intro 的轉場...");
-        state.isAnimating = true; // Lock state
+        console.log("開始 Preloader 到 Intro 的轉場 (滑動效果)...");
+        state.isAnimating = true; // 鎖定
 
-        // Start preloader exit animation by adding the class (CSS handles the fade-out)
+        // 1. 觸發 Preloader SVG 的滑動淡出動畫
+        DOM.elements.preloaderSvg.classList.add('svg-exiting');
+        console.log("觸發 Preloader SVG 退場動畫 (.svg-exiting added)");
+
+        // 2. 觸發 Preloader 容器的消失 (使用 visibility/opacity transition)
         DOM.containers.preloader.classList.add('transitioning-out');
+        console.log("觸發 Preloader 容器淡出 (.transitioning-out added)");
 
-        // After preloader exit animation duration (defined in CSS/JS constant),
-        // remove preloader active state and make intro active
+        // 3. 在適當延遲後，觸發 Intro 標題的光暈效果
+        //    確保 DOM.containers.introTitlePlaceholder 是有效的
+        const titlePlaceholder = DOM.containers.introTitlePlaceholder;
         setTimeout(() => {
-            console.log("Preloader 淡出動畫結束，移除 Preloader active 狀態，啟動 Intro。");
+            if (titlePlaceholder) {
+                console.log("添加 Intro 標題光暈");
+                titlePlaceholder.classList.add('intro-title-glow');
+            } else {
+                console.warn("無法添加 Intro 標題光暈，佔位符元素未找到！");
+            }
+        }, INTRO_TITLE_GLOW_DELAY);
+
+        // 4. 在 Preloader SVG 動畫結束後，正式移除 Preloader 相關 class，並激活 Intro
+        setTimeout(() => {
+            console.log("Preloader 動畫結束，清理 Preloader class，激活 Intro 容器");
             DOM.containers.preloader.classList.remove('active', 'transitioning-out');
-            // No need to specifically remove glow-active from SVG, it fades with preloader
+            if (DOM.elements.preloaderSvg) { // Add check before removing class
+                DOM.elements.preloaderSvg.classList.remove('svg-exiting', 'glow-active'); // 清理 SVG class
+            }
 
-            // Activate intro screen (CSS handles fade-in via .active class)
+            // 激活 Intro 容器 (CSS 會處理其子元素的延遲動畫)
             DOM.containers.intro.classList.add('active');
-            state.introVisible = true; // Mark intro as logically visible
+            state.introVisible = true;
 
-            // Unlock state after intro fade-in is complete (using INTRO_FADEIN_DURATION)
-            // This timeout starts *after* the preloader exit timeout finishes
-            setTimeout(() => {
-                 state.isAnimating = false; // Unlock state
-                 console.log("Intro 轉場完成。");
-            }, INTRO_FADEIN_DURATION); // Wait for intro content to fade in
+            // 5. 在 Intro 內容動畫完成後解鎖狀態
+            //    估算 Intro 最晚元素的動畫完成時間
+            //    (假設 footer 是最晚的，其延遲是 INTRO_TITLE_GLOW_DELAY + 600ms (來自CSS))
+            const introFooterAnimationSelector = '#intro-container.active .card-footer'; // Selector for the footer animation rule
+            const footerElement = DOM.containers.intro.querySelector('.card-footer');
+            let introFooterDelay = INTRO_TITLE_GLOW_DELAY + 600; // Default delay if CSS rule not found
+            try {
+                // Attempt to read the actual delay from CSS
+                const footerAnimDelayCSS = getComputedStyle(footerElement).animationDelay;
+                if (footerAnimDelayCSS) {
+                     introFooterDelay = parseFloat(footerAnimDelayCSS.replace('s','')) * 1000;
+                }
+            } catch(e) {
+                console.warn("Could not read animation delay for footer, using default.", e);
+            }
 
-        }, PRELOADER_EXIT_DURATION); // Wait for preloader to fade out
+            const introAnimationEndTime = introFooterDelay + INTRO_FADEIN_DURATION; // Delay + Duration
+
+            // 使用 requestAnimationFrame 確保 Intro 激活的樣式先生效
+            requestAnimationFrame(() => {
+                 setTimeout(() => {
+                     state.isAnimating = false; // 解鎖狀態
+                     console.log("Intro 轉場及內容動畫完成，解除鎖定。");
+                     // 可以選擇在這裡移除標題光暈，如果希望它只閃一下
+                     // if (titlePlaceholder) titlePlaceholder.classList.remove('intro-title-glow');
+                 }, introAnimationEndTime + 100); // 在估算的結束時間後稍作等待再解鎖
+            });
+
+
+        }, PRELOADER_EXIT_DURATION); // 等待 Preloader SVG 動畫結束
     }
 
+    // --- preloadImages 函數 ---
     function preloadImages() {
-        // Keep preloader entrance logic (showing preloader, adding glow)
         if (!DOM.containers?.preloader || !DOM.elements.preloaderSvg) {
             console.warn("找不到 preloader 或 preloader SVG...");
             state.preloadComplete = true; bindStartButton(); return;
@@ -161,9 +228,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         console.log("顯示 Preloader...");
-        DOM.containers.preloader.classList.remove('transitioning-out'); // Ensure exit class is removed
-        DOM.elements.preloaderSvg.classList.remove('glow-active'); // Reset glow state
-        DOM.containers.preloader.classList.add('active'); // Show preloader
+        DOM.containers.preloader.classList.remove('transitioning-out');
+        if (DOM.elements.preloaderSvg) { // Check if SVG exists
+             DOM.elements.preloaderSvg.classList.remove('glow-active', 'svg-exiting'); // 重置狀態
+        }
+        DOM.containers.preloader.classList.add('active');
 
         if (DOM.containers.intro) DOM.containers.intro.classList.remove('active');
         if (DOM.containers.test) DOM.containers.test.classList.remove('active');
@@ -177,7 +246,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, SVG_GLOW_DELAY);
 
-        // Image loading logic remains the same
+        // Image loading logic
         const imageUrls = ['./images/Intro.webp'];
         questions.forEach((_, index) => imageUrls.push(`./images/Q${index + 1}.webp`));
         let loadedCount = 0;
@@ -191,13 +260,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (loadedCount >= totalImages) {
                 state.preloadComplete = true;
                 console.log(`圖片預載入處理完成 ${errorOccurred ? '（有錯誤）' : ''}`);
-
                 const totalDelay = errorOccurred ? 500 : PRELOADER_EXTRA_DELAY;
                 console.log(`等待額外延遲 ${totalDelay}ms...`);
-
                 setTimeout(() => {
                     if (DOM.containers.preloader && DOM.containers.preloader.classList.contains('active')) {
-                        triggerIntroTransition(); // Start the fade-out transition
+                        triggerIntroTransition(); // Start the exit animation
                         bindStartButton();
                     } else {
                         console.log("Preloader no longer active, skipping transition.");
@@ -213,459 +280,180 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- triggerExplosion 函數 ---
     function triggerExplosion(targetElement, textToExplode, explosionContainer) {
-        // Explosion logic remains the same
-        if (!explosionContainer || !targetElement) {
-            console.error("Explosion failed: Missing container or target element.");
-            return;
-        }
-
-        explosionContainer.innerHTML = ''; // Clear previous
-        let startX, startY;
-
-        startX = targetElement.offsetWidth / 2;
-        startY = targetElement.offsetHeight / 2;
-
-
+        if (!explosionContainer || !targetElement) { console.error("Explosion failed: Missing container or target element."); return; }
+        explosionContainer.innerHTML = '';
+        let startX = targetElement.offsetWidth / 2; let startY = targetElement.offsetHeight / 2;
         textToExplode.split('').forEach((char) => {
             if (char.trim() === '') return;
-
-            const span = document.createElement('span');
-            span.textContent = char;
-            span.className = `char-explode`;
-
-            const angle = Math.random() * Math.PI * 2;
-            const radius = Math.random() * (Math.min(window.innerWidth, window.innerHeight) * 0.5);
-            const translateX = Math.cos(angle) * radius;
-            const translateY = Math.sin(angle) * radius;
-            const translateZ = Math.random() * 350 + 250;
-            const rotateZ = (Math.random() - 0.5) * 480;
-            const scale = Math.random() * 3.5 + 2.5;
-            const delay = Math.random() * 0.15;
-
-            span.style.left = `${startX}px`;
-            span.style.top = `${startY}px`;
-            span.style.setProperty('--tx', `${translateX}px`);
-            span.style.setProperty('--ty', `${translateY}px`);
-            span.style.setProperty('--tz', `${translateZ}px`);
-            span.style.setProperty('--rz', `${rotateZ}deg`);
-            span.style.setProperty('--sc', `${scale}`);
-            span.style.animationDelay = `${delay}s`;
-
+            const span = document.createElement('span'); span.textContent = char; span.className = `char-explode`;
+            const angle = Math.random() * Math.PI * 2; const radius = Math.random() * (Math.min(window.innerWidth, window.innerHeight) * 0.5);
+            const translateX = Math.cos(angle) * radius; const translateY = Math.sin(angle) * radius;
+            const translateZ = Math.random() * 350 + 250; const rotateZ = (Math.random() - 0.5) * 480;
+            const scale = Math.random() * 3.5 + 2.5; const delay = Math.random() * 0.15;
+            span.style.left = `${startX}px`; span.style.top = `${startY}px`;
+            span.style.setProperty('--tx', `${translateX}px`); span.style.setProperty('--ty', `${translateY}px`);
+            span.style.setProperty('--tz', `${translateZ}px`); span.style.setProperty('--rz', `${rotateZ}deg`);
+            span.style.setProperty('--sc', `${scale}`); span.style.animationDelay = `${delay}s`;
             explosionContainer.appendChild(span);
-
-            setTimeout(() => {
-                if (span.parentNode === explosionContainer) {
-                     explosionContainer.removeChild(span);
-                }
-            }, EXPLOSION_DURATION + delay * 1000 + 300);
+            setTimeout(() => { if (span.parentNode === explosionContainer) { explosionContainer.removeChild(span); } }, EXPLOSION_DURATION + delay * 1000 + 300);
         });
         console.log(`文字爆裂已觸發 for: ${textToExplode}`);
     }
 
-    // --- handleStartTestClick remains largely the same ---
+    // --- handleStartTestClick 函數 ---
      function handleStartTestClick() {
         console.log("handleStartTestClick triggered.");
         console.log("State check: preloadComplete =", state.preloadComplete, ", introVisible =", state.introVisible, ", isAnimating =", state.isAnimating);
-
-        if (!state.preloadComplete || !state.introVisible) {
-             console.warn("內容尚未準備好或 Intro 未顯示。");
-             return;
-        }
-        if (state.isAnimating || state.isTransitioning) {
-            console.log("動畫或轉換進行中...");
-            return;
-        }
-
+        if (!state.preloadComplete || !state.introVisible) { console.warn("內容尚未準備好或 Intro 未顯示。"); return; }
+        if (state.isAnimating || state.isTransitioning) { console.log("動畫或轉換進行中..."); return; }
         console.log("Start button clicked, processing effect...");
-        state.isAnimating = true;
-        state.isTransitioning = true;
-
-        const buttonElement = DOM.buttons.start;
-        const textElement = DOM.elements.startBtnText;
-        const explosionContainer = DOM.containers.startBtnExplosion;
-        const buttonText = textElement ? textElement.textContent : '開始測驗';
-
-        if (!buttonElement || !explosionContainer) {
-            console.error("Start button or explosion container missing!");
-            state.isAnimating = false;
-            state.isTransitioning = false;
-            return;
-        }
-
-        buttonElement.classList.add('exploded');
-        buttonElement.style.pointerEvents = 'none';
-
-        const buttonRect = buttonElement.getBoundingClientRect();
-        const parentRect = explosionContainer.offsetParent ? explosionContainer.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
-        explosionContainer.style.position = 'absolute';
-        explosionContainer.style.top = `${buttonRect.top - parentRect.top}px`;
-        explosionContainer.style.left = `${buttonRect.left - parentRect.left}px`;
-        explosionContainer.style.width = `${buttonRect.width}px`;
-        explosionContainer.style.height = `${buttonRect.height}px`;
-
+        state.isAnimating = true; state.isTransitioning = true;
+        const buttonElement = DOM.buttons.start; const textElement = DOM.elements.startBtnText;
+        const explosionContainer = DOM.containers.startBtnExplosion; const buttonText = textElement ? textElement.textContent : '開始測驗';
+        if (!buttonElement || !explosionContainer) { console.error("Start button or explosion container missing!"); state.isAnimating = false; state.isTransitioning = false; return; }
+        buttonElement.classList.add('exploded'); buttonElement.style.pointerEvents = 'none';
+        const buttonRect = buttonElement.getBoundingClientRect(); const parentRect = explosionContainer.offsetParent ? explosionContainer.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
+        explosionContainer.style.position = 'absolute'; explosionContainer.style.top = `${buttonRect.top - parentRect.top}px`; explosionContainer.style.left = `${buttonRect.left - parentRect.left}px`;
+        explosionContainer.style.width = `${buttonRect.width}px`; explosionContainer.style.height = `${buttonRect.height}px`;
         requestAnimationFrame(() => {
             console.log("Triggering start button explosion (option style)");
             triggerExplosion(buttonElement, buttonText, explosionContainer);
-
-             const switchDelay = EXPLOSION_DURATION * 0.8;
-             console.log(`Waiting ${switchDelay}ms for explosion before screen switch.`);
-
+             const switchDelay = EXPLOSION_DURATION * 0.8; console.log(`Waiting ${switchDelay}ms for explosion before screen switch.`);
              setTimeout(() => {
-                 console.log("Switching from intro to test after explosion delay");
-                 switchScreen('intro', 'test'); // switchScreen will unlock states
-
+                 console.log("Switching from intro to test after explosion delay"); switchScreen('intro', 'test');
+                 // Reset button appearance after screen transition animation
                  setTimeout(() => {
-                     buttonElement.classList.remove('exploded');
-                     buttonElement.style.pointerEvents = '';
-                     explosionContainer.style.top = '0';
-                     explosionContainer.style.left = '0';
-                     explosionContainer.style.width = '100%';
-                     explosionContainer.style.height = '100%';
+                     buttonElement.classList.remove('exploded'); buttonElement.style.pointerEvents = '';
+                     // Reset explosion container style/position
+                     explosionContainer.style.position = ''; // Remove absolute if not needed globally
+                     explosionContainer.style.top = '0'; explosionContainer.style.left = '0';
+                     explosionContainer.style.width = '100%'; explosionContainer.style.height = '100%';
                  }, SCREEN_TRANSITION_DURATION + 100);
-
              }, switchDelay);
         });
     }
 
-
+    // --- switchScreen 函數 ---
     function switchScreen(fromScreenId, toScreenId) {
-        const fromScreen = DOM.containers[fromScreenId];
-        const toScreen = DOM.containers[toScreenId];
-        if (!fromScreen || !toScreen) {
-            console.error(`切換屏幕失敗: ID ${fromScreenId} 或 ${toScreenId} 無效`);
-            state.isAnimating = false; state.isTransitioning = false; return;
-        }
-        // Allow switching only if not animating/transitioning (preloader transition is handled differently)
-        if ((state.isAnimating || state.isTransitioning)) {
+        const fromScreen = DOM.containers[fromScreenId]; const toScreen = DOM.containers[toScreenId];
+        if (!fromScreen || !toScreen) { console.error(`切換屏幕失敗: ID ${fromScreenId} 或 ${toScreenId} 無效`); state.isAnimating = false; state.isTransitioning = false; return; }
+        // Prevent switching if already animating/transitioning, except when coming from preloader
+        if ((state.isAnimating || state.isTransitioning) && fromScreenId !== 'preloader') { // Allow if coming from preloader
             console.log("屏幕切換或問題轉換已在進行中... 忽略重複請求");
             return;
         }
-
-        console.log(`切換屏幕從 ${fromScreenId} 到 ${toScreenId}...`);
-        state.isAnimating = true; state.isTransitioning = true;
-
+        console.log(`切換屏幕從 ${fromScreenId} 到 ${toScreenId}...`); state.isAnimating = true; state.isTransitioning = true;
         fromScreen.classList.remove('active');
-
+        // Wait for the 'from' screen to fade out
         setTimeout(() => {
-            toScreen.classList.add('active');
-            document.body.style.overflow = (toScreenId === 'result') ? 'auto' : 'hidden';
-            state.resultShowing = (toScreenId === 'result');
-            state.introVisible = (toScreenId === 'intro');
-
+            toScreen.classList.add('active'); document.body.style.overflow = (toScreenId === 'result') ? 'auto' : 'hidden';
+            state.resultShowing = (toScreenId === 'result'); state.introVisible = (toScreenId === 'intro');
+            // Initialize or reset based on the target screen
             if (toScreenId === 'test') {
-                 initializeTestScreen(); // Resets its own transition lock
+                 initializeTestScreen(); // Will reset its own transition lock
                  state.contentRendered = true;
             } else if (toScreenId === 'intro') {
-                // Reset states for intro screen
+                // Reset test/result states when going back to intro
                 state.currentQuestionIndex = 0; state.userAnswers = []; state.finalScores = {};
                 state.contentRendered = false;
                 if(DOM.elements.traitsContainer) DOM.elements.traitsContainer.innerHTML = '';
                 if(DOM.elements.progressFill) DOM.elements.progressFill.style.width = '0%';
+                 // Reset start button explosion container style
                  if(DOM.containers.startBtnExplosion) {
-                    DOM.containers.startBtnExplosion.style.position = ''; // Reset positioning
-                    DOM.containers.startBtnExplosion.style.top = ''; DOM.containers.startBtnExplosion.style.left = '';
-                    DOM.containers.startBtnExplosion.style.width = ''; DOM.containers.startBtnExplosion.style.height = '';
+                    DOM.containers.startBtnExplosion.style.position = ''; DOM.containers.startBtnExplosion.style.top = '';
+                    DOM.containers.startBtnExplosion.style.left = ''; DOM.containers.startBtnExplosion.style.width = '';
+                    DOM.containers.startBtnExplosion.style.height = '';
                  }
+                 // Reset Intro title glow (if needed when restarting)
+                 if(DOM.containers.introTitlePlaceholder) DOM.containers.introTitlePlaceholder.classList.remove('intro-title-glow');
             }
-
-            // Unlock states after the new screen's fade-in is complete
+            // Unlock states after the 'to' screen fade-in animation is complete
             setTimeout(() => {
                  state.isAnimating = false;
-                 // Test screen manages its own transition lock, so only unlock here if not going to test
+                 // Test screen manages its own transition lock, unlock otherwise
                  if (toScreenId !== 'test') {
                      state.isTransitioning = false;
                  }
                  console.log(`屏幕切換完成，當前屏幕: ${toScreenId}`);
             }, SCREEN_TRANSITION_DURATION);
-
-        }, SCREEN_TRANSITION_DURATION); // Wait for the fromScreen fade-out
+        }, SCREEN_TRANSITION_DURATION);
     }
 
-    // --- Test Logic (mostly unchanged) ---
-    function initializeTestScreen() {
-        if (!DOM.elements.questionTitle || !DOM.containers.options || !DOM.elements.testBackground) {
-            console.error("初始化測驗屏幕失敗：缺少必要元素。"); return;
-        }
-        console.log("初始化測驗屏幕...");
-        state.currentQuestionIndex = 0; state.userAnswers = [];
-        state.isTransitioning = false; // Reset question transition lock
-        updateProgressBar(0);
-        displayQuestion(state.currentQuestionIndex, true);
-        updateProgressBar(1);
+    // --- Test Logic ---
+     function initializeTestScreen() {
+        if (!DOM.elements.questionTitle || !DOM.containers.options || !DOM.elements.testBackground) { console.error("初始化測驗屏幕失敗：缺少必要元素。"); return; }
+        console.log("初始化測驗屏幕..."); state.currentQuestionIndex = 0; state.userAnswers = []; state.isTransitioning = false; updateProgressBar(0); displayQuestion(state.currentQuestionIndex, true); updateProgressBar(1);
      }
-
-    function displayQuestion(index, isInitialDisplay = false) {
+     function displayQuestion(index, isInitialDisplay = false) {
         if (index < 0 || index >= questions.length) { console.error(`無效的問題索引: ${index}`); return; }
-        const questionData = questions[index]; const questionNumber = index + 1;
-        state.isTransitioning = true; // Lock
-
+        const questionData = questions[index]; const questionNumber = index + 1; state.isTransitioning = true;
         if (DOM.elements.testBackground) {
             const imageUrl = `./images/Q${questionNumber}.webp`;
             if (!isInitialDisplay) {
                 DOM.elements.testBackground.classList.add('is-hidden');
-                setTimeout(() => {
-                    DOM.elements.testBackground.style.backgroundImage = `url('${imageUrl}')`;
-                    requestAnimationFrame(() => { DOM.elements.testBackground.classList.remove('is-hidden'); });
-                    console.log(`背景設置為: ${imageUrl}`);
-                }, 500);
-            } else {
-                DOM.elements.testBackground.style.backgroundImage = `url('${imageUrl}')`;
-                DOM.elements.testBackground.classList.remove('is-hidden');
-                console.log(`初始背景設置為: ${imageUrl}`);
-            }
+                setTimeout(() => { DOM.elements.testBackground.style.backgroundImage = `url('${imageUrl}')`; requestAnimationFrame(() => { DOM.elements.testBackground.classList.remove('is-hidden'); }); console.log(`背景設置為: ${imageUrl}`); }, 500);
+            } else { DOM.elements.testBackground.style.backgroundImage = `url('${imageUrl}')`; DOM.elements.testBackground.classList.remove('is-hidden'); console.log(`初始背景設置為: ${imageUrl}`); }
         }
-
         if (DOM.elements.questionTitle) {
              DOM.elements.questionTitle.classList.add('is-hidden');
-             setTimeout(() => {
-                 DOM.elements.questionTitle.innerText = questionData.question.replace(/^\d+\.\s*/, '');
-                 requestAnimationFrame(() => {
-                     DOM.elements.questionTitle.style.transition = '';
-                     DOM.elements.questionTitle.classList.remove('is-hidden');
-                 });
-             }, isInitialDisplay ? 100 : 500);
+             setTimeout(() => { DOM.elements.questionTitle.innerText = questionData.question.replace(/^\d+\.\s*/, ''); requestAnimationFrame(() => { DOM.elements.questionTitle.style.transition = ''; DOM.elements.questionTitle.classList.remove('is-hidden'); }); }, isInitialDisplay ? 100 : 500);
         }
-
         if (DOM.containers.options) {
             DOM.containers.options.innerHTML = '';
             questionData.options.forEach((optionData, optIndex) => {
-                const optionElement = document.createElement('div');
-                optionElement.className = 'option is-hidden'; optionElement.style.transition = 'none';
-                optionElement.dataset.text = optionData.text; optionElement.dataset.index = optIndex;
-                optionElement.innerText = optionData.text; optionElement.setAttribute('role', 'button');
-                optionElement.tabIndex = 0; optionElement.addEventListener('click', handleOptionClick);
-                optionElement.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOptionClick(e); } });
+                const optionElement = document.createElement('div'); optionElement.className = 'option is-hidden'; optionElement.style.transition = 'none';
+                optionElement.dataset.text = optionData.text; optionElement.dataset.index = optIndex; optionElement.innerText = optionData.text; optionElement.setAttribute('role', 'button');
+                optionElement.tabIndex = 0; optionElement.addEventListener('click', handleOptionClick); optionElement.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOptionClick(e); } });
                 DOM.containers.options.appendChild(optionElement);
             });
-            allOptions = Array.from(DOM.containers.options.querySelectorAll('.option'));
-             setTimeout(() => triggerQuestionEnterAnimation(), isInitialDisplay ? 150 : 0);
-        } else {
-             console.error("找不到 options-container"); state.isTransitioning = false;
-        }
+            allOptions = Array.from(DOM.containers.options.querySelectorAll('.option')); setTimeout(() => triggerQuestionEnterAnimation(), isInitialDisplay ? 150 : 0);
+        } else { console.error("找不到 options-container"); state.isTransitioning = false; }
     }
-
      function handleOptionClick(event) {
-         const clickedOption = event.currentTarget; const optionIndex = parseInt(clickedOption.dataset.index);
-         const questionIndex = state.currentQuestionIndex;
-
-         if (isNaN(optionIndex) || isNaN(questionIndex)) return;
-         if (state.isTransitioning || clickedOption.classList.contains('exploded') || clickedOption.classList.contains('fade-out')) {
-             console.log("正在轉換問題或選項已點擊..."); return;
-         }
-
-         state.isTransitioning = true; // Lock
-         console.log(`問題 ${questionIndex + 1} 選擇了選項 ${optionIndex + 1}`);
-         state.userAnswers[questionIndex] = optionIndex;
-
-         const optionRect = clickedOption.getBoundingClientRect();
-         const parentRect = DOM.containers.explosion.offsetParent ? DOM.containers.explosion.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
-         DOM.containers.explosion.style.position = 'absolute';
-         DOM.containers.explosion.style.top = `${optionRect.top - parentRect.top}px`;
-         DOM.containers.explosion.style.left = `${optionRect.left - parentRect.left}px`;
-         DOM.containers.explosion.style.width = `${optionRect.width}px`;
-         DOM.containers.explosion.style.height = `${optionRect.height}px`;
-
-         triggerQuestionFadeOut(clickedOption);
-         triggerExplosion(clickedOption, clickedOption.dataset.text || clickedOption.innerText, DOM.containers.explosion);
-
+         const clickedOption = event.currentTarget; const optionIndex = parseInt(clickedOption.dataset.index); const questionIndex = state.currentQuestionIndex;
+         if (isNaN(optionIndex) || isNaN(questionIndex)) return; if (state.isTransitioning || clickedOption.classList.contains('exploded') || clickedOption.classList.contains('fade-out')) { console.log("正在轉換問題或選項已點擊..."); return; }
+         state.isTransitioning = true; console.log(`問題 ${questionIndex + 1} 選擇了選項 ${optionIndex + 1}`); state.userAnswers[questionIndex] = optionIndex;
+         const optionRect = clickedOption.getBoundingClientRect(); const parentRect = DOM.containers.explosion.offsetParent ? DOM.containers.explosion.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
+         DOM.containers.explosion.style.position = 'absolute'; DOM.containers.explosion.style.top = `${optionRect.top - parentRect.top}px`; DOM.containers.explosion.style.left = `${optionRect.left - parentRect.left}px`; DOM.containers.explosion.style.width = `${optionRect.width}px`; DOM.containers.explosion.style.height = `${optionRect.height}px`;
+         triggerQuestionFadeOut(clickedOption); triggerExplosion(clickedOption, clickedOption.dataset.text || clickedOption.innerText, DOM.containers.explosion);
          const transitionDelay = EXPLOSION_DURATION + 100;
-
-         setTimeout(() => {
-             if (state.currentQuestionIndex < questions.length - 1) { prepareNextQuestion(); }
-             else { console.log("最後一題完成，顯示結果"); showResults(); }
-             // state.isTransitioning is reset by displayQuestion or showResults
-         }, transitionDelay);
+         setTimeout(() => { if (state.currentQuestionIndex < questions.length - 1) { prepareNextQuestion(); } else { console.log("最後一題完成，顯示結果"); showResults(); } }, transitionDelay);
      }
-
      function triggerQuestionFadeOut(clickedOptionElement) {
-        if (DOM.elements.testBackground) { DOM.elements.testBackground.classList.add('is-hidden'); }
-        if (DOM.elements.questionTitle) { DOM.elements.questionTitle.classList.add('is-hidden'); }
-        allOptions.forEach(option => {
-            option.style.transitionDelay = '';
-            if (option === clickedOptionElement) { option.classList.add('exploded'); }
-            else { option.classList.add('fade-out'); }
-            option.style.pointerEvents = 'none';
-        });
-        console.log("舊內容淡出已觸發");
+        if (DOM.elements.testBackground) { DOM.elements.testBackground.classList.add('is-hidden'); } if (DOM.elements.questionTitle) { DOM.elements.questionTitle.classList.add('is-hidden'); }
+        allOptions.forEach(option => { option.style.transitionDelay = ''; if (option === clickedOptionElement) { option.classList.add('exploded'); } else { option.classList.add('fade-out'); } option.style.pointerEvents = 'none'; }); console.log("舊內容淡出已觸發");
      }
-
-     function prepareNextQuestion() {
-        state.currentQuestionIndex++;
-        console.log(`準備顯示問題 ${state.currentQuestionIndex + 1}`);
-        updateProgressBar(state.currentQuestionIndex + 1);
-        displayQuestion(state.currentQuestionIndex, false);
-     }
-
+     function prepareNextQuestion() { state.currentQuestionIndex++; console.log(`準備顯示問題 ${state.currentQuestionIndex + 1}`); updateProgressBar(state.currentQuestionIndex + 1); displayQuestion(state.currentQuestionIndex, false); }
      function triggerQuestionEnterAnimation() {
-         console.log("觸發新內容進場動畫");
-         if (DOM.elements.questionTitle) { DOM.elements.questionTitle.classList.remove('is-hidden'); }
-
-         const optionsEnterStartDelay = 200; const optionStaggerDelay = 80;
-         const optionEnterDuration = 500;
-
-         allOptions.forEach((option, index) => {
-             option.style.transition = ''; option.style.transitionDelay = `${optionsEnterStartDelay + index * optionStaggerDelay}ms`;
-             option.classList.remove('is-hidden', 'fade-out', 'exploded');
-             requestAnimationFrame(() => { option.style.pointerEvents = ''; });
-         });
-
-         const totalOptionsDelay = (allOptions.length - 1) * optionStaggerDelay;
-         const finalResetDelay = optionsEnterStartDelay + totalOptionsDelay + optionEnterDuration + 100;
-
-         setTimeout(() => {
-             console.log("所有進場動畫完成");
-             allOptions.forEach(option => { option.style.transitionDelay = ''; });
-             state.isTransitioning = false; // Unlock question transition
-             console.log("問題轉換完成，解除鎖定。");
-         }, finalResetDelay);
+         console.log("觸發新內容進場動畫"); if (DOM.elements.questionTitle) { DOM.elements.questionTitle.classList.remove('is-hidden'); }
+         const optionsEnterStartDelay = 200; const optionStaggerDelay = 80; const optionEnterDuration = 500;
+         allOptions.forEach((option, index) => { option.style.transition = ''; option.style.transitionDelay = `${optionsEnterStartDelay + index * optionStaggerDelay}ms`; option.classList.remove('is-hidden', 'fade-out', 'exploded'); requestAnimationFrame(() => { option.style.pointerEvents = ''; }); });
+         const totalOptionsDelay = (allOptions.length - 1) * optionStaggerDelay; const finalResetDelay = optionsEnterStartDelay + totalOptionsDelay + optionEnterDuration + 100;
+         setTimeout(() => { console.log("所有進場動畫完成"); allOptions.forEach(option => { option.style.transitionDelay = ''; }); state.isTransitioning = false; console.log("問題轉換完成，解除鎖定。"); }, finalResetDelay);
     }
+     function updateProgressBar(questionNumber) { if (DOM.elements.progressFill) { const progress = (questionNumber / questions.length) * 100; DOM.elements.progressFill.style.width = `${Math.max(0, Math.min(progress, 100))}%`; } }
 
-     function updateProgressBar(questionNumber) {
-         if (DOM.elements.progressFill) {
-             const progress = (questionNumber / questions.length) * 100;
-             DOM.elements.progressFill.style.width = `${Math.max(0, Math.min(progress, 100))}%`;
-         }
-    }
-
-    // --- Result Logic (Unchanged) ---
-    function calculateResult() {
-        try {
-            const scores = { 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0 };
-            if (state.userAnswers.length !== questions.length) {
-                 console.warn(`Answers (${state.userAnswers.length}) mismatch questions (${questions.length})! Padding...`);
-                 for (let i = 0; i < questions.length; i++) { if (state.userAnswers[i] === undefined) state.userAnswers[i] = 0; }
-            }
-            state.userAnswers.forEach((answerIndex, questionIndex) => {
-                const question = questions[questionIndex];
-                if (question?.options?.[answerIndex]?.scores) {
-                    const optionScores = question.options[answerIndex].scores;
-                    for (const type in optionScores) { if (scores.hasOwnProperty(type)) { scores[type] += optionScores[type]; } }
-                } else { console.warn(`Invalid data for Q${questionIndex + 1}, Option ${answerIndex}, skipping score.`); }
-            });
-            state.finalScores = scores; console.log("Final Scores:", state.finalScores);
-            const scoreValues = Object.values(scores); const scoreFrequency = {};
-            scoreValues.forEach(score => { const roundedScore = Math.round(score * 10) / 10; scoreFrequency[roundedScore] = (scoreFrequency[roundedScore] || 0) + 1; });
-            for (const score in scoreFrequency) { if (scoreFrequency[score] >= 4) { console.log("SPECIAL result condition (4+ same scores)"); return results["SPECIAL"]; } }
-            let maxScore = -Infinity; let highestTypes = [];
-            for (const type in scores) { if (Math.abs(scores[type] - maxScore) < 0.01) { highestTypes.push(type); } else if (scores[type] > maxScore) { maxScore = scores[type]; highestTypes = [type]; } }
-             console.log("Highest type(s):", highestTypes, "Score:", maxScore);
-            if (highestTypes.length === 1) { return results[highestTypes[0]]; }
-            if (highestTypes.length >= 3) { console.log("SPECIAL result condition (3+ tied max scores)"); return results["SPECIAL"]; }
-            if (highestTypes.length === 2) {
-                 console.log("Tiebreaker needed (2 types tied)");
-                const tiebreakQuestionIndex = 8;
-                if (state.userAnswers[tiebreakQuestionIndex] === undefined) { console.warn("Tiebreaker question unanswered, selecting first tied type."); return results[highestTypes[0]]; }
-                const tiebreakAnswerIndex = state.userAnswers[tiebreakQuestionIndex];
-                const tiebreakPrimaryType = questions[tiebreakQuestionIndex]?.options?.[tiebreakAnswerIndex]?.primary;
-                 console.log(`Tiebreaker Q9 primary type: ${tiebreakPrimaryType}`);
-                if (tiebreakPrimaryType && highestTypes.includes(tiebreakPrimaryType)) { console.log(`Tiebreaker success: ${tiebreakPrimaryType}`); return results[tiebreakPrimaryType]; }
-                else { console.log("Tiebreaker failed or type not in tie, selecting first tied type."); return results[highestTypes[0]]; }
-            }
-            console.warn("Scoring logic fallback, returning default A"); return results['A'];
-        } catch (error) { console.error("Error calculating result:", error); return results['A']; }
-     }
-    function prepareResultData(resultData) {
-        if (!resultData || !DOM.elements.resultTitle || !DOM.elements.resultSubtitle || !DOM.elements.resultDescription || !DOM.elements.traitsContainer || !DOM.elements.similarBooks || !DOM.elements.complementaryBooks || !DOM.elements.shareText) { console.error("Failed to prepare result data: Missing DOM elements."); return false; }
-        try {
-            DOM.elements.resultTitle.textContent = resultData.title ? (resultData.title.includes('管理員') ? `你是：${resultData.title}` : `你的靈魂之書是：${resultData.title}`) : '結果未知';
-            DOM.elements.resultSubtitle.textContent = resultData.subtitle || '';
-            DOM.elements.resultDescription.textContent = resultData.description || '無法載入描述。';
-            DOM.elements.traitsContainer.innerHTML = '';
-            const typeScores = state.finalScores;
-            if (!typeScores || Object.keys(typeScores).length === 0) { console.warn("Cannot get final scores for traits."); }
-            else if (resultData.title && resultData.title.includes('管理員')) { Object.keys(traitNames).forEach(type => addTraitElement(type, 3)); }
-            else { Object.keys(traitNames).forEach(type => { const score = typeScores[type] || 0; let stars = 1; if (score >= 7) stars = 5; else if (score >= 5) stars = 4; else if (score >= 3) stars = 3; else if (score >= 1) stars = 2; addTraitElement(type, stars); }); }
-            DOM.elements.similarBooks.innerHTML = (resultData.similar?.length) ? resultData.similar.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>';
-            DOM.elements.complementaryBooks.innerHTML = (resultData.complementary?.length) ? resultData.complementary.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>';
-            DOM.elements.shareText.textContent = resultData.shareText || '快來測測你的靈魂之書吧！#靈魂藏書閣 #AmourOracle';
-            console.log("Result data prepared."); return true;
-        } catch (error) { console.error("Error preparing result data:", error); DOM.elements.resultTitle.textContent = "顯示結果時發生錯誤"; return false; }
-     }
-    function showResults() {
-        console.log("顯示結果頁面...");
-        if (state.isAnimating || state.isTransitioning) {
-             console.log("Cannot show results while animating or transitioning."); return;
-        }
-        state.isTransitioning = true;
-        try {
-            const resultData = calculateResult(); if (!resultData) throw new Error("Result calculation failed");
-            if (prepareResultData(resultData)) {
-                switchScreen('test', 'result'); // Handles unlocking states
-            } else { throw new Error("Result data preparation failed"); }
-        } catch (error) {
-            console.error("Error showing results:", error); alert(`抱歉，顯示結果時發生錯誤: ${error.message} 請重試。`);
-            state.isTransitioning = false; state.isAnimating = false; // Unlock on error
-            switchScreen('test', 'intro');
-        }
-     }
-    function addTraitElement(type, starCount) {
-        if (!DOM.elements.traitsContainer) return;
-        try {
-            const traitElement = document.createElement('div'); traitElement.className = 'trait-item';
-            const traitName = document.createElement('span'); traitName.className = 'trait-name'; traitName.textContent = traitNames[type] || type;
-            const traitStars = document.createElement('span'); traitStars.className = 'trait-stars';
-            const validStars = Math.max(0, Math.min(5, Math.round(starCount)));
-            traitStars.textContent = '★'.repeat(validStars) + '☆'.repeat(5 - validStars);
-            traitElement.appendChild(traitName); traitElement.appendChild(traitStars);
-            DOM.elements.traitsContainer.appendChild(traitElement);
-        } catch (error) { console.error(`Error adding trait ${type}:`, error); }
-     }
-    function copyShareText() {
-        if (!DOM.elements.shareText || !DOM.buttons.copy) return;
-         try {
-            const textToCopy = DOM.elements.shareText.textContent;
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(textToCopy).then(() => { DOM.buttons.copy.textContent = '已複製!'; setTimeout(() => { DOM.buttons.copy.textContent = '複製'; }, 2000); }).catch(err => { console.warn('Clipboard API copy failed:', err); fallbackCopyText(textToCopy); });
-            } else { fallbackCopyText(textToCopy); }
-         } catch (error) { console.error("Copy operation error:", error); alert('複製失敗，請手動複製。'); DOM.buttons.copy.textContent = '複製'; }
-     }
-    function fallbackCopyText(text) {
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.style.position = 'fixed'; textArea.style.left = '-9999px'; textArea.style.opacity = '0'; textArea.setAttribute('readonly', '');
-        document.body.appendChild(textArea);
-        textArea.select(); textArea.setSelectionRange(0, 99999);
-        let success = false;
-        try {
-            success = document.execCommand('copy');
-            if (success) { DOM.buttons.copy.textContent = '已複製!'; setTimeout(() => { DOM.buttons.copy.textContent = '複製'; }, 2000); }
-            else { console.error('Fallback copy (execCommand) failed'); alert('複製失敗，瀏覽器不支援此操作。'); }
-        } catch (err) { console.error('Fallback copy error:', err); alert('複製失敗，請手動複製。'); }
-        document.body.removeChild(textArea);
-     }
+    // --- Result Logic ---
+    function calculateResult() { try { const scores = { 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0 }; if (state.userAnswers.length !== questions.length) { console.warn(`Answers (${state.userAnswers.length}) mismatch questions (${questions.length})! Padding...`); for (let i = 0; i < questions.length; i++) { if (state.userAnswers[i] === undefined) state.userAnswers[i] = 0; } } state.userAnswers.forEach((answerIndex, questionIndex) => { const question = questions[questionIndex]; if (question?.options?.[answerIndex]?.scores) { const optionScores = question.options[answerIndex].scores; for (const type in optionScores) { if (scores.hasOwnProperty(type)) { scores[type] += optionScores[type]; } } } else { console.warn(`Invalid data for Q${questionIndex + 1}, Option ${answerIndex}, skipping score.`); } }); state.finalScores = scores; console.log("Final Scores:", state.finalScores); const scoreValues = Object.values(scores); const scoreFrequency = {}; scoreValues.forEach(score => { const roundedScore = Math.round(score * 10) / 10; scoreFrequency[roundedScore] = (scoreFrequency[roundedScore] || 0) + 1; }); for (const score in scoreFrequency) { if (scoreFrequency[score] >= 4) { console.log("SPECIAL result condition (4+ same scores)"); return results["SPECIAL"]; } } let maxScore = -Infinity; let highestTypes = []; for (const type in scores) { if (Math.abs(scores[type] - maxScore) < 0.01) { highestTypes.push(type); } else if (scores[type] > maxScore) { maxScore = scores[type]; highestTypes = [type]; } } console.log("Highest type(s):", highestTypes, "Score:", maxScore); if (highestTypes.length === 1) { return results[highestTypes[0]]; } if (highestTypes.length >= 3) { console.log("SPECIAL result condition (3+ tied max scores)"); return results["SPECIAL"]; } if (highestTypes.length === 2) { console.log("Tiebreaker needed (2 types tied)"); const tiebreakQuestionIndex = 8; if (state.userAnswers[tiebreakQuestionIndex] === undefined) { console.warn("Tiebreaker question unanswered, selecting first tied type."); return results[highestTypes[0]]; } const tiebreakAnswerIndex = state.userAnswers[tiebreakQuestionIndex]; const tiebreakPrimaryType = questions[tiebreakQuestionIndex]?.options?.[tiebreakAnswerIndex]?.primary; console.log(`Tiebreaker Q9 primary type: ${tiebreakPrimaryType}`); if (tiebreakPrimaryType && highestTypes.includes(tiebreakPrimaryType)) { console.log(`Tiebreaker success: ${tiebreakPrimaryType}`); return results[tiebreakPrimaryType]; } else { console.log("Tiebreaker failed or type not in tie, selecting first tied type."); return results[highestTypes[0]]; } } console.warn("Scoring logic fallback, returning default A"); return results['A']; } catch (error) { console.error("Error calculating result:", error); return results['A']; } }
+    function prepareResultData(resultData) { if (!resultData || !DOM.elements.resultTitle || !DOM.elements.resultSubtitle || !DOM.elements.resultDescription || !DOM.elements.traitsContainer || !DOM.elements.similarBooks || !DOM.elements.complementaryBooks || !DOM.elements.shareText) { console.error("Failed to prepare result data: Missing DOM elements."); return false; } try { DOM.elements.resultTitle.textContent = resultData.title ? (resultData.title.includes('管理員') ? `你是：${resultData.title}` : `你的靈魂之書是：${resultData.title}`) : '結果未知'; DOM.elements.resultSubtitle.textContent = resultData.subtitle || ''; DOM.elements.resultDescription.textContent = resultData.description || '無法載入描述。'; DOM.elements.traitsContainer.innerHTML = ''; const typeScores = state.finalScores; if (!typeScores || Object.keys(typeScores).length === 0) { console.warn("Cannot get final scores for traits."); } else if (resultData.title && resultData.title.includes('管理員')) { Object.keys(traitNames).forEach(type => addTraitElement(type, 3)); } else { Object.keys(traitNames).forEach(type => { const score = typeScores[type] || 0; let stars = 1; if (score >= 7) stars = 5; else if (score >= 5) stars = 4; else if (score >= 3) stars = 3; else if (score >= 1) stars = 2; addTraitElement(type, stars); }); } DOM.elements.similarBooks.innerHTML = (resultData.similar?.length) ? resultData.similar.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>'; DOM.elements.complementaryBooks.innerHTML = (resultData.complementary?.length) ? resultData.complementary.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>'; DOM.elements.shareText.textContent = resultData.shareText || '快來測測你的靈魂之書吧！#靈魂藏書閣 #AmourOracle'; console.log("Result data prepared."); return true; } catch (error) { console.error("Error preparing result data:", error); DOM.elements.resultTitle.textContent = "顯示結果時發生錯誤"; return false; } }
+    function showResults() { console.log("顯示結果頁面..."); if (state.isAnimating || state.isTransitioning) { console.log("Cannot show results while animating or transitioning."); return; } state.isTransitioning = true; try { const resultData = calculateResult(); if (!resultData) throw new Error("Result calculation failed"); if (prepareResultData(resultData)) { switchScreen('test', 'result'); } else { throw new Error("Result data preparation failed"); } } catch (error) { console.error("Error showing results:", error); alert(`抱歉，顯示結果時發生錯誤: ${error.message} 請重試。`); state.isTransitioning = false; state.isAnimating = false; switchScreen('test', 'intro'); } }
+    function addTraitElement(type, starCount) { if (!DOM.elements.traitsContainer) return; try { const traitElement = document.createElement('div'); traitElement.className = 'trait-item'; const traitName = document.createElement('span'); traitName.className = 'trait-name'; traitName.textContent = traitNames[type] || type; const traitStars = document.createElement('span'); traitStars.className = 'trait-stars'; const validStars = Math.max(0, Math.min(5, Math.round(starCount))); traitStars.textContent = '★'.repeat(validStars) + '☆'.repeat(5 - validStars); traitElement.appendChild(traitName); traitElement.appendChild(traitStars); DOM.elements.traitsContainer.appendChild(traitElement); } catch (error) { console.error(`Error adding trait ${type}:`, error); } }
+    function copyShareText() { if (!DOM.elements.shareText || !DOM.buttons.copy) return; try { const textToCopy = DOM.elements.shareText.textContent; if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(textToCopy).then(() => { DOM.buttons.copy.textContent = '已複製!'; setTimeout(() => { DOM.buttons.copy.textContent = '複製'; }, 2000); }).catch(err => { console.warn('Clipboard API copy failed:', err); fallbackCopyText(textToCopy); }); } else { fallbackCopyText(textToCopy); } } catch (error) { console.error("Copy operation error:", error); alert('複製失敗，請手動複製。'); DOM.buttons.copy.textContent = '複製'; } }
+    function fallbackCopyText(text) { const textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = 'fixed'; textArea.style.left = '-9999px'; textArea.style.opacity = '0'; textArea.setAttribute('readonly', ''); document.body.appendChild(textArea); textArea.select(); textArea.setSelectionRange(0, 99999); let success = false; try { success = document.execCommand('copy'); if (success) { DOM.buttons.copy.textContent = '已複製!'; setTimeout(() => { DOM.buttons.copy.textContent = '複製'; }, 2000); } else { console.error('Fallback copy (execCommand) failed'); alert('複製失敗，瀏覽器不支援此操作。'); } } catch (err) { console.error('Fallback copy error:', err); alert('複製失敗，請手動複製。'); } document.body.removeChild(textArea); }
 
     // --- Event Listeners ---
-    function bindStartButton() {
-        if (DOM.buttons.start) {
-            DOM.buttons.start.removeEventListener('click', handleStartTestClick); // Remove first to prevent duplicates
-            DOM.buttons.start.addEventListener('click', handleStartTestClick);
-            console.log("Start button event bound.");
-        } else { console.error("Failed to bind start button event."); displayInitializationError("無法啟動測驗，按鈕丟失。"); }
-    }
-    function bindOtherButtons() {
-        if (DOM.buttons.restart) { DOM.buttons.restart.removeEventListener('click', handleRestartClick); DOM.buttons.restart.addEventListener('click', handleRestartClick); console.log("Restart button event bound."); }
-        else { console.error("Cannot bind restart button."); }
-        if (DOM.buttons.copy) { DOM.buttons.copy.removeEventListener('click', copyShareText); DOM.buttons.copy.addEventListener('click', copyShareText); console.log("Copy button event bound."); }
-        else { console.error("Cannot bind copy button."); }
-     }
-     function handleRestartClick() {
-        if (state.isAnimating) {
-            console.log("Animation in progress, cannot restart yet."); return;
-        }
-        switchScreen('result', 'intro'); // switchScreen handles locks
-     }
+     function bindStartButton() { if (DOM.buttons.start) { DOM.buttons.start.removeEventListener('click', handleStartTestClick); DOM.buttons.start.addEventListener('click', handleStartTestClick); console.log("Start button event bound."); } else { console.error("Failed to bind start button event."); displayInitializationError("無法啟動測驗，按鈕丟失。"); } }
+     function bindOtherButtons() { if (DOM.buttons.restart) { DOM.buttons.restart.removeEventListener('click', handleRestartClick); DOM.buttons.restart.addEventListener('click', handleRestartClick); console.log("Restart button event bound."); } else { console.error("Cannot bind restart button."); } if (DOM.buttons.copy) { DOM.buttons.copy.removeEventListener('click', copyShareText); DOM.buttons.copy.addEventListener('click', copyShareText); console.log("Copy button event bound."); } else { console.error("Cannot bind copy button."); } }
+     function handleRestartClick() { if (state.isAnimating) { console.log("Animation in progress, cannot restart yet."); return; } switchScreen('result', 'intro'); }
 
     // --- Global Error Handler ---
-    window.addEventListener('error', function(event) {
-         console.error("Global error caught:", event.error, "at:", event.filename, ":", event.lineno);
-         state.isAnimating = false; state.isTransitioning = false; // Attempt to reset locks
-    });
+     window.addEventListener('error', function(event) { console.error("Global error caught:", event.error, "at:", event.filename, ":", event.lineno); state.isAnimating = false; state.isTransitioning = false; });
 
     // --- Initialization ---
     setViewportHeight();
     window.addEventListener('resize', setViewportHeight);
-
     if (cacheDOMElements()) {
         preloadImages(); // Starts preloading and the whole sequence
         bindOtherButtons();
@@ -673,6 +461,5 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.error("DOM element caching failed, initialization incomplete.");
     }
-
     console.log("Script initialization complete.");
 });
