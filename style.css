@@ -57,10 +57,19 @@ body {
     from { opacity: 1; }
     to { opacity: 0; }
 }
+
 /* --- Intro Content Fade In --- */
 @keyframes introElementFadeIn {
-    from { opacity: 0; transform: translateY(15px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        /* 同時包含水平置中和垂直位移 */
+        transform: translateX(-50%) translateY(15px);
+    }
+    to {
+        opacity: 1;
+        /* 動畫結束時也要保持水平置中 */
+        transform: translateX(-50%) translateY(0);
+    }
 }
 
 /* --- SVG Animation Keyframes --- */
@@ -232,24 +241,26 @@ body {
     position: absolute;
     top: 5%;
     left: 50%;
-    transform: translateX(-50%);
+    /* 基礎樣式包含水平置中和初始垂直位置 */
+    transform: translateX(-50%) translateY(0);
     width: 80%;
     max-width: 400px;
     z-index: 4;
-    /* text-align: center; */ /* 不再需要 text-align */
-    display: flex;            /* 將容器設為 Flexbox */
-    flex-direction: column;   /* 子元素垂直排列 (h1 在 p 上方) */
-    align-items: center;      /* 沿交叉軸 (此處為水平方向) 居中子元素 */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
-/* .intro-main-title 和 .intro-subtitle 的樣式保持不變 */
+/* Style for the new H1 main title */
 .intro-main-title {
     font-size: 2.8rem;
     font-weight: 700;
     color: var(--text-color);
     margin-bottom: 5px;
     text-shadow: 0 0 8px rgba(255, 255, 255, 0.5), 0 0 15px rgba(246, 71, 64, 0.4);
+    text-align: center; /* <-- 新增這一行 */
 }
+/* Style for the new P subtitle */
 .intro-subtitle {
     font-size: 1rem;
     font-weight: 400;
@@ -257,6 +268,7 @@ body {
     text-transform: uppercase;
     letter-spacing: 1px;
     text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+    text-align: center; /* <-- 新增這一行 */
 }
 
 /* --- Removed #intro-title-svg specific styles --- */
