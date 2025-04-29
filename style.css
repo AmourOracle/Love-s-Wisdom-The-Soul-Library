@@ -229,28 +229,34 @@ body {
 
 /* --- Intro Title Placeholder & Static Text Styles --- */
 .intro-title-placeholder {
-    position: absolute; top: 5%; left: 50%;
-    transform: translateX(-50%); width: 80%; /* Adjust width as needed */
-    max-width: 400px; /* Adjust max-width */
+    position: absolute;
+    top: 5%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    max-width: 400px;
     z-index: 4;
-    text-align: center; /* Center the text within the placeholder */
+    /* text-align: center; */ /* 不再需要 text-align */
+    display: flex;            /* 將容器設為 Flexbox */
+    flex-direction: column;   /* 子元素垂直排列 (h1 在 p 上方) */
+    align-items: center;      /* 沿交叉軸 (此處為水平方向) 居中子元素 */
 }
-/* Style for the new H1 main title */
+
+/* .intro-main-title 和 .intro-subtitle 的樣式保持不變 */
 .intro-main-title {
-    font-size: 2.8rem; /* Adjust size */
+    font-size: 2.8rem;
     font-weight: 700;
     color: var(--text-color);
-    margin-bottom: 5px; /* Space between main and sub title */
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5), 0 0 15px rgba(246, 71, 64, 0.4); /* Subtle glow */
+    margin-bottom: 5px;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5), 0 0 15px rgba(246, 71, 64, 0.4);
 }
-/* Style for the new P subtitle */
 .intro-subtitle {
-    font-size: 1rem; /* Adjust size */
+    font-size: 1rem;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.8); /* Slightly dimmer color */
+    color: rgba(255, 255, 255, 0.8);
     text-transform: uppercase;
     letter-spacing: 1px;
-    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3); /* Fainter glow */
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
 }
 
 /* --- Removed #intro-title-svg specific styles --- */
