@@ -4,38 +4,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- 狀態管理 ---
     const state = {
-        isAnimating: false, // General lock for transitions like screen switching, button clicks
-        isTransitioning: false, // Specific lock for question-to-question transitions
-        currentQuestionIndex: 0,
-        userAnswers: [],
-        preloadComplete: false,
-        introVisible: false,
-        resultShowing: false,
-        contentRendered: false,
-        finalScores: {}
+        isAnimating: false, isTransitioning: false, currentQuestionIndex: 0,
+        userAnswers: [], preloadComplete: false, introVisible: false,
+        resultShowing: false, contentRendered: false, finalScores: {}
     };
 
     // --- DOM 元素快取 ---
-    let DOM = {};
-    let allOptions = [];
+    let DOM = {}; let allOptions = [];
 
     // --- 從 data.js 獲取數據 ---
     if (typeof testData === 'undefined' || !testData || typeof testData !== 'object') { console.error("錯誤：找不到有效的 testData..."); displayInitializationError("無法載入測驗數據。"); return; }
     if (!Array.isArray(testData.questions) || testData.questions.length === 0) { console.error("錯誤：testData.questions 不是有效的陣列或為空。"); displayInitializationError("測驗問題數據格式錯誤。"); return; }
-    const questions = testData.questions;
-    const results = testData.results || {};
+    const questions = testData.questions; const results = testData.results || {};
     const traitNames = testData.traitNames || {};
 
     // --- Constants ---
-    const PRELOADER_EXTRA_DELAY = 3000; // 增加額外延遲，確保進場動畫能播完
+    const PRELOADER_EXTRA_DELAY = 3000;
     const PRELOADER_SVG_EXIT_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--preloader-svg-exit-duration').replace('s','')) * 1000 || 1200;
     const PRELOADER_EXIT_DURATION = PRELOADER_SVG_EXIT_DURATION;
     const INTRO_FADEIN_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-fadein-duration').replace('s','')) * 1000 || 1000;
     const SCREEN_TRANSITION_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--transition-duration').replace('s','')) * 1000 || 600;
-    // const EXPLOSION_DURATION = 1000; // 不再需要
-    const SVG_GLOW_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-glow-delay').replace('s','')) * 1000 || 3000; // 僅用於可能的未來效果
-    const EARLY_GLOW_TRIGGER_DELAY = 100; // 提早觸發放大效果的延遲 (毫秒)
-    const INTRO_ACTIVATION_OFFSET = 0;    // 立即激活 Intro
+    const SVG_GLOW_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-glow-delay').replace('s','')) * 1000 || 3000;
+    const EARLY_GLOW_TRIGGER_DELAY = 100;
+    const INTRO_ACTIVATION_OFFSET = 0;
 
     // --- 輔助函數 ---
     function setViewportHeight() { try { let vh = window.innerHeight * 0.01; document.documentElement.style.setProperty('--vh', `${vh}px`); } catch (e) { console.warn("設置視口高度錯誤:", e); } }
@@ -46,12 +37,57 @@ document.addEventListener('DOMContentLoaded', function() {
     function cacheDOMElements() {
          try {
              DOM = {
-                 containers: { intro: document.getElementById('intro-container'), test: document.getElementById('test-container'), result: document.getElementById('result-container'), preloader: document.getElementById('preloader'), options: document.getElementById('options-container'), /* explosion: Removed */ startBtnExplosion: null, /* Removed */ preloaderSvgContainer: document.getElementById('preloader-svg-container'), introTitlePlaceholder: document.querySelector('#intro-container .intro-title-placeholder') },
-                 elements: { testBackground: document.getElementById('test-background'), progressFill: document.getElementById('progress-fill'), questionTitle: document.getElementById('question-title'), resultTitle: document.getElementById('result-title'), resultSubtitle: document.getElementById('result-subtitle'), resultDescription: document.getElementById('result-description'), traitsContainer: document.getElementById('traits-container'), similarBooks: document.getElementById('similar-books'), complementaryBooks: document.getElementById('complementary-books'), shareText: document.getElementById('share-text'), preloaderSvg: document.getElementById('preloader-svg'), startBtnText: document.querySelector('#start-test .btn-text'), introTitleSvg: null },
-                 buttons: { start: document.getElementById('start-test'), copy: document.getElementById('copy-btn'), restart: document.getElementById('restart-btn') }
+                 containers: {
+                     intro: document.getElementById('intro-container'),
+                     test: document.getElementById('test-container'),
+                     result: document.getElementById('result-container'),
+                     preloader: document.getElementById('preloader'),
+                     options: document.getElementById('options-container'),
+                     /* explosion: Removed */
+                     startBtnExplosion: null, /* Removed */
+                     preloaderSvgContainer: document.getElementById('preloader-svg-container'),
+                     introTitlePlaceholder: document.querySelector('#intro-container .intro-title-placeholder')
+                 },
+                 elements: {
+                     testBackground: document.getElementById('test-background'),
+                     progressFill: document.getElementById('progress-fill'),
+                     questionTitle: document.getElementById('question-title'),
+                     resultTitle: document.getElementById('result-title'),
+                     resultSubtitle: document.getElementById('result-subtitle'),
+                     resultDescription: document.getElementById('result-description'),
+                     traitsContainer: document.getElementById('traits-container'),
+                     similarBooks: document.getElementById('similar-books'),
+                     complementaryBooks: document.getElementById('complementary-books'),
+                     shareText: document.getElementById('share-text'),
+                     preloaderSvg: document.getElementById('preloader-svg'),
+                     // *** 修改：移除 startBtnText ***
+                     // startBtnText: document.querySelector('#start-test .btn-text'),
+                     introTitleSvg: null
+                 },
+                 buttons: {
+                     start: document.getElementById('start-test'),
+                     copy: document.getElementById('copy-btn'),
+                     restart: document.getElementById('restart-btn')
+                 }
              };
-             const criticalElements = [ DOM.containers.intro, DOM.containers.test, DOM.containers.result, DOM.containers.preloader, DOM.containers.options, DOM.containers.preloaderSvgContainer, DOM.elements.preloaderSvg, DOM.containers.introTitlePlaceholder, DOM.elements.testBackground, DOM.elements.questionTitle, DOM.elements.startBtnText, DOM.buttons.start ];
-             if (criticalElements.some(el => !el)) { console.error("錯誤：未能找到所有必要的 HTML 元素。請檢查 HTML 結構和 ID/Class。", DOM); const missing = criticalElements.findIndex(el => !el); console.error("Missing element index:", missing); displayInitializationError("頁面結構錯誤，無法啟動測驗。"); return false; }
+             // *** 修改：移除 criticalElements 中的 startBtnText ***
+             const criticalElements = [
+                 DOM.containers.intro, DOM.containers.test, DOM.containers.result,
+                 DOM.containers.preloader, DOM.containers.options,
+                 DOM.containers.preloaderSvgContainer, DOM.elements.preloaderSvg,
+                 DOM.containers.introTitlePlaceholder, DOM.elements.testBackground,
+                 DOM.elements.questionTitle,
+                 /* DOM.elements.startBtnText, */ // <-- 移除此項
+                 DOM.buttons.start
+             ];
+             if (criticalElements.some(el => !el)) {
+                 // 重新計算 missing index (如果需要的話)
+                 const missingIndex = criticalElements.findIndex(el => !el);
+                 console.error("錯誤：未能找到所有必要的 HTML 元素。請檢查 HTML 結構和 ID/Class。", DOM);
+                 console.error("Missing element index:", missingIndex); // 更新報錯索引
+                 displayInitializationError("頁面結構錯誤，無法啟動測驗。");
+                 return false;
+             }
              if (DOM.elements.preloaderSvg && DOM.containers.introTitlePlaceholder) { console.log("準備複製 Preloader SVG 到 Intro..."); try { const clonedSvg = DOM.elements.preloaderSvg.cloneNode(true); clonedSvg.id = 'intro-title-svg'; clonedSvg.classList.remove('glow-active', 'svg-exiting'); DOM.containers.introTitlePlaceholder.innerHTML = ''; DOM.containers.introTitlePlaceholder.appendChild(clonedSvg); DOM.elements.introTitleSvg = clonedSvg; console.log("Intro title SVG 已從 Preloader SVG 複製並插入"); } catch (cloneError) { console.error("複製或插入 SVG 時發生錯誤:", cloneError); if (DOM.containers.introTitlePlaceholder) { DOM.containers.introTitlePlaceholder.innerHTML = '<h1 style="color:red;">Title Clone Error</h1>'; } } } else { console.error("無法複製 SVG：找不到 Preloader SVG 或 Intro title placeholder"); if (DOM.containers.introTitlePlaceholder) { DOM.containers.introTitlePlaceholder.innerHTML = '<h1 style="color:red;">Title Error</h1>'; } }
              console.log("DOM 元素已快取"); return true;
          } catch (error) { console.error("快取 DOM 元素時出錯:", error); displayInitializationError("頁面初始化時發生錯誤。"); return false; }
@@ -110,7 +146,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const fromScreen = DOM.containers[fromScreenId]; const toScreen = DOM.containers[toScreenId];
         if (!fromScreen || !toScreen) { console.error(`切換屏幕失敗: ID ${fromScreenId} 或 ${toScreenId} 無效`); state.isAnimating = false; state.isTransitioning = false; return; }
         if (state.isAnimating && fromScreenId !== 'preloader') { console.log("屏幕切換已在進行中... 忽略重複請求"); return; }
-        // 移除了 if (state.isTransitioning && fromScreenId === 'test') 檢查
         console.log(`切換屏幕從 ${fromScreenId} 到 ${toScreenId}...`); state.isAnimating = true; state.isTransitioning = true;
         fromScreen.classList.remove('active');
         setTimeout(() => {
@@ -125,11 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const unlockDelay = (fromScreenId === 'preloader') ? 100 : SCREEN_TRANSITION_DURATION;
             setTimeout(() => {
                  state.isAnimating = false;
-                  if (toScreenId !== 'test' ) { // Result -> Intro 或 Preloader -> Intro 時解除
-                      state.isTransitioning = false;
-                  } else {
-                      // Intro -> Test 或 Test -> Test 時， isTransitioning 由 displayQuestion 解除
-                  }
+                  if (toScreenId !== 'test' ) { state.isTransitioning = false; }
                  console.log(`屏幕切換完成，解除 isAnimating 鎖定。當前屏幕: ${toScreenId}`);
             }, unlockDelay);
         }, SCREEN_TRANSITION_DURATION);
@@ -168,13 +199,12 @@ document.addEventListener('DOMContentLoaded', function() {
          state.userAnswers[questionIndex] = optionIndex;
          if (state.currentQuestionIndex < questions.length - 1) {
              console.log("準備顯示下一個問題...");
-             prepareNextQuestion(); // isTransitioning 由 displayQuestion 解鎖
+             prepareNextQuestion();
          } else {
              console.log("最後一題完成，準備顯示結果...");
-             showResults(); // isTransitioning 在 showResults 內部，調用 switchScreen 前解鎖
+             showResults();
          }
      }
-     // **移除** triggerQuestionFadeOut, triggerQuestionEnterAnimation
      function prepareNextQuestion() {
         state.currentQuestionIndex++; console.log(`準備顯示問題 ${state.currentQuestionIndex + 1} (無動畫)`); updateProgressBar(state.currentQuestionIndex + 1); displayQuestion(state.currentQuestionIndex, false);
      }
@@ -183,7 +213,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Result Logic ---
     function calculateResult() { console.log("Calculating result..."); try { const scores = { 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0 }; if (state.userAnswers.length !== questions.length) { console.warn(`Answers (${state.userAnswers.length}) mismatch questions (${questions.length})! Padding...`); for (let i = 0; i < questions.length; i++) { if (state.userAnswers[i] === undefined) state.userAnswers[i] = 0; } } state.userAnswers.forEach((answerIndex, questionIndex) => { const question = questions[questionIndex]; if (question?.options?.[answerIndex]?.scores) { const optionScores = question.options[answerIndex].scores; for (const type in optionScores) { if (scores.hasOwnProperty(type)) { scores[type] += optionScores[type]; } } } else { console.warn(`Invalid data for Q${questionIndex + 1}, Option ${answerIndex}, skipping score.`); } }); state.finalScores = scores; console.log("Final Scores:", state.finalScores); const scoreValues = Object.values(scores); const scoreFrequency = {}; scoreValues.forEach(score => { const roundedScore = Math.round(score * 10) / 10; scoreFrequency[roundedScore] = (scoreFrequency[roundedScore] || 0) + 1; }); for (const score in scoreFrequency) { if (scoreFrequency[score] >= 4) { console.log("SPECIAL result condition (4+ same scores)"); return results["SPECIAL"]; } } let maxScore = -Infinity; let highestTypes = []; for (const type in scores) { if (Math.abs(scores[type] - maxScore) < 0.01) { highestTypes.push(type); } else if (scores[type] > maxScore) { maxScore = scores[type]; highestTypes = [type]; } } console.log("Highest type(s):", highestTypes, "Score:", maxScore); if (highestTypes.length === 1) { return results[highestTypes[0]]; } if (highestTypes.length >= 3) { console.log("SPECIAL result condition (3+ tied max scores)"); return results["SPECIAL"]; } if (highestTypes.length === 2) { console.log("Tiebreaker needed (2 types tied)"); const tiebreakQuestionIndex = 8; if (state.userAnswers[tiebreakQuestionIndex] === undefined) { console.warn("Tiebreaker question unanswered, selecting first tied type."); return results[highestTypes[0]]; } const tiebreakAnswerIndex = state.userAnswers[tiebreakQuestionIndex]; const tiebreakPrimaryType = questions[tiebreakQuestionIndex]?.options?.[tiebreakAnswerIndex]?.primary; console.log(`Tiebreaker Q9 primary type: ${tiebreakPrimaryType}`); if (tiebreakPrimaryType && highestTypes.includes(tiebreakPrimaryType)) { console.log(`Tiebreaker success: ${tiebreakPrimaryType}`); return results[tiebreakPrimaryType]; } else { console.log("Tiebreaker failed or type not in tie, selecting first tied type."); return results[highestTypes[0]]; } } console.warn("Scoring logic fallback, returning default A"); return results['A']; } catch (error) { console.error("Error calculating result:", error); return results['A']; } }
     function prepareResultData(resultData) { console.log("Preparing result data..."); if (!resultData || !DOM.elements.resultTitle || !DOM.elements.resultSubtitle || !DOM.elements.resultDescription || !DOM.elements.traitsContainer || !DOM.elements.similarBooks || !DOM.elements.complementaryBooks || !DOM.elements.shareText) { console.error("Failed to prepare result data: Missing DOM elements."); return false; } try { DOM.elements.resultTitle.textContent = resultData.title ? (resultData.title.includes('管理員') ? `你是：${resultData.title}` : `你的靈魂之書是：${resultData.title}`) : '結果未知'; DOM.elements.resultSubtitle.textContent = resultData.subtitle || ''; DOM.elements.resultDescription.textContent = resultData.description || '無法載入描述。'; DOM.elements.traitsContainer.innerHTML = ''; const typeScores = state.finalScores; if (!typeScores || Object.keys(typeScores).length === 0) { console.warn("Cannot get final scores for traits."); } else if (resultData.title && resultData.title.includes('管理員')) { Object.keys(traitNames).forEach(type => addTraitElement(type, 3)); } else { Object.keys(traitNames).forEach(type => { const score = typeScores[type] || 0; let stars = 1; if (score >= 7) stars = 5; else if (score >= 5) stars = 4; else if (score >= 3) stars = 3; else if (score >= 1) stars = 2; addTraitElement(type, stars); }); } DOM.elements.similarBooks.innerHTML = (resultData.similar?.length) ? resultData.similar.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>'; DOM.elements.complementaryBooks.innerHTML = (resultData.complementary?.length) ? resultData.complementary.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>'; DOM.elements.shareText.textContent = resultData.shareText || '快來測測你的靈魂之書吧！#靈魂藏書閣 #AmourOracle'; console.log("Result data prepared."); return true; } catch (error) { console.error("Error preparing result data:", error); DOM.elements.resultTitle.textContent = "顯示結果時發生錯誤"; return false; } }
-    // *** 修改: 在調用 switchScreen 前解除 isTransitioning ***
+    // *** showResults: 移除開頭檢查, 在調用 switchScreen 前解除 isTransitioning ***
     function showResults() {
         console.log("顯示結果頁面...");
         try {
