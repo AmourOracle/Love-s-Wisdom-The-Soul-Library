@@ -97,17 +97,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function switchScreen(fromScreenId, toScreenId) {
-        console.log(`Attempting to switch screen from ${fromScreenId} to ${toScreenId}`); // *** 新增日誌 ***
+        console.log(`Attempting to switch screen from ${fromScreenId} to ${toScreenId}`);
         const fromScreen = DOM.containers[fromScreenId]; const toScreen = DOM.containers[toScreenId];
         if (!fromScreen || !toScreen) { console.error(`切換屏幕失敗: ID ${fromScreenId} 或 ${toScreenId} 無效`); state.isAnimating = false; state.isTransitioning = false; return; }
-        // **修改**: 僅當非 Preloader 切換且正在動畫時才阻止
         if (state.isAnimating && fromScreenId !== 'preloader') { console.log("屏幕切換已在進行中... 忽略重複請求"); return; }
-        if (state.isTransitioning && fromScreenId === 'test') { console.log("問題切換進行中... 忽略重複請求"); return; } // 防止 test -> result 被打斷
-
-        console.log(`切換屏幕從 ${fromScreenId} 到 ${toScreenId}...`); state.isAnimating = true; state.isTransitioning = true; // 鎖定兩個狀態
+        if (state.isTransitioning && fromScreenId === 'test') { console.log("問題切換進行中... 忽略重複請求"); return; }
+        console.log(`切換屏幕從 ${fromScreenId} 到 ${toScreenId}...`); state.isAnimating = true; state.isTransitioning = true;
         fromScreen.classList.remove('active');
         setTimeout(() => {
-            console.log(`Adding .active to ${toScreenId}`); // *** 新增日誌 ***
+            console.log(`Adding .active to ${toScreenId}`);
             toScreen.classList.add('active'); document.body.style.overflow = (toScreenId === 'result') ? 'auto' : 'hidden';
             state.resultShowing = (toScreenId === 'result'); state.introVisible = (toScreenId === 'intro');
             if (toScreenId === 'test') { initializeTestScreen(); state.contentRendered = true; }
@@ -115,17 +113,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 state.currentQuestionIndex = 0; state.userAnswers = []; state.finalScores = {}; state.contentRendered = false;
                 if(DOM.elements.traitsContainer) DOM.elements.traitsContainer.innerHTML = ''; if(DOM.elements.progressFill) DOM.elements.progressFill.style.width = '0%';
             }
-            // 解鎖狀態的延遲
-            const unlockDelay = (fromScreenId === 'preloader') ? 100 : SCREEN_TRANSITION_DURATION; // Preloader轉場後立即解鎖可能更快
+            const unlockDelay = (fromScreenId === 'preloader') ? 100 : SCREEN_TRANSITION_DURATION;
             setTimeout(() => {
                  state.isAnimating = false;
-                 // **修改**: isTransitioning 只在非 test -> result 或 result -> intro 時解除
-                 if (toScreenId !== 'test' ) {
-                     state.isTransitioning = false;
+                 // isTransitioning 由 displayQuestion 或 switchScreen(-> result) 自己解除
+                 if (toScreenId === 'intro') { // 從 Result 返回 Intro 時需要解鎖 isTransitioning
+                      state.isTransitioning = false;
                  }
-                 console.log(`屏幕切換完成，解除鎖定。當前屏幕: ${toScreenId}`);
-            }, unlockDelay); // 使用計算的解鎖延遲
-        }, SCREEN_TRANSITION_DURATION); // 等待 fromScreen 淡出
+                 console.log(`屏幕切換完成，解除 isAnimating 鎖定。當前屏幕: ${toScreenId}`);
+            }, unlockDelay);
+        }, SCREEN_TRANSITION_DURATION);
     }
 
     // --- Test Logic (無動畫) ---
@@ -133,107 +130,74 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!DOM.elements.questionTitle || !DOM.containers.options || !DOM.elements.testBackground) { console.error("初始化測驗屏幕失敗：缺少必要元素。"); return; }
         console.log("初始化測驗屏幕 (無動畫)..."); state.currentQuestionIndex = 0; state.userAnswers = []; state.isTransitioning = false; updateProgressBar(0); displayQuestion(state.currentQuestionIndex, true); updateProgressBar(1);
      }
-
      function displayQuestion(index, isInitialDisplay = false) {
-        if (index < 0 || index >= questions.length) { console.error(`無效的問題索引: ${index}`); state.isTransitioning = false; return; } // 出錯時解鎖
+        if (index < 0 || index >= questions.length) { console.error(`無效的問題索引: ${index}`); state.isTransitioning = false; return; }
         const questionData = questions[index]; const questionNumber = index + 1;
-        // state.isTransitioning = true; // 在 handleOptionClick 中設置
-
-        if (DOM.elements.testBackground) {
-            const imageUrl = `./images/Q${questionNumber}.webp`;
-            DOM.elements.testBackground.style.backgroundImage = `url('${imageUrl}')`;
-            // console.log(`背景設置為: ${imageUrl}`); // 可選日誌
-        }
-        if (DOM.elements.questionTitle) {
-             DOM.elements.questionTitle.innerText = questionData.question.replace(/^\d+\.\s*/, '');
-        }
+        // isTransitioning 在 handleOptionClick 中設置為 true，在此處結束時設置為 false
+        if (DOM.elements.testBackground) { const imageUrl = `./images/Q${questionNumber}.webp`; DOM.elements.testBackground.style.backgroundImage = `url('${imageUrl}')`; }
+        if (DOM.elements.questionTitle) { DOM.elements.questionTitle.innerText = questionData.question.replace(/^\d+\.\s*/, ''); }
         if (DOM.containers.options) {
             DOM.containers.options.innerHTML = '';
             questionData.options.forEach((optionData, optIndex) => {
-                const optionElement = document.createElement('div');
-                optionElement.className = 'option';
-                optionElement.dataset.text = optionData.text; optionElement.dataset.index = optIndex;
-                optionElement.innerText = optionData.text; optionElement.setAttribute('role', 'button');
-                optionElement.tabIndex = 0; optionElement.addEventListener('click', handleOptionClick);
-                optionElement.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOptionClick(e); } });
+                const optionElement = document.createElement('div'); optionElement.className = 'option';
+                optionElement.dataset.text = optionData.text; optionElement.dataset.index = optIndex; optionElement.innerText = optionData.text; optionElement.setAttribute('role', 'button');
+                optionElement.tabIndex = 0; optionElement.addEventListener('click', handleOptionClick); optionElement.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOptionClick(e); } });
                 DOM.containers.options.appendChild(optionElement);
             });
             allOptions = Array.from(DOM.containers.options.querySelectorAll('.option'));
             console.log(`問題 ${questionNumber} 和選項已顯示`);
-            // **修改**: 在內容顯示後解除 isTransitioning 鎖定
-            requestAnimationFrame(() => { // 確保渲染完成
-                state.isTransitioning = false;
-                 console.log("isTransitioning 解鎖 (displayQuestion)");
-            });
-        } else {
-             console.error("找不到 options-container");
-             state.isTransitioning = false; // 出錯時解鎖
-        }
+            requestAnimationFrame(() => { state.isTransitioning = false; console.log("isTransitioning 解鎖 (displayQuestion)"); });
+        } else { console.error("找不到 options-container"); state.isTransitioning = false; }
     }
-
      function handleOptionClick(event) {
          const clickedOption = event.currentTarget; const optionIndex = parseInt(clickedOption.dataset.index); const questionIndex = state.currentQuestionIndex;
-         console.log(`Option clicked: Q${questionIndex + 1}, Option ${optionIndex + 1}`); // *** 新增日誌 ***
+         console.log(`Option clicked: Q${questionIndex + 1}, Option ${optionIndex + 1}`);
          if (isNaN(optionIndex) || isNaN(questionIndex)) { console.error("無效的選項或問題索引"); return; }
          if (state.isTransitioning) { console.log("正在處理上一個點擊或問題轉換..."); return; }
-
-         state.isTransitioning = true; // **鎖定**，防止連續點擊
+         state.isTransitioning = true;
          console.log(`問題 ${questionIndex + 1} 選擇了選項 ${optionIndex + 1} (無動畫)`);
          state.userAnswers[questionIndex] = optionIndex;
-
-         // 直接處理下一步
          if (state.currentQuestionIndex < questions.length - 1) {
-             console.log("準備顯示下一個問題..."); // *** 新增日誌 ***
-             prepareNextQuestion(); // 會調用 displayQuestion，並在 displayQuestion 結束時解鎖 isTransitioning
+             console.log("準備顯示下一個問題...");
+             prepareNextQuestion();
          } else {
-             console.log("最後一題完成，準備顯示結果..."); // *** 新增日誌 ***
-             showResults(); // 會調用 switchScreen，由 switchScreen 解鎖 isTransitioning
+             console.log("最後一題完成，準備顯示結果...");
+             showResults();
          }
      }
-
      // **移除** triggerQuestionFadeOut, triggerQuestionEnterAnimation
-
      function prepareNextQuestion() {
-        state.currentQuestionIndex++;
-        console.log(`準備顯示問題 ${state.currentQuestionIndex + 1} (無動畫)`);
-        updateProgressBar(state.currentQuestionIndex + 1);
-        displayQuestion(state.currentQuestionIndex, false);
+        state.currentQuestionIndex++; console.log(`準備顯示問題 ${state.currentQuestionIndex + 1} (無動畫)`); updateProgressBar(state.currentQuestionIndex + 1); displayQuestion(state.currentQuestionIndex, false);
      }
-
      function updateProgressBar(questionNumber) { if (DOM.elements.progressFill) { const progress = (questionNumber / questions.length) * 100; DOM.elements.progressFill.style.width = `${Math.max(0, Math.min(progress, 100))}%`; } }
 
     // --- Result Logic ---
-    function calculateResult() {
-        console.log("Calculating result..."); // *** 新增日誌 ***
-        // ... (計算邏輯不變) ...
-        try { const scores = { 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0 }; if (state.userAnswers.length !== questions.length) { console.warn(`Answers (${state.userAnswers.length}) mismatch questions (${questions.length})! Padding...`); for (let i = 0; i < questions.length; i++) { if (state.userAnswers[i] === undefined) state.userAnswers[i] = 0; } } state.userAnswers.forEach((answerIndex, questionIndex) => { const question = questions[questionIndex]; if (question?.options?.[answerIndex]?.scores) { const optionScores = question.options[answerIndex].scores; for (const type in optionScores) { if (scores.hasOwnProperty(type)) { scores[type] += optionScores[type]; } } } else { console.warn(`Invalid data for Q${questionIndex + 1}, Option ${answerIndex}, skipping score.`); } }); state.finalScores = scores; console.log("Final Scores:", state.finalScores); const scoreValues = Object.values(scores); const scoreFrequency = {}; scoreValues.forEach(score => { const roundedScore = Math.round(score * 10) / 10; scoreFrequency[roundedScore] = (scoreFrequency[roundedScore] || 0) + 1; }); for (const score in scoreFrequency) { if (scoreFrequency[score] >= 4) { console.log("SPECIAL result condition (4+ same scores)"); return results["SPECIAL"]; } } let maxScore = -Infinity; let highestTypes = []; for (const type in scores) { if (Math.abs(scores[type] - maxScore) < 0.01) { highestTypes.push(type); } else if (scores[type] > maxScore) { maxScore = scores[type]; highestTypes = [type]; } } console.log("Highest type(s):", highestTypes, "Score:", maxScore); if (highestTypes.length === 1) { return results[highestTypes[0]]; } if (highestTypes.length >= 3) { console.log("SPECIAL result condition (3+ tied max scores)"); return results["SPECIAL"]; } if (highestTypes.length === 2) { console.log("Tiebreaker needed (2 types tied)"); const tiebreakQuestionIndex = 8; if (state.userAnswers[tiebreakQuestionIndex] === undefined) { console.warn("Tiebreaker question unanswered, selecting first tied type."); return results[highestTypes[0]]; } const tiebreakAnswerIndex = state.userAnswers[tiebreakQuestionIndex]; const tiebreakPrimaryType = questions[tiebreakQuestionIndex]?.options?.[tiebreakAnswerIndex]?.primary; console.log(`Tiebreaker Q9 primary type: ${tiebreakPrimaryType}`); if (tiebreakPrimaryType && highestTypes.includes(tiebreakPrimaryType)) { console.log(`Tiebreaker success: ${tiebreakPrimaryType}`); return results[tiebreakPrimaryType]; } else { console.log("Tiebreaker failed or type not in tie, selecting first tied type."); return results[highestTypes[0]]; } } console.warn("Scoring logic fallback, returning default A"); return results['A']; } catch (error) { console.error("Error calculating result:", error); return results['A']; }
-     }
-    function prepareResultData(resultData) {
-        console.log("Preparing result data..."); // *** 新增日誌 ***
-        // ... (準備數據邏輯不變) ...
-        if (!resultData || !DOM.elements.resultTitle || !DOM.elements.resultSubtitle || !DOM.elements.resultDescription || !DOM.elements.traitsContainer || !DOM.elements.similarBooks || !DOM.elements.complementaryBooks || !DOM.elements.shareText) { console.error("Failed to prepare result data: Missing DOM elements."); return false; } try { DOM.elements.resultTitle.textContent = resultData.title ? (resultData.title.includes('管理員') ? `你是：${resultData.title}` : `你的靈魂之書是：${resultData.title}`) : '結果未知'; DOM.elements.resultSubtitle.textContent = resultData.subtitle || ''; DOM.elements.resultDescription.textContent = resultData.description || '無法載入描述。'; DOM.elements.traitsContainer.innerHTML = ''; const typeScores = state.finalScores; if (!typeScores || Object.keys(typeScores).length === 0) { console.warn("Cannot get final scores for traits."); } else if (resultData.title && resultData.title.includes('管理員')) { Object.keys(traitNames).forEach(type => addTraitElement(type, 3)); } else { Object.keys(traitNames).forEach(type => { const score = typeScores[type] || 0; let stars = 1; if (score >= 7) stars = 5; else if (score >= 5) stars = 4; else if (score >= 3) stars = 3; else if (score >= 1) stars = 2; addTraitElement(type, stars); }); } DOM.elements.similarBooks.innerHTML = (resultData.similar?.length) ? resultData.similar.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>'; DOM.elements.complementaryBooks.innerHTML = (resultData.complementary?.length) ? resultData.complementary.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>'; DOM.elements.shareText.textContent = resultData.shareText || '快來測測你的靈魂之書吧！#靈魂藏書閣 #AmourOracle'; console.log("Result data prepared."); return true; } catch (error) { console.error("Error preparing result data:", error); DOM.elements.resultTitle.textContent = "顯示結果時發生錯誤"; return false; }
-    }
+    function calculateResult() { console.log("Calculating result..."); try { const scores = { 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0 }; if (state.userAnswers.length !== questions.length) { console.warn(`Answers (${state.userAnswers.length}) mismatch questions (${questions.length})! Padding...`); for (let i = 0; i < questions.length; i++) { if (state.userAnswers[i] === undefined) state.userAnswers[i] = 0; } } state.userAnswers.forEach((answerIndex, questionIndex) => { const question = questions[questionIndex]; if (question?.options?.[answerIndex]?.scores) { const optionScores = question.options[answerIndex].scores; for (const type in optionScores) { if (scores.hasOwnProperty(type)) { scores[type] += optionScores[type]; } } } else { console.warn(`Invalid data for Q${questionIndex + 1}, Option ${answerIndex}, skipping score.`); } }); state.finalScores = scores; console.log("Final Scores:", state.finalScores); const scoreValues = Object.values(scores); const scoreFrequency = {}; scoreValues.forEach(score => { const roundedScore = Math.round(score * 10) / 10; scoreFrequency[roundedScore] = (scoreFrequency[roundedScore] || 0) + 1; }); for (const score in scoreFrequency) { if (scoreFrequency[score] >= 4) { console.log("SPECIAL result condition (4+ same scores)"); return results["SPECIAL"]; } } let maxScore = -Infinity; let highestTypes = []; for (const type in scores) { if (Math.abs(scores[type] - maxScore) < 0.01) { highestTypes.push(type); } else if (scores[type] > maxScore) { maxScore = scores[type]; highestTypes = [type]; } } console.log("Highest type(s):", highestTypes, "Score:", maxScore); if (highestTypes.length === 1) { return results[highestTypes[0]]; } if (highestTypes.length >= 3) { console.log("SPECIAL result condition (3+ tied max scores)"); return results["SPECIAL"]; } if (highestTypes.length === 2) { console.log("Tiebreaker needed (2 types tied)"); const tiebreakQuestionIndex = 8; if (state.userAnswers[tiebreakQuestionIndex] === undefined) { console.warn("Tiebreaker question unanswered, selecting first tied type."); return results[highestTypes[0]]; } const tiebreakAnswerIndex = state.userAnswers[tiebreakQuestionIndex]; const tiebreakPrimaryType = questions[tiebreakQuestionIndex]?.options?.[tiebreakAnswerIndex]?.primary; console.log(`Tiebreaker Q9 primary type: ${tiebreakPrimaryType}`); if (tiebreakPrimaryType && highestTypes.includes(tiebreakPrimaryType)) { console.log(`Tiebreaker success: ${tiebreakPrimaryType}`); return results[tiebreakPrimaryType]; } else { console.log("Tiebreaker failed or type not in tie, selecting first tied type."); return results[highestTypes[0]]; } } console.warn("Scoring logic fallback, returning default A"); return results['A']; } catch (error) { console.error("Error calculating result:", error); return results['A']; } }
+    function prepareResultData(resultData) { console.log("Preparing result data..."); if (!resultData || !DOM.elements.resultTitle || !DOM.elements.resultSubtitle || !DOM.elements.resultDescription || !DOM.elements.traitsContainer || !DOM.elements.similarBooks || !DOM.elements.complementaryBooks || !DOM.elements.shareText) { console.error("Failed to prepare result data: Missing DOM elements."); return false; } try { DOM.elements.resultTitle.textContent = resultData.title ? (resultData.title.includes('管理員') ? `你是：${resultData.title}` : `你的靈魂之書是：${resultData.title}`) : '結果未知'; DOM.elements.resultSubtitle.textContent = resultData.subtitle || ''; DOM.elements.resultDescription.textContent = resultData.description || '無法載入描述。'; DOM.elements.traitsContainer.innerHTML = ''; const typeScores = state.finalScores; if (!typeScores || Object.keys(typeScores).length === 0) { console.warn("Cannot get final scores for traits."); } else if (resultData.title && resultData.title.includes('管理員')) { Object.keys(traitNames).forEach(type => addTraitElement(type, 3)); } else { Object.keys(traitNames).forEach(type => { const score = typeScores[type] || 0; let stars = 1; if (score >= 7) stars = 5; else if (score >= 5) stars = 4; else if (score >= 3) stars = 3; else if (score >= 1) stars = 2; addTraitElement(type, stars); }); } DOM.elements.similarBooks.innerHTML = (resultData.similar?.length) ? resultData.similar.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>'; DOM.elements.complementaryBooks.innerHTML = (resultData.complementary?.length) ? resultData.complementary.map(book => `<p>${book}</p>`).join('') : '<p>暫無資料</p>'; DOM.elements.shareText.textContent = resultData.shareText || '快來測測你的靈魂之書吧！#靈魂藏書閣 #AmourOracle'; console.log("Result data prepared."); return true; } catch (error) { console.error("Error preparing result data:", error); DOM.elements.resultTitle.textContent = "顯示結果時發生錯誤"; return false; } }
+    // *** 修改: 移除 showResults 開頭的狀態檢查 ***
     function showResults() {
-        console.log("顯示結果頁面..."); // *** 修改: Log 移到最前 ***
-        if (state.isAnimating || state.isTransitioning) { console.log("Cannot show results while animating or transitioning."); return; }
-        // state.isTransitioning = true; // 由 switchScreen 處理
-
+        console.log("顯示結果頁面...");
+        /*
+        if (state.isAnimating || state.isTransitioning) {
+             console.log("Cannot show results while animating or transitioning.");
+             return;
+        }
+        */
         try {
+            console.log("Calling calculateResult...");
             const resultData = calculateResult();
             if (!resultData) throw new Error("Result calculation failed");
-
+            console.log("Calling prepareResultData...");
             if (prepareResultData(resultData)) {
-                console.log("Result data prepared successfully, switching screen..."); // *** 新增日誌 ***
-                switchScreen('test', 'result'); // switchScreen 會設置 isTransitioning
+                console.log("Result data prepared successfully, calling switchScreen...");
+                switchScreen('test', 'result'); // switchScreen 會處理狀態鎖
             } else {
                 throw new Error("Result data preparation failed");
             }
         } catch (error) {
             console.error("顯示結果時發生錯誤:", error);
             alert(`抱歉，顯示結果時發生錯誤: ${error.message} 請重試。`);
-            // 確保在錯誤時解鎖狀態並嘗試返回 Intro
-            state.isTransitioning = false;
-            state.isAnimating = false;
+            state.isTransitioning = false; state.isAnimating = false; // 手動解鎖
             switchScreen('test', 'intro');
         }
      }
