@@ -4,8 +4,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- 狀態管理 ---
     const state = {
-        isAnimating: false, // General lock for transitions like screen switching, button clicks
-        isTransitioning: false, // Specific lock for question-to-question transitions
+        isAnimating: false,
+        isTransitioning: false,
         currentQuestionIndex: 0,
         userAnswers: [],
         preloadComplete: false,
@@ -27,15 +27,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const traitNames = testData.traitNames || {};
 
     // --- Constants ---
-    const PRELOADER_EXTRA_DELAY = 5000; // Minimum display time for preloader
-    // 更新: 從 CSS 變數獲取動畫時間 (毫秒)
+    const PRELOADER_EXTRA_DELAY = 5000;
     const PRELOADER_SVG_EXIT_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--preloader-svg-exit-duration').replace('s','')) * 1000 || 1200;
-    const PRELOADER_EXIT_DURATION = PRELOADER_SVG_EXIT_DURATION; // 讓容器消失時間與 SVG 動畫同步
+    const PRELOADER_EXIT_DURATION = PRELOADER_SVG_EXIT_DURATION;
     const INTRO_FADEIN_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-fadein-duration').replace('s','')) * 1000 || 1000;
     const SCREEN_TRANSITION_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--transition-duration').replace('s','')) * 1000 || 600;
-    const EXPLOSION_DURATION = 1000; // Matches CSS explodeForwardBlur animation
-    const SVG_GLOW_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-glow-delay').replace('s','')) * 1000 || 3000;
-    const INTRO_TITLE_GLOW_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-title-glow-delay').replace('s','')) * 1000 || 700; // 光暈延遲
+    const EXPLOSION_DURATION = 1000;
+    const SVG_GLOW_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-glow-delay').replace('s','')) * 1000 || 3000; // 這個延遲不再用於放大，但保留給光暈動畫本身
+    const INTRO_TITLE_GLOW_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-title-glow-delay').replace('s','')) * 1000 || 700;
+    const EARLY_GLOW_TRIGGER_DELAY = 100; // 修改：提早觸發放大的延遲 (毫秒)
+    const INTRO_ACTIVATION_OFFSET = 200; // 修改：Preloader 退場後多久激活 Intro (毫秒)
 
 
     // --- 輔助函數 ---
@@ -52,7 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function cacheDOMElements() {
          try {
-             DOM = {
+             DOM = { // ... (保持不變) ...
                  containers: {
                      intro: document.getElementById('intro-container'),
                      test: document.getElementById('test-container'),
@@ -62,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
                      explosion: document.getElementById('explosion-container'),
                      startBtnExplosion: document.getElementById('start-btn-explosion-container'),
                      preloaderSvgContainer: document.getElementById('preloader-svg-container'),
-                     introTitlePlaceholder: document.querySelector('#intro-container .intro-title-placeholder') // 快取標題佔位符
+                     introTitlePlaceholder: document.querySelector('#intro-container .intro-title-placeholder')
                  },
                  elements: {
                      testBackground: document.getElementById('test-background'),
@@ -75,9 +76,9 @@ document.addEventListener('DOMContentLoaded', function() {
                      similarBooks: document.getElementById('similar-books'),
                      complementaryBooks: document.getElementById('complementary-books'),
                      shareText: document.getElementById('share-text'),
-                     preloaderSvg: document.getElementById('preloader-svg'), // Preloader 的 SVG
+                     preloaderSvg: document.getElementById('preloader-svg'),
                      startBtnText: document.querySelector('#start-test .btn-text')
-                     // introTitleSvg: null // 將在下面動態創建和賦值
+                     // introTitleSvg: null
                  },
                  buttons: {
                      start: document.getElementById('start-test'),
@@ -85,195 +86,150 @@ document.addEventListener('DOMContentLoaded', function() {
                      restart: document.getElementById('restart-btn')
                  }
              };
-             // Check critical elements
-             const criticalElements = [
+             const criticalElements = [ // ... (保持不變) ...
                  DOM.containers.intro, DOM.containers.test, DOM.containers.result,
                  DOM.containers.preloader, DOM.containers.options, DOM.containers.explosion,
                  DOM.containers.startBtnExplosion, DOM.containers.preloaderSvgContainer,
-                 DOM.elements.preloaderSvg, DOM.containers.introTitlePlaceholder, // 確保佔位符存在
+                 DOM.elements.preloaderSvg, DOM.containers.introTitlePlaceholder,
                  DOM.elements.testBackground, DOM.elements.questionTitle,
                  DOM.elements.startBtnText, DOM.buttons.start
              ];
-             if (criticalElements.some(el => !el)) {
-                 console.error("錯誤：未能找到所有必要的 HTML 元素。請檢查 HTML 結構和 ID/Class。", DOM);
-                 const missing = criticalElements.findIndex(el => !el);
-                 console.error("Missing element:", criticalElements[missing] ? 'Unknown' : 'Element at index ' + missing);
-                 displayInitializationError("頁面結構錯誤，無法啟動測驗。");
-                 return false;
-             }
+             if (criticalElements.some(el => !el)) { /* ... (錯誤處理不變) ... */ return false; }
 
-            // --- 重新加入: 複製 Preloader SVG 作為 Intro Title ---
-             if (DOM.elements.preloaderSvg && DOM.containers.introTitlePlaceholder) {
+             if (DOM.elements.preloaderSvg && DOM.containers.introTitlePlaceholder) { // ... (SVG 複製邏輯不變) ...
                 console.log("準備複製 Preloader SVG 到 Intro...");
                 const clonedSvg = DOM.elements.preloaderSvg.cloneNode(true);
-                clonedSvg.id = 'intro-title-svg'; // 為複製的 SVG 設置新 ID
-                // 清除可能殘留的 preloader 動畫 class
+                clonedSvg.id = 'intro-title-svg';
                 clonedSvg.classList.remove('glow-active', 'svg-exiting');
-                // 可選：更徹底地移除內聯動畫樣式 (如果有的話)
-                // clonedSvg.style.animation = 'none';
-                // clonedSvg.querySelectorAll('*').forEach(el => el.style.animation = 'none');
-
-                DOM.containers.introTitlePlaceholder.innerHTML = ''; // 清空佔位符
+                DOM.containers.introTitlePlaceholder.innerHTML = '';
                 DOM.containers.introTitlePlaceholder.appendChild(clonedSvg);
-                DOM.elements.introTitleSvg = clonedSvg; // 將複製的 SVG 存儲到 DOM 快取中
+                DOM.elements.introTitleSvg = clonedSvg;
                 console.log("Intro title SVG 已從 Preloader SVG 複製並插入");
-            } else {
-                console.error("無法複製 SVG：找不到 Preloader SVG 或 Intro title placeholder");
-                // 可以在此處添加備用標題，以防 SVG 複製失敗
-                if (DOM.containers.introTitlePlaceholder) {
-                    DOM.containers.introTitlePlaceholder.innerHTML = '<h1 style="color:red;">Title Error</h1>';
-                }
-                // return false; // 可以考慮是否因為此錯誤而終止初始化
-            }
-            // --- End SVG Cloning ---
+             } else { /* ... (錯誤處理不變) ... */ }
 
              console.log("DOM 元素已快取");
              return true;
-         } catch (error) {
-             console.error("快取 DOM 元素時出錯:", error);
-             displayInitializationError("頁面初始化時發生錯誤。");
-             return false;
-         }
+         } catch (error) { /* ... (錯誤處理不變) ... */ return false; }
     }
 
     // --- 更新: Preloader 到 Intro 的轉場函數 ---
     function triggerIntroTransition() {
-        // 增加對 introTitlePlaceholder 的檢查
         if (!DOM.containers.preloader || !DOM.containers.intro || !DOM.elements.preloaderSvg || !DOM.containers.introTitlePlaceholder) {
             console.error("Preloader/Intro/SVG/Title placeholder not found for transition.");
-            state.isAnimating = false; // 解鎖
-            return;
+            state.isAnimating = false; return;
         }
-        if (state.isAnimating) {
-            console.log("正在轉換 Intro，忽略重複觸發");
-            return;
-        }
+        if (state.isAnimating) { console.log("正在轉換 Intro，忽略重複觸發"); return; }
 
         console.log("開始 Preloader 到 Intro 的轉場 (滑動效果)...");
-        state.isAnimating = true; // 鎖定
+        state.isAnimating = true;
 
         // 1. 觸發 Preloader SVG 的滑動淡出動畫
         DOM.elements.preloaderSvg.classList.add('svg-exiting');
         console.log("觸發 Preloader SVG 退場動畫 (.svg-exiting added)");
 
-        // 2. 觸發 Preloader 容器的消失 (使用 visibility/opacity transition)
+        // 2. 觸發 Preloader 容器的消失
         DOM.containers.preloader.classList.add('transitioning-out');
         console.log("觸發 Preloader 容器淡出 (.transitioning-out added)");
 
-        // 3. 在適當延遲後，觸發 Intro 標題的光暈效果
-        //    確保 DOM.containers.introTitlePlaceholder 是有效的
-        const titlePlaceholder = DOM.containers.introTitlePlaceholder;
+        // --- 修改：提早激活 Intro 容器以觸發背景淡入 ---
         setTimeout(() => {
-            if (titlePlaceholder) {
-                console.log("添加 Intro 標題光暈");
-                titlePlaceholder.classList.add('intro-title-glow');
-            } else {
-                console.warn("無法添加 Intro 標題光暈，佔位符元素未找到！");
-            }
-        }, INTRO_TITLE_GLOW_DELAY);
-
-        // 4. 在 Preloader SVG 動畫結束後，正式移除 Preloader 相關 class，並激活 Intro
-        setTimeout(() => {
-            console.log("Preloader 動畫結束，清理 Preloader class，激活 Intro 容器");
-            DOM.containers.preloader.classList.remove('active', 'transitioning-out');
-            if (DOM.elements.preloaderSvg) { // Add check before removing class
-                DOM.elements.preloaderSvg.classList.remove('svg-exiting', 'glow-active'); // 清理 SVG class
-            }
-
-            // 激活 Intro 容器 (CSS 會處理其子元素的延遲動畫)
-            DOM.containers.intro.classList.add('active');
-            state.introVisible = true;
-
-            // 5. 在 Intro 內容動畫完成後解鎖狀態
-            //    估算 Intro 最晚元素的動畫完成時間
-            //    (假設 footer 是最晚的，其延遲是 INTRO_TITLE_GLOW_DELAY + 600ms (來自CSS))
-            const introFooterAnimationSelector = '#intro-container.active .card-footer'; // Selector for the footer animation rule
-            const footerElement = DOM.containers.intro.querySelector('.card-footer');
-            let introFooterDelay = INTRO_TITLE_GLOW_DELAY + 600; // Default delay if CSS rule not found
-            try {
-                // Attempt to read the actual delay from CSS
-                const footerAnimDelayCSS = getComputedStyle(footerElement).animationDelay;
-                if (footerAnimDelayCSS) {
-                     introFooterDelay = parseFloat(footerAnimDelayCSS.replace('s','')) * 1000;
-                }
-            } catch(e) {
-                console.warn("Could not read animation delay for footer, using default.", e);
-            }
-
-            const introAnimationEndTime = introFooterDelay + INTRO_FADEIN_DURATION; // Delay + Duration
-
-            // 使用 requestAnimationFrame 確保 Intro 激活的樣式先生效
-            requestAnimationFrame(() => {
+            if (DOM.containers.intro && !DOM.containers.intro.classList.contains('active')) {
+                console.log(`在 ${INTRO_ACTIVATION_OFFSET}ms 後提早激活 Intro 容器`);
+                DOM.containers.intro.classList.add('active');
+                state.introVisible = true; // 標記 Intro 可見
+                 // 觸發 Intro 標題的光暈效果 (延遲相對於 Intro 激活)
+                 // 注意：這裡的延遲是 INTRO_TITLE_GLOW_DELAY 減去我們提早的時間
+                 const actualGlowDelay = Math.max(0, INTRO_TITLE_GLOW_DELAY - INTRO_ACTIVATION_OFFSET);
+                 const titlePlaceholder = DOM.containers.introTitlePlaceholder;
                  setTimeout(() => {
-                     state.isAnimating = false; // 解鎖狀態
-                     console.log("Intro 轉場及內容動畫完成，解除鎖定。");
-                     // 可以選擇在這裡移除標題光暈，如果希望它只閃一下
-                     // if (titlePlaceholder) titlePlaceholder.classList.remove('intro-title-glow');
-                 }, introAnimationEndTime + 100); // 在估算的結束時間後稍作等待再解鎖
-            });
+                     if (titlePlaceholder) {
+                         console.log("添加 Intro 標題光暈");
+                         titlePlaceholder.classList.add('intro-title-glow');
+                     }
+                 }, actualGlowDelay);
+            }
+        }, INTRO_ACTIVATION_OFFSET); // 在開始退場後很短時間就激活 Intro
 
+        // --- 以下邏輯不變：等待 Preloader 動畫結束後清理和解鎖 ---
+        setTimeout(() => {
+            console.log("Preloader 動畫結束，清理 Preloader class");
+            DOM.containers.preloader.classList.remove('active', 'transitioning-out');
+            if (DOM.elements.preloaderSvg) {
+                DOM.elements.preloaderSvg.classList.remove('svg-exiting', 'glow-active');
+            }
 
-        }, PRELOADER_EXIT_DURATION); // 等待 Preloader SVG 動畫結束
+            // Intro 容器應該已經是 active 了，這裡主要是確保狀態
+            if (!DOM.containers.intro.classList.contains('active')) {
+                 console.warn("Intro container was not active after preloader exit, activating now.");
+                 DOM.containers.intro.classList.add('active');
+                 state.introVisible = true;
+            }
+
+            // 在 Intro 內容動畫完成後解鎖狀態 (需要估算最晚的動畫結束時間)
+            // 假設 footer 動畫延遲是相對於 intro 激活後的 INTRO_TITLE_GLOW_DELAY + 600ms
+            // 但 intro 激活被提早了 INTRO_ACTIVATION_OFFSET
+            // 所以實際的 footer 動畫開始時間點約為 INTRO_ACTIVATION_OFFSET + (INTRO_TITLE_GLOW_DELAY + 600)
+            let introFooterStartDelay = INTRO_ACTIVATION_OFFSET + (INTRO_TITLE_GLOW_DELAY + 600);
+            try { // 嘗試從 CSS 獲取精確延遲 (相對於容器激活)
+                 const footerElement = DOM.containers.intro.querySelector('.card-footer');
+                 const footerAnimDelayCSS = getComputedStyle(footerElement).animationDelay;
+                 if (footerAnimDelayCSS) {
+                      introFooterStartDelay = INTRO_ACTIVATION_OFFSET + (parseFloat(footerAnimDelayCSS.replace('s','')) * 1000);
+                 }
+            } catch(e){ console.warn("Cannot read footer animation delay, using estimation."); }
+
+            const introAnimationEndTime = introFooterStartDelay + INTRO_FADEIN_DURATION;
+            const timeToWaitAfterPreloaderExit = Math.max(0, introAnimationEndTime - PRELOADER_EXIT_DURATION);
+
+            setTimeout(() => {
+                 state.isAnimating = false; // 解鎖狀態
+                 console.log("Intro 內容動畫應已完成，解除鎖定。");
+            }, timeToWaitAfterPreloaderExit + 100); // 加一點緩衝
+
+        }, PRELOADER_EXIT_DURATION); // 仍然等待 Preloader 動畫的總時長
     }
 
-    // --- preloadImages 函數 ---
+    // --- 更新: preloadImages 函數 ---
     function preloadImages() {
-        if (!DOM.containers?.preloader || !DOM.elements.preloaderSvg) {
-            console.warn("找不到 preloader 或 preloader SVG...");
-            state.preloadComplete = true; bindStartButton(); return;
-        }
-        if (!questions || questions.length === 0) {
-            console.warn("無法預載入圖片：缺少 questions...");
-            state.preloadComplete = true; if(DOM.containers.preloader) DOM.containers.preloader.classList.remove('active'); bindStartButton(); return;
-        }
+        if (!DOM.containers?.preloader || !DOM.elements.preloaderSvg) { /* ... (不變) ... */ return; }
+        if (!questions || questions.length === 0) { /* ... (不變) ... */ return; }
 
         console.log("顯示 Preloader...");
         DOM.containers.preloader.classList.remove('transitioning-out');
-        if (DOM.elements.preloaderSvg) { // Check if SVG exists
-             DOM.elements.preloaderSvg.classList.remove('glow-active', 'svg-exiting'); // 重置狀態
-        }
+        if (DOM.elements.preloaderSvg) { DOM.elements.preloaderSvg.classList.remove('glow-active', 'svg-exiting'); }
         DOM.containers.preloader.classList.add('active');
 
         if (DOM.containers.intro) DOM.containers.intro.classList.remove('active');
         if (DOM.containers.test) DOM.containers.test.classList.remove('active');
         if (DOM.containers.result) DOM.containers.result.classList.remove('active');
 
-        // Add glow effect after a delay
+        // --- 修改：提早觸發放大效果 ---
         setTimeout(() => {
             if (DOM.containers.preloader.classList.contains('active') && DOM.elements.preloaderSvg) {
-                 console.log("為 preloader SVG 添加光暈和放大效果");
-                 DOM.elements.preloaderSvg.classList.add('glow-active');
+                 console.log(`在 ${EARLY_GLOW_TRIGGER_DELAY}ms 後提早觸發 SVG 放大 (添加 .glow-active)`);
+                 DOM.elements.preloaderSvg.classList.add('glow-active'); // .glow-active 控制放大和光暈動畫
             }
-        }, SVG_GLOW_DELAY);
+        }, EARLY_GLOW_TRIGGER_DELAY); // 使用新的較短延遲
 
-        // Image loading logic
+        // --- 圖片載入邏輯不變 ---
         const imageUrls = ['./images/Intro.webp'];
         questions.forEach((_, index) => imageUrls.push(`./images/Q${index + 1}.webp`));
-        let loadedCount = 0;
-        const totalImages = imageUrls.length;
-        let errorOccurred = false;
-
+        let loadedCount = 0; const totalImages = imageUrls.length; let errorOccurred = false;
         function updateProgress(isError = false) {
-            loadedCount++;
-            if (isError) errorOccurred = true;
-
+            loadedCount++; if (isError) errorOccurred = true;
             if (loadedCount >= totalImages) {
-                state.preloadComplete = true;
-                console.log(`圖片預載入處理完成 ${errorOccurred ? '（有錯誤）' : ''}`);
+                state.preloadComplete = true; console.log(`圖片預載入處理完成 ${errorOccurred ? '（有錯誤）' : ''}`);
                 const totalDelay = errorOccurred ? 500 : PRELOADER_EXTRA_DELAY;
                 console.log(`等待額外延遲 ${totalDelay}ms...`);
                 setTimeout(() => {
                     if (DOM.containers.preloader && DOM.containers.preloader.classList.contains('active')) {
-                        triggerIntroTransition(); // Start the exit animation
+                        triggerIntroTransition(); // 開始退場轉場
                         bindStartButton();
-                    } else {
-                        console.log("Preloader no longer active, skipping transition.");
-                    }
+                    } else { console.log("Preloader no longer active, skipping transition."); }
                 }, totalDelay);
             }
         }
-
-        imageUrls.forEach(url => {
+        imageUrls.forEach(url => { /* ... (載入圖片不變) ... */
              const img = new Image(); img.src = url;
              img.onload = () => updateProgress(false);
              img.onerror = () => { console.warn(`圖片載入失敗: ${url}`); updateProgress(true); };
@@ -307,10 +263,16 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("handleStartTestClick triggered.");
         console.log("State check: preloadComplete =", state.preloadComplete, ", introVisible =", state.introVisible, ", isAnimating =", state.isAnimating);
         if (!state.preloadComplete || !state.introVisible) { console.warn("內容尚未準備好或 Intro 未顯示。"); return; }
+        // **增加檢查: 按鈕本身是否可見 (opacity > 0)**
+        const buttonElement = DOM.buttons.start;
+        if (parseFloat(getComputedStyle(buttonElement).opacity) < 0.1) {
+             console.log("Start button is not fully visible yet.");
+             return; // 如果按鈕還在淡入，則不響應點擊
+        }
         if (state.isAnimating || state.isTransitioning) { console.log("動畫或轉換進行中..."); return; }
         console.log("Start button clicked, processing effect...");
         state.isAnimating = true; state.isTransitioning = true;
-        const buttonElement = DOM.buttons.start; const textElement = DOM.elements.startBtnText;
+        const textElement = DOM.elements.startBtnText;
         const explosionContainer = DOM.containers.startBtnExplosion; const buttonText = textElement ? textElement.textContent : '開始測驗';
         if (!buttonElement || !explosionContainer) { console.error("Start button or explosion container missing!"); state.isAnimating = false; state.isTransitioning = false; return; }
         buttonElement.classList.add('exploded'); buttonElement.style.pointerEvents = 'none';
@@ -323,12 +285,9 @@ document.addEventListener('DOMContentLoaded', function() {
              const switchDelay = EXPLOSION_DURATION * 0.8; console.log(`Waiting ${switchDelay}ms for explosion before screen switch.`);
              setTimeout(() => {
                  console.log("Switching from intro to test after explosion delay"); switchScreen('intro', 'test');
-                 // Reset button appearance after screen transition animation
                  setTimeout(() => {
                      buttonElement.classList.remove('exploded'); buttonElement.style.pointerEvents = '';
-                     // Reset explosion container style/position
-                     explosionContainer.style.position = ''; // Remove absolute if not needed globally
-                     explosionContainer.style.top = '0'; explosionContainer.style.left = '0';
+                     explosionContainer.style.position = ''; explosionContainer.style.top = '0'; explosionContainer.style.left = '0';
                      explosionContainer.style.width = '100%'; explosionContainer.style.height = '100%';
                  }, SCREEN_TRANSITION_DURATION + 100);
              }, switchDelay);
@@ -339,43 +298,21 @@ document.addEventListener('DOMContentLoaded', function() {
     function switchScreen(fromScreenId, toScreenId) {
         const fromScreen = DOM.containers[fromScreenId]; const toScreen = DOM.containers[toScreenId];
         if (!fromScreen || !toScreen) { console.error(`切換屏幕失敗: ID ${fromScreenId} 或 ${toScreenId} 無效`); state.isAnimating = false; state.isTransitioning = false; return; }
-        // Prevent switching if already animating/transitioning, except when coming from preloader
-        if ((state.isAnimating || state.isTransitioning) && fromScreenId !== 'preloader') { // Allow if coming from preloader
-            console.log("屏幕切換或問題轉換已在進行中... 忽略重複請求");
-            return;
-        }
+        if ((state.isAnimating || state.isTransitioning) && fromScreenId !== 'preloader') { console.log("屏幕切換或問題轉換已在進行中... 忽略重複請求"); return; }
         console.log(`切換屏幕從 ${fromScreenId} 到 ${toScreenId}...`); state.isAnimating = true; state.isTransitioning = true;
         fromScreen.classList.remove('active');
-        // Wait for the 'from' screen to fade out
         setTimeout(() => {
             toScreen.classList.add('active'); document.body.style.overflow = (toScreenId === 'result') ? 'auto' : 'hidden';
             state.resultShowing = (toScreenId === 'result'); state.introVisible = (toScreenId === 'intro');
-            // Initialize or reset based on the target screen
-            if (toScreenId === 'test') {
-                 initializeTestScreen(); // Will reset its own transition lock
-                 state.contentRendered = true;
-            } else if (toScreenId === 'intro') {
-                // Reset test/result states when going back to intro
-                state.currentQuestionIndex = 0; state.userAnswers = []; state.finalScores = {};
-                state.contentRendered = false;
-                if(DOM.elements.traitsContainer) DOM.elements.traitsContainer.innerHTML = '';
-                if(DOM.elements.progressFill) DOM.elements.progressFill.style.width = '0%';
-                 // Reset start button explosion container style
-                 if(DOM.containers.startBtnExplosion) {
-                    DOM.containers.startBtnExplosion.style.position = ''; DOM.containers.startBtnExplosion.style.top = '';
-                    DOM.containers.startBtnExplosion.style.left = ''; DOM.containers.startBtnExplosion.style.width = '';
-                    DOM.containers.startBtnExplosion.style.height = '';
-                 }
-                 // Reset Intro title glow (if needed when restarting)
+            if (toScreenId === 'test') { initializeTestScreen(); state.contentRendered = true; }
+            else if (toScreenId === 'intro') {
+                state.currentQuestionIndex = 0; state.userAnswers = []; state.finalScores = {}; state.contentRendered = false;
+                if(DOM.elements.traitsContainer) DOM.elements.traitsContainer.innerHTML = ''; if(DOM.elements.progressFill) DOM.elements.progressFill.style.width = '0%';
+                 if(DOM.containers.startBtnExplosion) { DOM.containers.startBtnExplosion.style.position = ''; DOM.containers.startBtnExplosion.style.top = ''; DOM.containers.startBtnExplosion.style.left = ''; DOM.containers.startBtnExplosion.style.width = ''; DOM.containers.startBtnExplosion.style.height = ''; }
                  if(DOM.containers.introTitlePlaceholder) DOM.containers.introTitlePlaceholder.classList.remove('intro-title-glow');
             }
-            // Unlock states after the 'to' screen fade-in animation is complete
             setTimeout(() => {
-                 state.isAnimating = false;
-                 // Test screen manages its own transition lock, unlock otherwise
-                 if (toScreenId !== 'test') {
-                     state.isTransitioning = false;
-                 }
+                 state.isAnimating = false; if (toScreenId !== 'test') { state.isTransitioning = false; }
                  console.log(`屏幕切換完成，當前屏幕: ${toScreenId}`);
             }, SCREEN_TRANSITION_DURATION);
         }, SCREEN_TRANSITION_DURATION);

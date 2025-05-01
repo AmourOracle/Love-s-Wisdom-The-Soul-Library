@@ -233,7 +233,9 @@ body {
 
 /* --- Intro 動畫應用 --- */
 #intro-container.active .background-layer {
-    animation: introElementFadeIn var(--intro-fadein-duration) ease-out var(--intro-fadein-delay) forwards;
+    animation: introElementFadeIn var(--intro-fadein-duration) ease-out forwards; /* 確保延遲為 0s */
+    /* animation-delay: 0s; */ /* 可以明確寫出，或依賴 forwards */
+     opacity: 0; /* 確保初始為0 */
 }
 #intro-container.active .intro-title-placeholder {
     /* 標題動畫 (延遲觸發，配合光暈) */
