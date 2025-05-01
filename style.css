@@ -13,17 +13,14 @@
     --deep-blue-bg: #121824; /* 深藍背景 */
 
     /* --- 動畫時間 --- */
-    --preloader-svg-exit-duration: 1.2s; /* Preloader SVG 退場動畫時間 (可調整) */
-    /* --intro-title-glow-delay 不再需要 */
-    --preloader-exit-duration: var(--preloader-svg-exit-duration); /* 同步 Preloader 容器消失時間 */
-    --intro-fadein-delay: 0s; /* Intro 元素基礎延遲，具體由各元素動畫設置 */
-    --intro-fadein-duration: 1s; /* Intro 元素淡入持續時間 */
+    --preloader-svg-exit-duration: 1.2s;
+    --preloader-exit-duration: var(--preloader-svg-exit-duration);
+    --intro-fadein-delay: 0s;
+    --intro-fadein-duration: 1s;
 
     /* --- SVG Animation Timings (For Preloader Entrance) --- */
-    --svg-base-draw-duration: 2.5s; /* 描邊填色時間 */
-    /* --svg-glow-delay 不再需要 */
-    /* --svg-glow-duration 不再需要 */
-    --svg-scale-duration: var(--svg-base-draw-duration); /* 讓放大效果和描邊填色同步發生 */
+    --svg-base-draw-duration: 2.5s;
+    --svg-scale-duration: var(--svg-base-draw-duration);
     --svg-stagger-delay: 0.15s;
     --svg-fade-in-duration: 1.5s;
     --svg-fade-in-delay: 0.6s;
@@ -61,11 +58,11 @@ body {
 @keyframes preloaderSvgSlideUpFadeOut {
     from {
         opacity: 1;
-        transform: scale(1.05) translateY(0); /* 從放大狀態開始 */
+        transform: scale(1.05) translateY(0);
     }
     to {
         opacity: 0;
-        transform: scale(0.7) translateY(-150%); /* 向上位移並縮小 */
+        transform: scale(0.7) translateY(-150%);
     }
 }
 
@@ -109,9 +106,8 @@ body {
     transition: transform var(--svg-scale-duration) ease-in-out;
 }
 #preloader-svg.glow-active {
-    transform: scale(1.05); /* 直接觸發放大 */
+    transform: scale(1.05);
 }
-/* 應用 SVG 退場動畫的狀態 */
 #preloader-svg.svg-exiting {
     animation: preloaderSvgSlideUpFadeOut var(--preloader-svg-exit-duration) cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
 }
@@ -194,21 +190,14 @@ body {
 }
 
 /* ================= 按鈕樣式 ================= */
-.btn { display: inline-block; padding: 14px 28px; border-radius: 50px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; font-family: 'Noto Serif TC', serif; text-align: center; margin: 0 auto; position: relative; }
-.btn-svg-style { background-color: transparent; border: 1px solid rgba(255, 255, 255, 0.7); color: rgba(255, 255, 255, 0.9); padding: 12px 30px; border-radius: 8px; transition: background-color 0.4s ease, color 0.4s ease, box-shadow 0.4s ease, transform 0.3s ease; box-shadow: 0 0 8px rgba(246, 71, 64, 0); }
-/* 修改：移除 Hover 的 transform 和 box-shadow，保留顏色變化 */
-.btn-svg-style:hover {
-    background-color: rgba(246, 71, 64, 0.15);
-    color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.9);
-    /* transform: translateY(-2px) scale(1.02); */ /* 移除 */
-    /* box-shadow: 0 0 15px rgba(246, 71, 64, 0.6); */ /* 移除 */
-}
+.btn { display: inline-block; padding: 14px 28px; border-radius: 50px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; /* 移除 transform 和 box-shadow 的 transition */ font-family: 'Noto Serif TC', serif; text-align: center; margin: 0 auto; position: relative; }
+.btn-svg-style { background-color: transparent; border: 1px solid rgba(255, 255, 255, 0.7); color: rgba(255, 255, 255, 0.9); padding: 12px 30px; border-radius: 8px; /* 移除 box-shadow */ }
+/* *** 移除 .btn-svg-style:hover 規則 *** */
 .btn-svg-style .btn-text { display: inline-block; transition: opacity 0.3s ease; opacity: 1; }
 .btn-svg-style .btn-text.hidden { opacity: 0; }
 /* .btn.exploded 規則已被移除 */
 .primary-btn { background-color: var(--primary-color); color: white; }
-.primary-btn:hover { background-color: #e53935; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); }
+.primary-btn:hover { background-color: #e53935; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); } /* 其他按鈕hover效果保留 */
 .secondary-btn { background-color: transparent; color: white; border: 1px solid white; }
 .secondary-btn:hover { background-color: rgba(255, 255, 255, 0.1); }
 #result-container .primary-btn { background-color: var(--primary-color); color: white; }
@@ -218,23 +207,21 @@ body {
 
 /* ================= 測驗頁面 ================= */
 #test-container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px 40px; perspective: 800px; position: relative; }
-#test-background { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; z-index: 5; opacity: 1; filter: blur(0px); transition: opacity 0.8s ease-out, filter 0.8s ease-out; }
-#test-background.is-hidden { opacity: 0; filter: blur(10px); pointer-events: none; }
+#test-background { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; z-index: 5; opacity: 1; filter: blur(0px); /* 移除 transition */ }
+/* 移除 #test-background.is-hidden */
 .progress-container { position: absolute; top: 0; left: 0; width: 100%; padding: 10px 15px 5px; background: linear-gradient(to bottom, rgba(18, 24, 36, 0.7), rgba(18, 24, 36, 0)); z-index: 30; }
 .progress-bar { background-color: rgba(255, 255, 255, 0.2); height: 4px; border-radius: 2px; overflow: hidden; }
 .progress-fill { background-color: var(--primary-color); height: 100%; width: 0%; transition: width 0.5s cubic-bezier(0.33, 1, 0.68, 1); }
-#question-title { color: rgba(255, 255, 255, 0.9); font-size: 24px; font-weight: 500; line-height: 1.5; text-align: center; margin-bottom: 40px; position: relative; z-index: 20; width: 100%; max-width: 90%; opacity: 1; filter: blur(0px); transform: translateY(0); transition: opacity 0.5s ease-out, filter 0.5s ease-out, transform 0.5s ease-out; }
-#question-title.is-hidden { opacity: 0; filter: blur(5px); transform: translateY(-10px); pointer-events: none; }
+#question-title { color: rgba(255, 255, 255, 0.9); font-size: 24px; font-weight: 500; line-height: 1.5; text-align: center; margin-bottom: 40px; position: relative; z-index: 20; width: 100%; max-width: 90%; opacity: 1; filter: blur(0px); transform: translateY(0); /* 移除 transition */ }
+/* 移除 #question-title.is-hidden */
 #options-container { display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 400px; position: relative; z-index: 10; }
-.option { background-color: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: white; padding: 15px 25px; border-radius: 10px; cursor: pointer; text-align: center; font-size: 16px; transition: background-color 0.3s ease, opacity 0.5s ease-out, filter 0.5s ease-out, transform 0.5s ease-out; position: relative; overflow: hidden; min-height: 50px; transform-style: preserve-3d; opacity: 1; filter: blur(0px); transform: translateY(0); }
-.option.is-hidden { opacity: 0; filter: blur(5px); transform: translateY(15px); pointer-events: none; }
-.option.fade-out { opacity: 0 !important; filter: blur(8px) !important; transform: translateY(0) !important; transition: opacity 0.5s ease-out, filter 0.5s ease-out !important; pointer-events: none; }
-.option.exploded { opacity: 0 !important; transform: scale(0.9) !important; transition: opacity 0.3s ease-out, transform 0.3s ease-out !important; pointer-events: none; }
+.option { background-color: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: white; padding: 15px 25px; border-radius: 10px; cursor: pointer; text-align: center; font-size: 16px; /* 移除 transition */ position: relative; overflow: hidden; min-height: 50px; transform-style: preserve-3d; opacity: 1; filter: blur(0px); transform: translateY(0); }
+/* 移除 .option.is-hidden, .option.fade-out, .option.exploded */
 .option:hover { background-color: rgba(255, 255, 255, 0.2); }
 
 /* ================= Explosion Containers ================= */
-#explosion-container, #start-btn-explosion-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 1000; transform-style: preserve-3d; }
-.char-explode { display: inline-block; position: absolute; color: white; font-size: 24px; font-weight: bold; opacity: 1; animation: explodeForwardBlur 1.0s forwards cubic-bezier(0.16, 1, 0.3, 1); white-space: pre; will-change: transform, opacity, filter; transform-style: preserve-3d; filter: blur(0px); }
+/* 移除 #explosion-container, #start-btn-explosion-container */
+/* 移除 @keyframes explodeForwardBlur 和 .char-explode */
 
 /* ================= 結果頁面樣式 ================= */
 .result-card { background-color: white; border-radius: var(--border-radius); box-shadow: 0 5px 15px var(--shadow-color); padding: var(--card-padding); max-width: 800px; margin: 40px auto; text-align: center; animation: fadeIn 0.8s ease-out; }
@@ -260,14 +247,14 @@ h3 { color: var(--secondary-color); margin-bottom: 15px; font-size: 18px; }
     .content-layer { padding: 20px 20px; }
     .card-body .description { font-size: 16px; }
     .progress-container { padding: 8px 15px 2px; }
-    .intro-title-placeholder { width: 90%; margin-top: 18%; } /* Adjust responsive margin */
+    .intro-title-placeholder { width: 90%; margin-top: 18%; }
 }
 @media (max-width: 375px) and (max-height: 667px) {
     #question-title { font-size: 18px; margin-bottom: 25px; }
     .option { padding: 10px 15px; font-size: 13px; min-height: 40px; }
     #options-container { gap: 8px; }
     .content-layer { padding: 15px 15px; }
-    .intro-title-placeholder { width: 95%; margin-top: 15%; } /* Adjust responsive margin */
+    .intro-title-placeholder { width: 95%; margin-top: 15%; }
      .card-body .description { font-size: 15px; }
 }
 @media (max-width: 900px) and (orientation: landscape) {
@@ -277,5 +264,5 @@ h3 { color: var(--secondary-color); margin-bottom: 15px; font-size: 18px; }
     #options-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 90%; }
     .result-card { margin: 20px auto; }
     .content-layer { padding: 10px 20px; }
-    .intro-title-placeholder { width: 70%; margin-top: 5%; } /* Adjust responsive margin */
+    .intro-title-placeholder { width: 70%; margin-top: 5%; }
 }
