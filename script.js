@@ -4,18 +4,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- 狀態管理 ---
     const state = {
-        isAnimating: false, isTransitioning: false, currentQuestionIndex: 0,
-        userAnswers: [], preloadComplete: false, introVisible: false,
-        resultShowing: false, contentRendered: false, finalScores: {}
+        isAnimating: false, // General lock for transitions like screen switching, button clicks
+        isTransitioning: false, // Specific lock for question-to-question transitions
+        currentQuestionIndex: 0,
+        userAnswers: [],
+        preloadComplete: false,
+        introVisible: false,
+        resultShowing: false,
+        contentRendered: false,
+        finalScores: {}
     };
 
     // --- DOM 元素快取 ---
-    let DOM = {}; let allOptions = [];
+    let DOM = {};
+    let allOptions = [];
 
     // --- 從 data.js 獲取數據 ---
     if (typeof testData === 'undefined' || !testData || typeof testData !== 'object') { console.error("錯誤：找不到有效的 testData..."); displayInitializationError("無法載入測驗數據。"); return; }
     if (!Array.isArray(testData.questions) || testData.questions.length === 0) { console.error("錯誤：testData.questions 不是有效的陣列或為空。"); displayInitializationError("測驗問題數據格式錯誤。"); return; }
-    const questions = testData.questions; const results = testData.results || {};
+    const questions = testData.questions;
+    const results = testData.results || {};
     const traitNames = testData.traitNames || {};
 
     // --- Constants ---
@@ -25,32 +33,109 @@ document.addEventListener('DOMContentLoaded', function() {
     const INTRO_FADEIN_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--intro-fadein-duration').replace('s','')) * 1000 || 1000;
     const SCREEN_TRANSITION_DURATION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--transition-duration').replace('s','')) * 1000 || 600;
     const EXPLOSION_DURATION = 1000;
-    const SVG_GLOW_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-glow-delay').replace('s','')) * 1000 || 3000; // 僅用於 fadeInGlow 動畫 (如果恢復使用的話)
-    const EARLY_GLOW_TRIGGER_DELAY = 100; // 提早觸發放大效果的延遲
-    const INTRO_ACTIVATION_OFFSET = 0;    // 立即激活 Intro
+    const SVG_GLOW_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-glow-delay').replace('s','')) * 1000 || 3000; // 僅用於可能的未來效果
+    // INTRO_TITLE_GLOW_DELAY 不再需要
+    const EARLY_GLOW_TRIGGER_DELAY = 100; // 提早觸發放大效果的延遲 (毫秒)
+    const INTRO_ACTIVATION_OFFSET = 0;    // *** 修改：立即激活 Intro ***
 
     // --- 輔助函數 ---
-    function setViewportHeight() { try { let vh = window.innerHeight * 0.01; document.documentElement.style.setProperty('--vh', `${vh}px`); } catch (e) { console.warn("設置視口高度錯誤:", e); } }
+    function setViewportHeight() {
+        try {
+            let vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        } catch (e) {
+            console.warn("設置視口高度錯誤:", e);
+        }
+    }
+
     function displayInitializationError(message) {
         const preloaderContent = document.querySelector('.preloader-content');
         if (preloaderContent) {
             preloaderContent.innerHTML = `<p style="color: red; padding: 20px;">${message}</p>`;
             const preloader = document.getElementById('preloader');
             if (preloader) preloader.classList.add('active');
-        } else { document.body.innerHTML = `<p style="color: red; padding: 20px;">${message}</p>`; }
+        } else {
+            document.body.innerHTML = `<p style="color: red; padding: 20px;">${message}</p>`;
+        }
     }
+
     function cacheDOMElements() {
          try {
              DOM = {
-                 containers: { intro: document.getElementById('intro-container'), test: document.getElementById('test-container'), result: document.getElementById('result-container'), preloader: document.getElementById('preloader'), options: document.getElementById('options-container'), explosion: document.getElementById('explosion-container'), startBtnExplosion: document.getElementById('start-btn-explosion-container'), preloaderSvgContainer: document.getElementById('preloader-svg-container'), introTitlePlaceholder: document.querySelector('#intro-container .intro-title-placeholder') },
-                 elements: { testBackground: document.getElementById('test-background'), progressFill: document.getElementById('progress-fill'), questionTitle: document.getElementById('question-title'), resultTitle: document.getElementById('result-title'), resultSubtitle: document.getElementById('result-subtitle'), resultDescription: document.getElementById('result-description'), traitsContainer: document.getElementById('traits-container'), similarBooks: document.getElementById('similar-books'), complementaryBooks: document.getElementById('complementary-books'), shareText: document.getElementById('share-text'), preloaderSvg: document.getElementById('preloader-svg'), startBtnText: document.querySelector('#start-test .btn-text'), introTitleSvg: null },
-                 buttons: { start: document.getElementById('start-test'), copy: document.getElementById('copy-btn'), restart: document.getElementById('restart-btn') }
+                 containers: {
+                     intro: document.getElementById('intro-container'),
+                     test: document.getElementById('test-container'),
+                     result: document.getElementById('result-container'),
+                     preloader: document.getElementById('preloader'),
+                     options: document.getElementById('options-container'),
+                     explosion: document.getElementById('explosion-container'),
+                     startBtnExplosion: document.getElementById('start-btn-explosion-container'),
+                     preloaderSvgContainer: document.getElementById('preloader-svg-container'),
+                     introTitlePlaceholder: document.querySelector('#intro-container .intro-title-placeholder')
+                 },
+                 elements: {
+                     testBackground: document.getElementById('test-background'),
+                     progressFill: document.getElementById('progress-fill'),
+                     questionTitle: document.getElementById('question-title'),
+                     resultTitle: document.getElementById('result-title'),
+                     resultSubtitle: document.getElementById('result-subtitle'),
+                     resultDescription: document.getElementById('result-description'),
+                     traitsContainer: document.getElementById('traits-container'),
+                     similarBooks: document.getElementById('similar-books'),
+                     complementaryBooks: document.getElementById('complementary-books'),
+                     shareText: document.getElementById('share-text'),
+                     preloaderSvg: document.getElementById('preloader-svg'),
+                     startBtnText: document.querySelector('#start-test .btn-text'),
+                     introTitleSvg: null // Will be assigned after cloning
+                 },
+                 buttons: {
+                     start: document.getElementById('start-test'),
+                     copy: document.getElementById('copy-btn'),
+                     restart: document.getElementById('restart-btn')
+                 }
              };
-             const criticalElements = [ DOM.containers.intro, DOM.containers.test, DOM.containers.result, DOM.containers.preloader, DOM.containers.options, DOM.containers.explosion, DOM.containers.startBtnExplosion, DOM.containers.preloaderSvgContainer, DOM.elements.preloaderSvg, DOM.containers.introTitlePlaceholder, DOM.elements.testBackground, DOM.elements.questionTitle, DOM.elements.startBtnText, DOM.buttons.start ];
-             if (criticalElements.some(el => !el)) { console.error("錯誤：未能找到所有必要的 HTML 元素。請檢查 HTML 結構和 ID/Class。", DOM); const missing = criticalElements.findIndex(el => !el); console.error("Missing element:", criticalElements[missing] ? 'Unknown' : 'Element at index ' + missing); displayInitializationError("頁面結構錯誤，無法啟動測驗。"); return false; }
-             if (DOM.elements.preloaderSvg && DOM.containers.introTitlePlaceholder) { console.log("準備複製 Preloader SVG 到 Intro..."); const clonedSvg = DOM.elements.preloaderSvg.cloneNode(true); clonedSvg.id = 'intro-title-svg'; clonedSvg.classList.remove('glow-active', 'svg-exiting'); DOM.containers.introTitlePlaceholder.innerHTML = ''; DOM.containers.introTitlePlaceholder.appendChild(clonedSvg); DOM.elements.introTitleSvg = clonedSvg; console.log("Intro title SVG 已從 Preloader SVG 複製並插入"); } else { console.error("無法複製 SVG：找不到 Preloader SVG 或 Intro title placeholder"); if (DOM.containers.introTitlePlaceholder) { DOM.containers.introTitlePlaceholder.innerHTML = '<h1 style="color:red;">Title Error</h1>'; } }
-             console.log("DOM 元素已快取"); return true;
-         } catch (error) { console.error("快取 DOM 元素時出錯:", error); displayInitializationError("頁面初始化時發生錯誤。"); return false; }
+             // Check critical elements
+             const criticalElements = [
+                 DOM.containers.intro, DOM.containers.test, DOM.containers.result,
+                 DOM.containers.preloader, DOM.containers.options, DOM.containers.explosion,
+                 // DOM.containers.startBtnExplosion is no longer critical as div is removed
+                 DOM.containers.preloaderSvgContainer, DOM.elements.preloaderSvg,
+                 DOM.containers.introTitlePlaceholder, DOM.elements.testBackground,
+                 DOM.elements.questionTitle, DOM.elements.startBtnText, DOM.buttons.start
+             ];
+             if (criticalElements.some(el => !el)) {
+                 console.error("錯誤：未能找到所有必要的 HTML 元素。請檢查 HTML 結構和 ID/Class。", DOM);
+                 const missing = criticalElements.findIndex(el => !el);
+                 console.error("Missing element:", criticalElements[missing] ? 'Unknown' : 'Element at index ' + missing);
+                 displayInitializationError("頁面結構錯誤，無法啟動測驗。");
+                 return false;
+             }
+
+            // --- 複製 Preloader SVG 作為 Intro Title ---
+             if (DOM.elements.preloaderSvg && DOM.containers.introTitlePlaceholder) {
+                console.log("準備複製 Preloader SVG 到 Intro...");
+                const clonedSvg = DOM.elements.preloaderSvg.cloneNode(true);
+                clonedSvg.id = 'intro-title-svg';
+                clonedSvg.classList.remove('glow-active', 'svg-exiting');
+                DOM.containers.introTitlePlaceholder.innerHTML = '';
+                DOM.containers.introTitlePlaceholder.appendChild(clonedSvg);
+                DOM.elements.introTitleSvg = clonedSvg; // Store reference
+                console.log("Intro title SVG 已從 Preloader SVG 複製並插入");
+            } else {
+                console.error("無法複製 SVG：找不到 Preloader SVG 或 Intro title placeholder");
+                if (DOM.containers.introTitlePlaceholder) {
+                    DOM.containers.introTitlePlaceholder.innerHTML = '<h1 style="color:red;">Title Error</h1>'; // Fallback title
+                }
+            }
+            // --- End SVG Cloning ---
+
+             console.log("DOM 元素已快取");
+             return true;
+         } catch (error) {
+             console.error("快取 DOM 元素時出錯:", error);
+             displayInitializationError("頁面初始化時發生錯誤。");
+             return false;
+         }
     }
 
     // --- Preloader 到 Intro 的轉場函數 ---
@@ -64,29 +149,25 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("開始 Preloader 到 Intro 的轉場 (滑動效果)...");
         state.isAnimating = true;
 
+        // 1. 觸發 Preloader SVG 的滑動淡出動畫
         if (DOM.elements.preloaderSvg) {
              DOM.elements.preloaderSvg.classList.add('svg-exiting');
              console.log("觸發 Preloader SVG 退場動畫 (.svg-exiting added)");
         }
+
+        // 2. 觸發 Preloader 容器的消失
         DOM.containers.preloader.classList.add('transitioning-out');
         console.log("觸發 Preloader 容器淡出 (.transitioning-out added)");
 
-        if (INTRO_ACTIVATION_OFFSET <= 0) {
-            if (DOM.containers.intro && !DOM.containers.intro.classList.contains('active')) {
-                console.log(`立即激活 Intro 容器`);
-                DOM.containers.intro.classList.add('active');
-                state.introVisible = true;
-            }
-        } else {
-            setTimeout(() => {
-                if (DOM.containers.intro && !DOM.containers.intro.classList.contains('active')) {
-                     console.log(`在 ${INTRO_ACTIVATION_OFFSET}ms 後提早激活 Intro 容器`);
-                     DOM.containers.intro.classList.add('active');
-                     state.introVisible = true;
-                }
-            }, INTRO_ACTIVATION_OFFSET);
+        // --- 立即激活 Intro 容器 (INTRO_ACTIVATION_OFFSET = 0) ---
+        if (DOM.containers.intro && !DOM.containers.intro.classList.contains('active')) {
+            console.log(`立即激活 Intro 容器`);
+            DOM.containers.intro.classList.add('active');
+            state.introVisible = true;
+            // 光暈效果已移除
         }
 
+        // --- 等待 Preloader 動畫結束後清理和解鎖 ---
         setTimeout(() => {
             console.log("Preloader 動畫結束，清理 Preloader class");
             DOM.containers.preloader.classList.remove('active', 'transitioning-out');
@@ -99,31 +180,46 @@ document.addEventListener('DOMContentLoaded', function() {
                  state.introVisible = true;
             }
 
+            // 估算 Intro 最晚動畫結束時間點 (相對於 Preloader 退場開始)
             let latestIntroAnimEndTime = 0;
             try {
-                const footerElement = DOM.containers.intro.querySelector('.card-footer');
-                if (footerElement) {
-                    const styles = getComputedStyle(footerElement);
-                    const delay = parseFloat(styles.animationDelay.replace('s','')) * 1000 || 0;
-                    const duration = parseFloat(styles.animationDuration.replace('s','')) * 1000 || 0;
-                    latestIntroAnimEndTime = INTRO_ACTIVATION_OFFSET + delay + duration;
-                } else {
-                    console.warn("Cannot find footer element to calculate intro animation end time.");
-                    latestIntroAnimEndTime = INTRO_ACTIVATION_OFFSET + 700 + INTRO_FADEIN_DURATION;
-                }
+                 // Find the element with the latest animation start time + duration
+                const titlePlaceholder = DOM.containers.introTitlePlaceholder;
+                const cardBody = DOM.containers.intro.querySelector('.card-body');
+                const cardFooter = DOM.containers.intro.querySelector('.card-footer');
+                let maxEndTime = 0;
+
+                [titlePlaceholder, cardBody, cardFooter].forEach(el => {
+                    if (el) {
+                        const styles = getComputedStyle(el);
+                        const delay = parseFloat(styles.animationDelay.replace('s','')) * 1000 || 0;
+                        const duration = parseFloat(styles.animationDuration.replace('s','')) * 1000 || 0;
+                        // Animation starts relative to Intro activation (time = INTRO_ACTIVATION_OFFSET)
+                        const endTime = INTRO_ACTIVATION_OFFSET + delay + duration;
+                        if (endTime > maxEndTime) {
+                            maxEndTime = endTime;
+                        }
+                    }
+                });
+                latestIntroAnimEndTime = maxEndTime;
+                console.log("Calculated latest intro animation end time:", latestIntroAnimEndTime);
+
             } catch(e) {
                  console.warn("Error getting intro animation timing, using estimate.", e);
-                 latestIntroAnimEndTime = INTRO_ACTIVATION_OFFSET + 700 + INTRO_FADEIN_DURATION;
+                 // Fallback estimation (assuming footer is last, using its fixed CSS delay)
+                 latestIntroAnimEndTime = INTRO_ACTIVATION_OFFSET + (PRELOADER_SVG_EXIT_DURATION * 0.7) + INTRO_FADEIN_DURATION;
             }
 
+            // 需要等待的時間 = 從 Preloader 退場結束點算起，還需要等多久 Intro 動畫才結束
             const timeToWaitAfterPreloaderExit = Math.max(0, latestIntroAnimEndTime - PRELOADER_EXIT_DURATION);
+            console.log(`Waiting additional ${timeToWaitAfterPreloaderExit}ms after preloader exit to unlock state.`);
 
             setTimeout(() => {
-                 state.isAnimating = false;
+                 state.isAnimating = false; // 解鎖狀態
                  console.log("Intro 內容動畫應已完成，解除鎖定。");
-            }, timeToWaitAfterPreloaderExit + 100);
+            }, timeToWaitAfterPreloaderExit + 100); // 加一點緩衝
 
-        }, PRELOADER_EXIT_DURATION);
+        }, PRELOADER_EXIT_DURATION); // 等待 Preloader SVG 動畫的總時長
     }
 
     // --- preloadImages 函數 ---
@@ -136,6 +232,7 @@ document.addEventListener('DOMContentLoaded', function() {
         DOM.containers.preloader.classList.add('active');
         if (DOM.containers.intro) DOM.containers.intro.classList.remove('active'); if (DOM.containers.test) DOM.containers.test.classList.remove('active'); if (DOM.containers.result) DOM.containers.result.classList.remove('active');
 
+        // --- 提早觸發放大效果 ---
         setTimeout(() => {
             if (DOM.containers.preloader.classList.contains('active') && DOM.elements.preloaderSvg) {
                  console.log(`在 ${EARLY_GLOW_TRIGGER_DELAY}ms 後提早觸發 SVG 放大 (添加 .glow-active)`);
@@ -143,6 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, EARLY_GLOW_TRIGGER_DELAY);
 
+        // --- 圖片載入邏輯 ---
         const imageUrls = ['./images/Intro.webp']; questions.forEach((_, index) => imageUrls.push(`./images/Q${index + 1}.webp`)); let loadedCount = 0; const totalImages = imageUrls.length; let errorOccurred = false;
         function updateProgress(isError = false) { loadedCount++; if (isError) errorOccurred = true; if (loadedCount >= totalImages) { state.preloadComplete = true; console.log(`圖片預載入處理完成 ${errorOccurred ? '（有錯誤）' : ''}`); const totalDelay = errorOccurred ? 500 : PRELOADER_EXTRA_DELAY; console.log(`等待額外延遲 ${totalDelay}ms...`); setTimeout(() => { if (DOM.containers.preloader && DOM.containers.preloader.classList.contains('active')) { triggerIntroTransition(); bindStartButton(); } else { console.log("Preloader no longer active, skipping transition."); } }, totalDelay); } }
         imageUrls.forEach(url => { const img = new Image(); img.src = url; img.onload = () => updateProgress(false); img.onerror = () => { console.warn(`圖片載入失敗: ${url}`); updateProgress(true); }; });
@@ -156,20 +254,17 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(`文字爆裂已觸發 for: ${textToExplode}`);
      }
 
-    // --- handleStartTestClick 函數 ---
+    // --- handleStartTestClick (簡化版) ---
      function handleStartTestClick() {
-        console.log("handleStartTestClick triggered."); console.log("State check: preloadComplete =", state.preloadComplete, ", introVisible =", state.introVisible, ", isAnimating =", state.isAnimating);
+        console.log("handleStartTestClick triggered (Simplified).");
         if (!state.preloadComplete || !state.introVisible) { console.warn("內容尚未準備好或 Intro 未顯示。"); return; }
         const buttonElement = DOM.buttons.start; if (!buttonElement) { console.error("Start button not found!"); return; }
-        if (parseFloat(getComputedStyle(buttonElement).opacity) < 0.9) { console.log("Start button is not fully visible yet."); return; }
-        if (state.isAnimating || state.isTransitioning) { console.log("動畫或轉換進行中..."); return; }
-        console.log("Start button clicked, processing effect..."); state.isAnimating = true; state.isTransitioning = true;
-        const textElement = DOM.elements.startBtnText; const explosionContainer = DOM.containers.startBtnExplosion; const buttonText = textElement ? textElement.textContent : '開始測驗';
-        if (!explosionContainer) { console.error("Start button explosion container missing!"); state.isAnimating = false; state.isTransitioning = false; return; }
-        buttonElement.classList.add('exploded'); buttonElement.style.pointerEvents = 'none';
-        const buttonRect = buttonElement.getBoundingClientRect(); const parentRect = explosionContainer.offsetParent ? explosionContainer.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
-        explosionContainer.style.position = 'absolute'; explosionContainer.style.top = `${buttonRect.top - parentRect.top}px`; explosionContainer.style.left = `${buttonRect.left - parentRect.left}px`; explosionContainer.style.width = `${buttonRect.width}px`; explosionContainer.style.height = `${buttonRect.height}px`;
-        requestAnimationFrame(() => { console.log("Triggering start button explosion (option style)"); triggerExplosion(buttonElement, buttonText, explosionContainer); const switchDelay = EXPLOSION_DURATION * 0.8; console.log(`Waiting ${switchDelay}ms for explosion before screen switch.`); setTimeout(() => { console.log("Switching from intro to test after explosion delay"); switchScreen('intro', 'test'); setTimeout(() => { buttonElement.classList.remove('exploded'); buttonElement.style.pointerEvents = ''; explosionContainer.style.position = ''; explosionContainer.style.top = '0'; explosionContainer.style.left = '0'; explosionContainer.style.width = '100%'; explosionContainer.style.height = '100%'; }, SCREEN_TRANSITION_DURATION + 100); }, switchDelay); });
+        // 按鈕可見性檢查 (可選，如果按鈕淡入時間很長的話)
+        // if (parseFloat(getComputedStyle(buttonElement).opacity) < 0.9) { console.log("Start button is not fully visible yet."); return; }
+        if (state.isAnimating || state.isTransitioning) { console.log("動畫或屏幕轉換進行中..."); return; }
+        console.log("Start button clicked, switching screen...");
+        // 直接調用屏幕切換函數
+        switchScreen('intro', 'test');
     }
 
     // --- switchScreen 函數 ---
@@ -186,7 +281,7 @@ document.addEventListener('DOMContentLoaded', function() {
             else if (toScreenId === 'intro') {
                 state.currentQuestionIndex = 0; state.userAnswers = []; state.finalScores = {}; state.contentRendered = false;
                 if(DOM.elements.traitsContainer) DOM.elements.traitsContainer.innerHTML = ''; if(DOM.elements.progressFill) DOM.elements.progressFill.style.width = '0%';
-                 if(DOM.containers.startBtnExplosion) { DOM.containers.startBtnExplosion.style.position = ''; DOM.containers.startBtnExplosion.style.top = ''; DOM.containers.startBtnExplosion.style.left = ''; DOM.containers.startBtnExplosion.style.width = ''; DOM.containers.startBtnExplosion.style.height = ''; }
+                 // startBtnExplosion container 已移除，無需重置
                  // if(DOM.containers.introTitlePlaceholder) DOM.containers.introTitlePlaceholder.classList.remove('intro-title-glow'); // 光暈已移除
             }
             setTimeout(() => {

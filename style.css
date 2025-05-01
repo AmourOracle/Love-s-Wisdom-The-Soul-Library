@@ -62,12 +62,10 @@ body {
     from {
         opacity: 1;
         transform: scale(1.05) translateY(0); /* 從放大狀態開始 */
-        /* filter 不再需要 */
     }
     to {
         opacity: 0;
         transform: scale(0.7) translateY(-150%); /* 向上位移並縮小 */
-        /* filter 不再需要 */
     }
 }
 
@@ -80,8 +78,6 @@ body {
 /* --- SVG Animation Keyframes (Preloader Entrance) --- */
 @keyframes drawStrokeAndFill { 0% { stroke-dashoffset: 1500; fill: none; fill-opacity: 0; opacity: 1; } 70% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 0; opacity: 1; } 100% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 1; opacity: 1; } }
 @keyframes fadeInGroup { from { opacity: 0; } to { opacity: 1; } }
-/* @keyframes glow (已移除) */
-/* @keyframes fadeInGlow (已移除) */
 
 /* ================= 預加載畫面 ================= */
 .preloader {
@@ -106,15 +102,13 @@ body {
 
 #preloader-svg {
     width: 100%; height: auto; display: block; overflow: visible;
-    will-change: transform, opacity; /* 移除 filter */
+    will-change: transform, opacity;
     transform: translateY(0) scale(1);
     opacity: 1;
-    filter: none; /* 確保無濾鏡 */
-    /* 修改: 只保留 transform 的 transition */
+    filter: none;
     transition: transform var(--svg-scale-duration) ease-in-out;
 }
 #preloader-svg.glow-active {
-    /* 不再應用任何 animation */
     transform: scale(1.05); /* 直接觸發放大 */
 }
 /* 應用 SVG 退場動畫的狀態 */
@@ -163,9 +157,7 @@ body {
     margin-top: 18%; /* 增加上邊距以垂直居中 */
     margin-bottom: 15px; /* 調整下邊距 */
     opacity: 0; /* 初始隱藏 */
-    /* filter 不再需要 */
 }
-/* 移除 .intro-title-glow 規則 */
 
 /* --- Intro 標題 SVG 的樣式 --- */
 #intro-title-svg { width: 100%; height: auto; display: block; }
@@ -189,18 +181,15 @@ body {
 
 /* --- Intro 動畫應用 --- */
 #intro-container.active .background-layer {
-    animation: introElementFadeIn var(--intro-fadein-duration) ease-out forwards; /* 延遲為 0 */
+    animation: introElementFadeIn var(--intro-fadein-duration) ease-out forwards;
 }
 #intro-container.active .intro-title-placeholder {
-    /* 調整延遲，使其在 Preloader 退場動畫中途出現 */
     animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--preloader-svg-exit-duration) * 0.5) forwards;
 }
 #intro-container.active .card-body {
-    /* 在標題後出現 */
     animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--preloader-svg-exit-duration) * 0.6) forwards;
 }
 #intro-container.active .card-footer {
-    /* 最後出現 */
     animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--preloader-svg-exit-duration) * 0.7) forwards;
 }
 
@@ -210,7 +199,7 @@ body {
 .btn-svg-style:hover { background-color: rgba(246, 71, 64, 0.15); color: #ffffff; border-color: rgba(255, 255, 255, 0.9); transform: translateY(-2px) scale(1.02); box-shadow: 0 0 15px rgba(246, 71, 64, 0.6); }
 .btn-svg-style .btn-text { display: inline-block; transition: opacity 0.3s ease; opacity: 1; }
 .btn-svg-style .btn-text.hidden { opacity: 0; }
-.btn.exploded { opacity: 0 !important; transform: scale(0.9) !important; transition: opacity 0.3s ease-out, transform 0.3s ease-out !important; pointer-events: none; }
+/* .btn.exploded 規則已被移除 */
 .primary-btn { background-color: var(--primary-color); color: white; }
 .primary-btn:hover { background-color: #e53935; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); }
 .secondary-btn { background-color: transparent; color: white; border: 1px solid white; }
@@ -264,14 +253,14 @@ h3 { color: var(--secondary-color); margin-bottom: 15px; font-size: 18px; }
     .content-layer { padding: 20px 20px; }
     .card-body .description { font-size: 16px; }
     .progress-container { padding: 8px 15px 2px; }
-    .intro-title-placeholder { width: 90%; margin-top: 15%; } /* Adjust responsive margin */
+    .intro-title-placeholder { width: 90%; margin-top: 15%; }
 }
 @media (max-width: 375px) and (max-height: 667px) {
     #question-title { font-size: 18px; margin-bottom: 25px; }
     .option { padding: 10px 15px; font-size: 13px; min-height: 40px; }
     #options-container { gap: 8px; }
     .content-layer { padding: 15px 15px; }
-    .intro-title-placeholder { width: 95%; margin-top: 12%; } /* Adjust responsive margin */
+    .intro-title-placeholder { width: 95%; margin-top: 12%; }
      .card-body .description { font-size: 15px; }
 }
 @media (max-width: 900px) and (orientation: landscape) {
@@ -281,5 +270,5 @@ h3 { color: var(--secondary-color); margin-bottom: 15px; font-size: 18px; }
     #options-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 90%; }
     .result-card { margin: 20px auto; }
     .content-layer { padding: 10px 20px; }
-    .intro-title-placeholder { width: 70%; margin-top: 5%; } /* Adjust responsive margin */
+    .intro-title-placeholder { width: 70%; margin-top: 5%; }
 }
