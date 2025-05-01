@@ -14,16 +14,16 @@
 
     /* --- 動畫時間 --- */
     --preloader-svg-exit-duration: 1.2s; /* Preloader SVG 退場動畫時間 (可調整) */
-    --intro-title-glow-delay: calc(var(--preloader-svg-exit-duration) * 0.6); /* Intro 標題光暈延遲 */
+    /* --intro-title-glow-delay 不再需要 */
     --preloader-exit-duration: var(--preloader-svg-exit-duration); /* 同步 Preloader 容器消失時間 */
     --intro-fadein-delay: 0s; /* Intro 元素基礎延遲，具體由各元素動畫設置 */
     --intro-fadein-duration: 1s; /* Intro 元素淡入持續時間 */
 
     /* --- SVG Animation Timings (For Preloader Entrance) --- */
-    --svg-base-draw-duration: 2.5s;
-    --svg-glow-delay: calc(var(--svg-base-draw-duration) * 1.1); /* 用於 fadeInGlow 的延遲 */
-    --svg-glow-duration: 2.5s; /* 用於 fadeInGlow 的持續時間 */
-    --svg-scale-duration: var(--svg-glow-duration); /* 放大效果的 transition 時間 */
+    --svg-base-draw-duration: 2.5s; /* 描邊填色時間 */
+    /* --svg-glow-delay 不再需要 */
+    /* --svg-glow-duration 不再需要 */
+    --svg-scale-duration: var(--svg-base-draw-duration); /* 讓放大效果和描邊填色同步發生 */
     --svg-stagger-delay: 0.15s;
     --svg-fade-in-duration: 1.5s;
     --svg-fade-in-delay: 0.6s;
@@ -57,17 +57,17 @@ body {
     100% { opacity: 0; filter: blur(8px); transform: translate3d(var(--tx, 0), var(--ty, 0), var(--tz, 0)) rotate(var(--rz, 0deg)) scale(var(--sc, 1)); }
 }
 
-/* --- Preloader SVG 滑動淡出動畫 (調整數值) --- */
+/* --- Preloader SVG 滑動淡出動畫 --- */
 @keyframes preloaderSvgSlideUpFadeOut {
     from {
         opacity: 1;
-        transform: scale(1.05) translateY(0);
-        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 15px rgba(246, 71, 64, 0.6));
+        transform: scale(1.05) translateY(0); /* 從放大狀態開始 */
+        /* filter 不再需要 */
     }
     to {
         opacity: 0;
-        transform: scale(0.7) translateY(-150%); /* 增加向上位移，減小縮放 */
-        filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)) drop-shadow(0 0 0px rgba(246, 71, 64, 0));
+        transform: scale(0.7) translateY(-150%); /* 向上位移並縮小 */
+        /* filter 不再需要 */
     }
 }
 
@@ -80,8 +80,8 @@ body {
 /* --- SVG Animation Keyframes (Preloader Entrance) --- */
 @keyframes drawStrokeAndFill { 0% { stroke-dashoffset: 1500; fill: none; fill-opacity: 0; opacity: 1; } 70% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 0; opacity: 1; } 100% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 1; opacity: 1; } }
 @keyframes fadeInGroup { from { opacity: 0; } to { opacity: 1; } }
-/* @keyframes glow (移除，解決閃爍) */
-@keyframes fadeInGlow { from { filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)) drop-shadow(0 0 0px rgba(246, 71, 64, 0)); opacity: 0; } to { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4)); opacity: 1;} }
+/* @keyframes glow (已移除) */
+/* @keyframes fadeInGlow (已移除) */
 
 /* ================= 預加載畫面 ================= */
 .preloader {
@@ -106,20 +106,21 @@ body {
 
 #preloader-svg {
     width: 100%; height: auto; display: block; overflow: visible;
-    will-change: filter, transform, opacity;
+    will-change: transform, opacity; /* 移除 filter */
     transform: translateY(0) scale(1);
-    opacity: 1; filter: none;
-    /* 放大效果主要由 transition 控制 */
-    transition: transform var(--svg-scale-duration) ease-in-out, opacity var(--preloader-svg-exit-duration) ease-out, filter var(--preloader-svg-exit-duration) ease-out;
+    opacity: 1;
+    filter: none; /* 確保無濾鏡 */
+    /* 修改: 只保留 transform 的 transition */
+    transition: transform var(--svg-scale-duration) ease-in-out;
 }
 #preloader-svg.glow-active {
-    /* 只應用 fadeInGlow 動畫，移除循環的 glow 動畫 */
-    animation: fadeInGlow calc(var(--svg-glow-duration) * 0.4) ease-out var(--svg-glow-delay) forwards;
-    transform: scale(1.05); /* 觸發放大 */
+    /* 不再應用任何 animation */
+    transform: scale(1.05); /* 直接觸發放大 */
 }
 /* 應用 SVG 退場動畫的狀態 */
 #preloader-svg.svg-exiting {
     animation: preloaderSvgSlideUpFadeOut var(--preloader-svg-exit-duration) cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
+    /* 由於退場動畫包含 opacity，基礎 transition 中的 opacity 已移除 */
 }
 
 /* --- SVG Path/Group Animation Setup (Preloader Entrance) --- */
@@ -132,7 +133,6 @@ body {
 #preloader-svg #eng-subtitle-group, #preloader-svg #chn-subtitle-group { opacity: 0; will-change: opacity; animation: fadeInGroup var(--svg-fade-in-duration) ease-in forwards; animation-delay: var(--svg-fade-in-delay); }
 #preloader-svg #eng-subtitle-group path, #preloader-svg #chn-subtitle-group path { opacity: 1; fill: #ffffff; stroke: none; stroke-dasharray: none; stroke-dashoffset: 0; stroke-width: 0; animation: none; fill-opacity: 1; }
 #preloader-svg #chn-subtitle-group .st3 { fill: #f2f2f2; }
-
 
 /* ================= 通用屏幕容器 ================= */
 .screen-container { display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; visibility: hidden; transition: opacity var(--transition-duration) var(--transition-timing), visibility 0s linear var(--transition-duration); overflow: hidden; background-color: var(--deep-blue-bg); }
@@ -162,12 +162,10 @@ body {
 .intro-title-placeholder {
     width: 90%; max-width: 450px; text-align: center;
     margin-top: 5%; margin-bottom: 20px;
-    opacity: 0; transition: filter 0.5s ease-out; filter: none;
+    opacity: 0; /* 初始隱藏 */
+    /* filter 不再需要 */
 }
-/* Intro 標題光暈狀態 */
-.intro-title-placeholder.intro-title-glow {
-    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.7)) drop-shadow(0 0 12px rgba(246, 71, 64, 0.5));
-}
+/* 移除 .intro-title-glow 規則 */
 
 /* --- Intro 標題 SVG 的樣式 --- */
 #intro-title-svg { width: 100%; height: auto; display: block; }
@@ -194,15 +192,17 @@ body {
     animation: introElementFadeIn var(--intro-fadein-duration) ease-out forwards; /* 延遲為 0 */
 }
 #intro-container.active .intro-title-placeholder {
-    animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--intro-title-glow-delay) + 0.2s) forwards;
+    /* 調整延遲，使其在 Preloader 退場動畫中途出現 */
+    animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--preloader-svg-exit-duration) * 0.5) forwards;
 }
 #intro-container.active .card-body {
-    animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--intro-title-glow-delay) + 0.4s) forwards;
+    /* 在標題後出現 */
+    animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--preloader-svg-exit-duration) * 0.6) forwards;
 }
 #intro-container.active .card-footer {
-    animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--intro-title-glow-delay) + 0.6s) forwards;
+    /* 最後出現 */
+    animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--preloader-svg-exit-duration) * 0.7) forwards;
 }
-
 
 /* ================= 按鈕樣式 ================= */
 .btn { display: inline-block; padding: 14px 28px; border-radius: 50px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; font-family: 'Noto Serif TC', serif; text-align: center; margin: 0 auto; position: relative; }
