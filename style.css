@@ -13,7 +13,7 @@
     --deep-blue-bg: #121824; /* 深藍背景 */
 
     /* --- 動畫時間 --- */
-    --preloader-svg-exit-duration: 1.5s; /* Preloader SVG 退場動畫時間 */
+    --preloader-svg-exit-duration: 1.2s; /* Preloader SVG 退場動畫時間 (可調整) */
     --intro-title-glow-delay: calc(var(--preloader-svg-exit-duration) * 0.6); /* Intro 標題光暈延遲 */
     --preloader-exit-duration: var(--preloader-svg-exit-duration); /* 同步 Preloader 容器消失時間 */
     --intro-fadein-delay: 0s; /* Intro 元素基礎延遲，具體由各元素動畫設置 */
@@ -21,9 +21,9 @@
 
     /* --- SVG Animation Timings (For Preloader Entrance) --- */
     --svg-base-draw-duration: 2.5s;
-    --svg-glow-delay: calc(var(--svg-base-draw-duration) * 1.1);
-    --svg-glow-duration: 2.5s;
-    --svg-scale-duration: var(--svg-glow-duration);
+    --svg-glow-delay: calc(var(--svg-base-draw-duration) * 1.1); /* 用於 fadeInGlow 的延遲 */
+    --svg-glow-duration: 2.5s; /* 用於 fadeInGlow 的持續時間 */
+    --svg-scale-duration: var(--svg-glow-duration); /* 放大效果的 transition 時間 */
     --svg-stagger-delay: 0.15s;
     --svg-fade-in-duration: 1.5s;
     --svg-fade-in-delay: 0.6s;
@@ -61,14 +61,13 @@ body {
 @keyframes preloaderSvgSlideUpFadeOut {
     from {
         opacity: 1;
-        transform: scale(1.05) translateY(0); /* 從放大狀態開始 */
-        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 15px rgba(246, 71, 64, 0.6)); /* 保持光暈 */
+        transform: scale(1.05) translateY(0);
+        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 15px rgba(246, 71, 64, 0.6));
     }
     to {
         opacity: 0;
-        /* 加大向上移動距離，調整縮放 */
-        transform: scale(0.7) translateY(-150%);
-        filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)) drop-shadow(0 0 0px rgba(246, 71, 64, 0)); /* 光暈消失 */
+        transform: scale(0.7) translateY(-150%); /* 增加向上位移，減小縮放 */
+        filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)) drop-shadow(0 0 0px rgba(246, 71, 64, 0));
     }
 }
 
@@ -81,7 +80,7 @@ body {
 /* --- SVG Animation Keyframes (Preloader Entrance) --- */
 @keyframes drawStrokeAndFill { 0% { stroke-dashoffset: 1500; fill: none; fill-opacity: 0; opacity: 1; } 70% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 0; opacity: 1; } 100% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 1; opacity: 1; } }
 @keyframes fadeInGroup { from { opacity: 0; } to { opacity: 1; } }
-@keyframes glow { from { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4)); } to { filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 15px rgba(246, 71, 64, 0.6)); } }
+/* @keyframes glow (移除，解決閃爍) */
 @keyframes fadeInGlow { from { filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)) drop-shadow(0 0 0px rgba(246, 71, 64, 0)); opacity: 0; } to { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 10px rgba(246, 71, 64, 0.4)); opacity: 1;} }
 
 /* ================= 預加載畫面 ================= */
@@ -110,14 +109,13 @@ body {
     will-change: filter, transform, opacity;
     transform: translateY(0) scale(1);
     opacity: 1; filter: none;
+    /* 放大效果主要由 transition 控制 */
     transition: transform var(--svg-scale-duration) ease-in-out, opacity var(--preloader-svg-exit-duration) ease-out, filter var(--preloader-svg-exit-duration) ease-out;
 }
-
 #preloader-svg.glow-active {
-    /* 修改 animation，移除 glow 部分 */
+    /* 只應用 fadeInGlow 動畫，移除循環的 glow 動畫 */
     animation: fadeInGlow calc(var(--svg-glow-duration) * 0.4) ease-out var(--svg-glow-delay) forwards;
-    /* 原本的 transform: scale(1.05); 保持不變，因為放大效果需要 */
-    transform: scale(1.05);
+    transform: scale(1.05); /* 觸發放大 */
 }
 /* 應用 SVG 退場動畫的狀態 */
 #preloader-svg.svg-exiting {
@@ -148,100 +146,54 @@ body {
 #intro-container { /* 保持為容器 */ }
 
 .background-layer {
-    position: absolute; /* 背景層在底層 */
-    top: 0; left: 0; width: 100%; height: 100%;
-    z-index: 1; /* 低層級 */
-    overflow: hidden; /* 防止背景溢出 */
-    opacity: 0; /* 初始隱藏，由動畫控制 */
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 1; overflow: hidden; opacity: 0;
 }
 .content-layer {
-    position: relative; /* 內容層在上面 */
-    z-index: 2; /* 高層級 */
-    width: 100%; height: 100%;
-    display: flex; /* 使用 Flexbox 佈局 */
-    flex-direction: column; /* 垂直排列 */
-    align-items: center; /* 水平居中所有子元素 */
-    justify-content: space-between; /* 將子元素推向頂部和底部 */
-    padding: 20px 30px; /* 內邊距 */
-    color: var(--text-color); /* 確保文字顏色正確 */
+    position: relative; z-index: 2; width: 100%; height: 100%;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: space-between; padding: 20px 30px; color: var(--text-color);
 }
 
-.intro-background {
-    width: 100%; height: 100%;
-    background-size: cover; background-position: center;
-}
-.intro-overlay {
-    position: absolute; /* 遮罩層疊在背景圖上 */
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 30%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0.7) 100%);
-}
+.intro-background { width: 100%; height: 100%; background-size: cover; background-position: center; }
+.intro-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 30%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0.7) 100%); }
 
 /* --- Intro Title Placeholder (Flex item) --- */
 .intro-title-placeholder {
-    width: 90%;
-    max-width: 450px;
-    text-align: center;
-    margin-top: 5%;
-    margin-bottom: 20px;
-    opacity: 0; /* 初始隱藏 */
-    /* 添加 transition 以便光暈平滑出現 */
-    transition: filter 0.5s ease-out;
-    filter: none; /* 初始無光暈 */
+    width: 90%; max-width: 450px; text-align: center;
+    margin-top: 5%; margin-bottom: 20px;
+    opacity: 0; transition: filter 0.5s ease-out; filter: none;
 }
 /* Intro 標題光暈狀態 */
 .intro-title-placeholder.intro-title-glow {
     filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.7)) drop-shadow(0 0 12px rgba(246, 71, 64, 0.5));
 }
 
-/* --- 新增：Intro 標題 SVG 的樣式 --- */
-#intro-title-svg {
-    width: 100%; /* SVG 寬度適應容器 */
-    height: auto; /* 高度自動 */
-    display: block;
-}
-/* 為 Intro 中的 SVG path 設定預設外觀 */
-#intro-title-svg path {
-     fill: var(--text-color); /* 預設填充色 */
-     stroke: none; /* 無描邊 */
-     opacity: 1;
-     /* 移除動畫相關樣式 */
-     animation: none !important;
-     stroke-dasharray: none !important;
-     stroke-dashoffset: 0 !important;
-}
-/* 如果需要，為特定部分設定顏色 */
+/* --- Intro 標題 SVG 的樣式 --- */
+#intro-title-svg { width: 100%; height: auto; display: block; }
+#intro-title-svg path { fill: var(--text-color); stroke: none; opacity: 1; animation: none !important; stroke-dasharray: none !important; stroke-dashoffset: 0 !important; }
 #intro-title-svg #eng-subtitle-group path { fill: #cccccc; }
 #intro-title-svg #chn-subtitle-group path { fill: #cccccc; }
 #intro-title-svg #chn-subtitle-group .st3 { fill: #b3b3b3; }
-/* 移除 H1 和 P 的特定樣式 */
-/* .intro-main-title, .intro-subtitle 不再需要 */
 
 /* Card Body, Footer */
 .card-body {
-    flex-grow: 1; /* 佔據可用空間 */
-    display: flex; flex-direction: column; justify-content: center;
-    width: 100%;
-    max-width: 90%;
-    margin-left: auto; margin-right: auto;
-    opacity: 0; /* 初始隱藏 */
+    flex-grow: 1; display: flex; flex-direction: column; justify-content: center;
+    width: 100%; max-width: 90%; margin-left: auto; margin-right: auto;
+    opacity: 0;
 }
 .card-body .description { font-size: 17px; line-height: 1.7; margin-bottom: 15px; text-align: center; }
 .card-footer {
-    width: 100%;
-    margin-bottom: 5%;
-    text-align: center; position: relative;
-    opacity: 0; /* 初始隱藏 */
+    width: 100%; margin-bottom: 5%; text-align: center; position: relative;
+    opacity: 0;
 }
 .card-meta { margin-top: 20px; font-size: 12px; opacity: 0.7; text-align: center; }
 
 /* --- Intro 動畫應用 --- */
 #intro-container.active .background-layer {
-    animation: introElementFadeIn var(--intro-fadein-duration) ease-out forwards; /* 確保延遲為 0s */
-    /* animation-delay: 0s; */ /* 可以明確寫出，或依賴 forwards */
-     opacity: 0; /* 確保初始為0 */
+    animation: introElementFadeIn var(--intro-fadein-duration) ease-out forwards; /* 延遲為 0 */
 }
 #intro-container.active .intro-title-placeholder {
-    /* 標題動畫 (延遲觸發，配合光暈) */
     animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--intro-title-glow-delay) + 0.2s) forwards;
 }
 #intro-container.active .card-body {
@@ -310,7 +262,6 @@ h3 { color: var(--secondary-color); margin-bottom: 15px; font-size: 18px; }
     #options-container { gap: 10px; }
     .option { padding: 12px 20px; font-size: 14px; min-height: 44px;}
     .content-layer { padding: 20px 20px; }
-    /* Removed font-size overrides for H1/P as title is SVG now */
     .card-body .description { font-size: 16px; }
     .progress-container { padding: 8px 15px 2px; }
     .intro-title-placeholder { width: 90%; margin-top: 3%; }
@@ -320,7 +271,6 @@ h3 { color: var(--secondary-color); margin-bottom: 15px; font-size: 18px; }
     .option { padding: 10px 15px; font-size: 13px; min-height: 40px; }
     #options-container { gap: 8px; }
     .content-layer { padding: 15px 15px; }
-    /* Removed font-size overrides for H1/P */
     .intro-title-placeholder { width: 95%; margin-top: 2%; }
      .card-body .description { font-size: 15px; }
 }
@@ -331,6 +281,5 @@ h3 { color: var(--secondary-color); margin-bottom: 15px; font-size: 18px; }
     #options-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 90%; }
     .result-card { margin: 20px auto; }
     .content-layer { padding: 10px 20px; }
-    /* Removed font-size overrides for H1/P */
     .intro-title-placeholder { width: 70%; margin-top: 2%; }
 }
