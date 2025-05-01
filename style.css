@@ -13,7 +13,7 @@
     --deep-blue-bg: #121824; /* 深藍背景 */
 
     /* --- 動畫時間 --- */
-    --preloader-svg-exit-duration: 1.2s; /* Preloader SVG 退場動畫時間 */
+    --preloader-svg-exit-duration: 1.5s; /* Preloader SVG 退場動畫時間 */
     --intro-title-glow-delay: calc(var(--preloader-svg-exit-duration) * 0.6); /* Intro 標題光暈延遲 */
     --preloader-exit-duration: var(--preloader-svg-exit-duration); /* 同步 Preloader 容器消失時間 */
     --intro-fadein-delay: 0s; /* Intro 元素基礎延遲，具體由各元素動畫設置 */
@@ -57,17 +57,18 @@ body {
     100% { opacity: 0; filter: blur(8px); transform: translate3d(var(--tx, 0), var(--ty, 0), var(--tz, 0)) rotate(var(--rz, 0deg)) scale(var(--sc, 1)); }
 }
 
-/* --- Preloader SVG 滑動淡出動畫 --- */
+/* --- Preloader SVG 滑動淡出動畫 (調整數值) --- */
 @keyframes preloaderSvgSlideUpFadeOut {
     from {
         opacity: 1;
-        transform: scale(1.05) translateY(0);
-        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 15px rgba(246, 71, 64, 0.6));
+        transform: scale(1.05) translateY(0); /* 從放大狀態開始 */
+        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 15px rgba(246, 71, 64, 0.6)); /* 保持光暈 */
     }
     to {
         opacity: 0;
-        transform: scale(0.8) translateY(-120%);
-        filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)) drop-shadow(0 0 0px rgba(246, 71, 64, 0));
+        /* 加大向上移動距離，調整縮放 */
+        transform: scale(0.7) translateY(-150%);
+        filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0)) drop-shadow(0 0 0px rgba(246, 71, 64, 0)); /* 光暈消失 */
     }
 }
 
@@ -111,9 +112,11 @@ body {
     opacity: 1; filter: none;
     transition: transform var(--svg-scale-duration) ease-in-out, opacity var(--preloader-svg-exit-duration) ease-out, filter var(--preloader-svg-exit-duration) ease-out;
 }
+
 #preloader-svg.glow-active {
-    animation: fadeInGlow calc(var(--svg-glow-duration) * 0.4) ease-out var(--svg-glow-delay) forwards,
-               glow var(--svg-glow-duration) ease-in-out calc(var(--svg-glow-delay) + (var(--svg-glow-duration) * 0.4)) infinite alternate;
+    /* 修改 animation，移除 glow 部分 */
+    animation: fadeInGlow calc(var(--svg-glow-duration) * 0.4) ease-out var(--svg-glow-delay) forwards;
+    /* 原本的 transform: scale(1.05); 保持不變，因為放大效果需要 */
     transform: scale(1.05);
 }
 /* 應用 SVG 退場動畫的狀態 */
