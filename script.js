@@ -84,6 +84,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const SVG_GLOW_DELAY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-glow-delay').replace('s','')) * 1000 || 3000;
     const EARLY_GLOW_TRIGGER_DELAY = 100;
     const INTRO_ACTIVATION_OFFSET = 0;
+    // 动画持续时间常量
+    const OPTION_EXPLODE_DURATION = 800; // 选项爆炸动画持续时间(毫秒)
+    const CONTENT_FADEOUT_DURATION = 600; // 内容淡出持续时间(毫秒)
+    const QUESTION_FADEIN_DURATION = 800; // 问题淡入持续时间(毫秒)
 
     // --- 輔助函數 ---
     function setViewportHeight() { 
@@ -418,13 +422,28 @@ document.addEventListener('DOMContentLoaded', function() {
         const questionData = questions[index]; 
         const questionNumber = index + 1;
         
+        // 背景图片淡入效果
         if (DOM.elements.testBackground) { 
             const imageUrl = `./images/Q${questionNumber}.webp`; 
+            
+            // 删除之前的动画类
+            DOM.elements.testBackground.classList.remove('fade-out');
+            
+            // 设置新背景并添加淡入动画
             DOM.elements.testBackground.style.backgroundImage = `url('${imageUrl}')`; 
+            DOM.elements.testBackground.classList.add('fade-in');
         }
         
+        // 问题文本淡入效果
         if (DOM.elements.questionTitle) { 
+            // 淡入动画前先清除之前的类
+            DOM.elements.questionTitle.classList.remove('fade-out');
+            
+            // 设置新问题文本
             DOM.elements.questionTitle.innerText = questionData.question.replace(/^\d+\.\s*/, ''); 
+            
+            // 添加自上而下淡入动画
+            DOM.elements.questionTitle.classList.add('fade-in');
         }
         
         if (DOM.containers.options) {
@@ -438,6 +457,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 optionElement.innerText = optionData.text; 
                 optionElement.setAttribute('role', 'button');
                 optionElement.tabIndex = 0; 
+                
+                // 为新选项设置淡入动画
+                optionElement.style.animation = 'fadeIn 0.5s forwards';
+                optionElement.style.animationDelay = `${0.1 * optIndex}s`; // 错开每个选项的动画
+                
                 optionElement.addEventListener('click', handleOptionClick); 
                 optionElement.addEventListener('keydown', (e) => { 
                     if (e.key === 'Enter' || e.key === ' ') { 
@@ -452,15 +476,41 @@ document.addEventListener('DOMContentLoaded', function() {
             allOptions = Array.from(DOM.containers.options.querySelectorAll('.option'));
             console.log(`問題 ${questionNumber} 和選項已顯示`);
             
-            // 使用 requestAnimationFrame 確保下一幀解鎖狀態
-            requestAnimationFrame(() => { 
-                stateManager.unlock('isTransitioning'); 
-                console.log("isTransitioning 解鎖 (displayQuestion)"); 
-            });
+            // 监听动画完成事件以解锁状态
+            const lastOption = allOptions[allOptions.length - 1];
+            if (lastOption) {
+                const unlockAfterAnimation = () => {
+                    stateManager.unlock('isTransitioning'); 
+                    console.log("isTransitioning 解锁 (displayQuestion)"); 
+                    lastOption.removeEventListener('animationend', unlockAfterAnimation);
+                };
+                
+                lastOption.addEventListener('animationend', unlockAfterAnimation);
+            } else {
+                // 如果没有选项，还是要解锁
+                requestAnimationFrame(() => { 
+                    stateManager.unlock('isTransitioning'); 
+                    console.log("isTransitioning 解锁 (displayQuestion - no options)"); 
+                });
+            }
         } else { 
             console.error("找不到 options-container"); 
             stateManager.unlock('isTransitioning'); 
         }
+        
+        // 为动画元素添加事件监听器，在动画完成后清除类名
+        const cleanupAnimations = (element, className) => {
+            if (element) {
+                const onAnimationEnd = () => {
+                    element.classList.remove(className);
+                    element.removeEventListener('animationend', onAnimationEnd);
+                };
+                element.addEventListener('animationend', onAnimationEnd);
+            }
+        };
+        
+        cleanupAnimations(DOM.elements.testBackground, 'fade-in');
+        cleanupAnimations(DOM.elements.questionTitle, 'fade-in');
     }
     
     function handleOptionClick(event) {
@@ -485,13 +535,36 @@ document.addEventListener('DOMContentLoaded', function() {
         
         state.userAnswers[questionIndex] = optionIndex;
         
-        if (stateManager.get('currentQuestionIndex') < questions.length - 1) {
-            console.log("準備顯示下一個問題...");
-            prepareNextQuestion();
-        } else {
-            console.log("最後一題完成，準備顯示結果...");
-            showResults();
+        // 添加爆炸动画到选中的选项
+        clickedOption.classList.add('exploding');
+        
+        // 同时让其他选项淡出
+        const allOptions = Array.from(DOM.containers.options.querySelectorAll('.option'));
+        allOptions.forEach(option => {
+            if (option !== clickedOption) {
+                option.style.animation = 'fadeOut 0.5s forwards';
+            }
+        });
+        
+        // 添加问题和背景的淡出动画
+        if (DOM.elements.questionTitle) {
+            DOM.elements.questionTitle.classList.add('fade-out');
         }
+        
+        if (DOM.elements.testBackground) {
+            DOM.elements.testBackground.classList.add('fade-out');
+        }
+        
+        // 等待动画完成后切换到下一个问题
+        setTimeout(() => {
+            if (stateManager.get('currentQuestionIndex') < questions.length - 1) {
+                console.log("準備顯示下一個問題...");
+                prepareNextQuestion();
+            } else {
+                console.log("最後一題完成，準備顯示結果...");
+                showResults();
+            }
+        }, 700); // 设置为略小于动画时长，确保平滑过渡
     }
     
     function prepareNextQuestion() {

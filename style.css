@@ -25,6 +25,12 @@
     --svg-fade-in-duration: 1.5s;
     --svg-fade-in-delay: 0.6s;
     --svg-glow-delay: 3s;
+    
+    /* --- 新增動畫時間變數 --- */
+    --option-explode-duration: 0.8s;
+    --content-fadeout-duration: 0.6s;
+    --content-fadein-duration: 0.8s;
+    --question-slidein-duration: 0.8s;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -71,6 +77,31 @@ body {
 @keyframes fadeInGroup { 
     from { opacity: 0; } 
     to { opacity: 1; } 
+}
+
+/* --- 新增選項爆炸動畫 --- */
+@keyframes optionExplode {
+    0% { transform: scale(1); opacity: 1; filter: blur(0); }
+    50% { transform: scale(1.2); opacity: 0.7; filter: blur(2px); }
+    100% { transform: scale(1.5); opacity: 0; filter: blur(5px); }
+}
+
+/* --- 新增問題/背景淡出模糊 --- */
+@keyframes contentFadeOutBlur {
+    0% { opacity: 1; filter: blur(0); }
+    100% { opacity: 0; filter: blur(10px); }
+}
+
+/* --- 新增問題/背景淡入清晰 --- */
+@keyframes contentFadeInBlur {
+    0% { opacity: 0; filter: blur(10px); }
+    100% { opacity: 1; filter: blur(0); }
+}
+
+/* --- 新增問題自上而下淡入 --- */
+@keyframes questionSlideDown {
+    0% { transform: translateY(-20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
 }
 
 /* 錯誤提示樣式 */
@@ -390,7 +421,16 @@ body {
     z-index: 5; 
     opacity: 1; 
     filter: blur(0px);
-    will-change: background-image;
+    will-change: background-image, opacity, filter; /* 優化性能 */
+}
+
+/* 新增背景淡入淡出動畫樣式 */
+#test-background.fade-out {
+    animation: contentFadeOutBlur var(--content-fadeout-duration) forwards;
+}
+
+#test-background.fade-in {
+    animation: contentFadeInBlur var(--content-fadein-duration) forwards;
 }
 
 .progress-container { 
@@ -432,7 +472,16 @@ body {
     opacity: 1; 
     filter: blur(0px); 
     transform: translateY(0);
-    will-change: content;
+    will-change: transform, opacity, filter; /* 優化性能 */
+}
+
+/* 新增問題淡入淡出動畫樣式 */
+#question-title.fade-in {
+    animation: questionSlideDown var(--question-slidein-duration) forwards;
+}
+
+#question-title.fade-out {
+    animation: contentFadeOutBlur var(--content-fadeout-duration) forwards;
 }
 
 #options-container { 
@@ -463,11 +512,17 @@ body {
     filter: blur(0px); 
     transform: translateY(0);
     transition: background-color 0.2s ease;
-    will-change: transform, opacity;
+    will-change: transform, opacity, filter; /* 優化性能 */
 }
 
 .option:hover { 
     background-color: rgba(255, 255, 255, 0.2); 
+}
+
+/* 新增選項爆炸動畫樣式 */
+.option.exploding {
+    animation: optionExplode var(--option-explode-duration) forwards;
+    pointer-events: none; /* 防止動畫過程中再次點擊 */
 }
 
 /* ================= 結果頁面 specific ================= */
@@ -682,6 +737,21 @@ h3 {
 #result-container .secondary-btn:hover { 
     background-color: rgba(0, 0, 0, 0.05); 
     transform: translateY(-2px); 
+}
+
+/* ================= 優化無障礙動畫設定 ================= */
+@media (prefers-reduced-motion: reduce) {
+    /* 為需要減少動畫的用戶提供簡化版本 */
+    .option.exploding {
+        animation-duration: 0.3s;
+    }
+    
+    #question-title.fade-in,
+    #question-title.fade-out,
+    #test-background.fade-in,
+    #test-background.fade-out {
+        animation-duration: 0.3s;
+    }
 }
 
 /* ================= 響應式設計 ================= */
