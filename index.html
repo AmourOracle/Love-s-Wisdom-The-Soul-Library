@@ -12,6 +12,10 @@
     <link rel="preload" href="./images/Q1.webp" as="image">
 </head>
 <body>
+    <script src="js/lib/typeit.min.js"></script> <!-- 優先載入 TypeIt.js -->
+<script src="js/data.js"></script>
+<script type="module" src="js/main.js"></script>
+
     <div class="container">
         <div id="intro-container" class="screen-container active">
             <div class="background-layer">
@@ -133,9 +137,5 @@
             </div>
         </div>
     </div>
-
-    <!-- 修改：使用 ES 模組載入 -->
-<script src="js/data.js"></script>
-<script type="module" src="js/main.js"></script>
 </body>
 </html>
