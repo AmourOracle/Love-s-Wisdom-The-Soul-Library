@@ -174,6 +174,11 @@ export function animateOptionExplode(clickedOption, allOptions) {
             DOM.elements.testBackground.classList.add('fade-out');
         }
         
+        // 添加螢幕閃光效果
+        const flashElement = document.createElement('div');
+        flashElement.className = 'screen-flash';
+        document.body.appendChild(flashElement);
+        
         // 使用 requestAnimationFrame 而非 setTimeout 來優化
         let startTime = null;
         
@@ -195,6 +200,11 @@ export function animateOptionExplode(clickedOption, allOptions) {
                     DOM.elements.testBackground.style.willChange = 'auto';
                 }
                 
+                // 移除閃光元素
+                if (flashElement && flashElement.parentNode) {
+                    flashElement.parentNode.removeChild(flashElement);
+                }
+                
                 resolve();
                 return;
             }
@@ -207,6 +217,9 @@ export function animateOptionExplode(clickedOption, allOptions) {
         
         // 設置超時保障
         setTimeout(() => {
+            if (flashElement && flashElement.parentNode) {
+                flashElement.parentNode.removeChild(flashElement);
+            }
             resolve();
         }, OPTION_EXPLODE_DURATION + 100);
     });

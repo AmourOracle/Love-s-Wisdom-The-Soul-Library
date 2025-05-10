@@ -1,7 +1,7 @@
 // testLogic.js - 測驗邏輯處理模組
 
 import { stateManager, legacyState } from './state.js';
-import { DOM, allOptions } from './dom.js';
+import { DOM, allOptions, setOptions } from './dom.js';
 import { switchScreen } from './animation.js';
 import { displayQuestion, updateProgressBar } from './view.js';
 import { animateOptionExplode } from './animation.js';
@@ -29,9 +29,36 @@ export function bindStartButton(questions) {
         DOM.buttons.start.removeEventListener('click', handleStartTestClick); 
         DOM.buttons.start.addEventListener('click', () => handleStartTestClick(questions)); 
         console.log("Start button event bound."); 
+        
+        // 添加打字機效果
+        setupStartButtonTypingEffect();
     } else { 
         console.error("Failed to bind start button event."); 
     } 
+}
+
+// 設置開始按鈕打字機效果 (新增)
+function setupStartButtonTypingEffect() {
+    const startButton = DOM.buttons.start;
+    if (!startButton) return;
+    
+    // 保存原始文字
+    const originalText = startButton.textContent.trim() || '親啟';
+    startButton.innerHTML = '';
+    
+    // 創建打字機效果元素
+    const typingSpan = document.createElement('span');
+    typingSpan.className = 'btn-text typing-effect';
+    typingSpan.textContent = originalText;
+    
+    // 設置打字機效果延遲和持續時間
+    typingSpan.style.setProperty('--typing-delay', '0.5s');
+    typingSpan.style.setProperty('--typing-duration', '1s');
+    
+    // 添加到按鈕
+    startButton.appendChild(typingSpan);
+    
+    console.log("Start button typing effect applied.");
 }
 
 // 綁定其他按鈕
@@ -39,6 +66,10 @@ export function bindOtherButtons() {
     if (DOM.buttons.restart) { 
         DOM.buttons.restart.removeEventListener('click', handleRestartClick); 
         DOM.buttons.restart.addEventListener('click', handleRestartClick); 
+        
+        // 添加重新開始按鈕打字效果
+        setupButtonTypingEffect(DOM.buttons.restart);
+        
         console.log("Restart button event bound."); 
     } else { 
         console.error("Cannot bind restart button."); 
@@ -47,10 +78,37 @@ export function bindOtherButtons() {
     if (DOM.buttons.copy) { 
         DOM.buttons.copy.removeEventListener('click', copyShareText); 
         DOM.buttons.copy.addEventListener('click', copyShareText); 
+        
+        // 添加複製按鈕打字效果
+        setupButtonTypingEffect(DOM.buttons.copy);
+        
         console.log("Copy button event bound."); 
     } else { 
         console.error("Cannot bind copy button."); 
     } 
+}
+
+// 通用按鈕打字效果設置 (新增)
+function setupButtonTypingEffect(button) {
+    if (!button) return;
+    
+    const originalText = button.textContent.trim();
+    if (!originalText) return;
+    
+    button.innerHTML = '';
+    
+    const typingSpan = document.createElement('span');
+    typingSpan.className = 'btn-text typing-effect';
+    typingSpan.textContent = originalText;
+    
+    // 為每個按鈕設置稍微不同的延遲和速度，增加隨機性
+    const randomDelay = (Math.random() * 0.3 + 0.2) + 's';
+    const typingDuration = (originalText.length * 30 / 1000 + 0.5) + 's';
+    
+    typingSpan.style.setProperty('--typing-delay', randomDelay);
+    typingSpan.style.setProperty('--typing-duration', typingDuration);
+    
+    button.appendChild(typingSpan);
 }
 
 // 優化的選項點擊處理
@@ -76,6 +134,9 @@ export function handleOptionClick(event, questions) {
     
     legacyState.userAnswers[questionIndex] = optionIndex;
     
+    // 螢幕閃光效果
+    addScreenFlashEffect();
+    
     // 使用優化的動畫系統
     animateOptionExplode(clickedOption, allOptions).then(() => {
         if (stateManager.get('currentQuestionIndex') < questions.length - 1) {
@@ -84,6 +145,20 @@ export function handleOptionClick(event, questions) {
         } else {
             console.log("最後一題完成，準備顯示結果...");
             showResults(questions, legacyState.userAnswers);
+        }
+    });
+}
+
+// 添加螢幕閃光效果 (新增)
+function addScreenFlashEffect() {
+    const flashElement = document.createElement('div');
+    flashElement.className = 'screen-flash';
+    document.body.appendChild(flashElement);
+    
+    // 動畫結束後移除元素
+    flashElement.addEventListener('animationend', () => {
+        if (flashElement.parentNode) {
+            flashElement.parentNode.removeChild(flashElement);
         }
     });
 }
@@ -144,7 +219,11 @@ function handleRestartClick() {
     } 
     
     switchScreen('result', 'intro')
-        .then(() => console.log("測驗重新開始"))
+        .then(() => {
+            console.log("測驗重新開始");
+            // 重新應用按鈕打字效果
+            setupStartButtonTypingEffect();
+        })
         .catch(err => console.error("重新開始測驗失敗:", err));
 }
 
@@ -161,6 +240,8 @@ function copyShareText() {
                     DOM.buttons.copy.textContent = '已複製!'; 
                     setTimeout(() => { 
                         DOM.buttons.copy.textContent = '複製'; 
+                        // 重新應用按鈕打字效果
+                        setupButtonTypingEffect(DOM.buttons.copy);
                     }, 2000); 
                 })
                 .catch(err => { 
@@ -174,6 +255,8 @@ function copyShareText() {
         console.error("Copy operation error:", error); 
         alert('複製失敗，請手動複製。'); 
         DOM.buttons.copy.textContent = '複製'; 
+        // 重新應用按鈕打字效果
+        setupButtonTypingEffect(DOM.buttons.copy);
     } 
 }
 
@@ -196,6 +279,8 @@ function fallbackCopyText(text) {
             DOM.buttons.copy.textContent = '已複製!'; 
             setTimeout(() => { 
                 DOM.buttons.copy.textContent = '複製'; 
+                // 重新應用按鈕打字效果
+                setupButtonTypingEffect(DOM.buttons.copy);
             }, 2000); 
         } else { 
             console.error('Fallback copy (execCommand) failed'); 

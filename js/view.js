@@ -95,7 +95,6 @@ function createOptions(questionData, container) {
         optionElement.className = 'option';
         optionElement.dataset.text = optionData.text; 
         optionElement.dataset.index = optIndex; 
-        optionElement.innerText = optionData.text; 
         optionElement.setAttribute('role', 'button');
         optionElement.tabIndex = 0; 
         
@@ -105,9 +104,25 @@ function createOptions(questionData, container) {
         // 使用 will-change 提示瀏覽器優化
         optionElement.style.willChange = 'opacity, transform';
         
+        // 新增：創建打字機效果的包裝容器
+        const textSpan = document.createElement('span');
+        textSpan.className = 'option-text typing-effect';
+        textSpan.textContent = optionData.text;
+        
+        // 設置隨機延遲的打字機效果 (0.2s 到 1.2s 之間的隨機值)
+        const randomDelay = (0.2 + Math.random() * 1) + 's';
+        // 根據文本長度設置打字機動畫持續時間 (每個字符 50ms 到 80ms)
+        const typingDuration = (optionData.text.length * (50 + Math.random() * 30) / 1000) + 's';
+        
+        textSpan.style.setProperty('--typing-delay', randomDelay);
+        textSpan.style.setProperty('--typing-duration', typingDuration);
+        
         // 為新選項設置淡入動畫
         optionElement.style.animation = 'fadeIn 0.5s forwards';
         optionElement.style.animationDelay = `${0.1 * optIndex}s`; // 錯開每個選項的動畫
+        
+        // 添加文本到選項
+        optionElement.appendChild(textSpan);
         
         // 動畫結束後清理
         optionElement.addEventListener('animationend', () => {
