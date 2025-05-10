@@ -22,8 +22,8 @@
     /* --- 動畫時間 --- */
     --preloader-svg-exit-duration: 1.2s;
     --preloader-exit-duration: var(--preloader-svg-exit-duration);
-    --intro-fadein-delay: 0s; /* TypeIt 會處理自己的延遲 */
-    --intro-fadein-duration: 1s;
+    /* --intro-fadein-delay: 0s; */ /* TypeIt 會處理自己的延遲 */
+    --intro-fadein-duration: 1s; /* intro 容器的淡入 */
 
     /* --- SVG Animation Timings --- */
     --svg-base-draw-duration: 2.5s;
@@ -37,10 +37,10 @@
     --option-explode-duration: 0.8s; /* 字符爆炸的基礎時長 */
     --content-fadeout-duration: 0.6s;
     --content-fadein-duration: 0.8s; /* 問題標題和背景淡入 */
-    --question-slidein-duration: 0.8s; /* 如果問題標題有獨立滑動動畫 */
+    /* --question-slidein-duration: 0.8s; */ /* 如果問題標題有獨立滑動動畫 */
 
     /* TypeIt 的打字延遲由 JS 控制，這裡的 base-delay 用於選項容器的錯開 */
-    --typing-base-delay: 0.15s; /* 選項容器 fadeIn 的基礎錯開延遲 */
+    --typing-base-delay: 0.1s; /* 選項容器 fadeIn 的基礎錯開延遲 (縮短) */
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -63,16 +63,12 @@ body {
 /* ================= 動畫關鍵幀 ================= */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fadeOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-10px); } }
-/* spin, preloaderSvgSlideUpFadeOut, introElementFadeIn, drawStrokeAndFill, fadeInGroup 保持不變 */
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes preloaderSvgSlideUpFadeOut { from { opacity: 1; transform: scale(1.05) translateY(0); } to { opacity: 0; transform: scale(0.7) translateY(-150%); } }
 @keyframes introElementFadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes drawStrokeAndFill { 0% { stroke-dashoffset: 1500; fill: none; fill-opacity: 0; opacity: 1; } 70% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 0; opacity: 1; } 100% { stroke-dashoffset: 0; fill: var(--svg-fill-color, #ffffff); fill-opacity: 1; opacity: 1; } }
 @keyframes fadeInGroup { from { opacity: 0; } to { opacity: 1; } }
 
-
-/* 移除舊的 typewriter 動畫，因為 TypeIt 會處理 */
-/* @keyframes typewriter { ... } */
 
 /* TypeIt 有自己的光標閃爍，但如果想覆蓋，可以保留或修改這個 */
 @keyframes blink {
@@ -95,14 +91,13 @@ body {
     }
 }
 
-/* 屏幕閃光、內容淡出模糊、內容淡入清晰、問題滑動動畫 保持不變 */
 @keyframes screenFlash { 0% { background-color: rgba(255, 255, 255, 0); } 20% { background-color: rgba(255, 255, 255, 0.3); } 100% { background-color: rgba(255, 255, 255, 0); } }
 @keyframes contentFadeOutBlur { 0% { opacity: 1; filter: blur(0); } 100% { opacity: 0; filter: blur(10px); } }
 @keyframes contentFadeInBlur { 0% { opacity: 0; filter: blur(10px); } 100% { opacity: 1; filter: blur(0); } }
 @keyframes questionSlideDown { 0% { transform: translateY(-20px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
 
 
-/* 錯誤提示樣式 (保持不變) */
+/* 錯誤提示樣式 */
 .error-message { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: rgba(0,0,0,0.7); z-index: 10000; }
 .error-container { background-color: white; padding: 24px; border-radius: 8px; max-width: 90%; width: 400px; text-align: center; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
 .error-container h3 { color: var(--primary-color); margin-bottom: 12px; }
@@ -111,7 +106,7 @@ body {
 #error-reset-btn:hover { transform: translateY(-2px); }
 
 
-/* ================= 預加載畫面 (保持不變) ================= */
+/* ================= 預加載畫面 ================= */
 .preloader { z-index: 9999; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--deep-blue-bg); display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: visibility 0s linear var(--preloader-exit-duration), opacity var(--preloader-exit-duration) ease-out; visibility: hidden; }
 .preloader.active { opacity: 1; pointer-events: auto; visibility: visible; transition: none; }
 .preloader.transitioning-out { opacity: 0; visibility: hidden; pointer-events: none; }
@@ -130,11 +125,11 @@ body {
 #preloader-svg #eng-subtitle-group path, #preloader-svg #chn-subtitle-group path { opacity: 1; fill: #ffffff; stroke: none; stroke-dasharray: none; stroke-dashoffset: 0; stroke-width: 0; animation: none; fill-opacity: 1; }
 #preloader-svg #chn-subtitle-group .st3 { fill: #f2f2f2; }
 
-/* ================= 通用屏幕容器 (保持不變) ================= */
+/* ================= 通用屏幕容器 ================= */
 .screen-container { display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; visibility: hidden; transition: opacity var(--transition-duration) var(--transition-timing), visibility 0s linear var(--transition-duration); overflow: hidden; }
 .screen-container.active { opacity: 1; visibility: visible; transition: opacity var(--transition-duration) var(--transition-timing), visibility 0s linear 0s; }
 
-/* ================= 首頁 specific (保持不變) ================= */
+/* ================= 首頁 specific ================= */
 #intro-container .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; overflow: hidden; opacity: 0; }
 #intro-container .content-layer { position: relative; z-index: 2; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 20px 30px; color: var(--text-color); }
 #intro-container .intro-background { width: 100%; height: 100%; background-size: cover; background-position: center; }
@@ -153,7 +148,7 @@ body {
 #intro-container.active .card-body { animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--preloader-svg-exit-duration) * 0.6) forwards; }
 #intro-container.active .card-footer { animation: introElementFadeIn var(--intro-fadein-duration) ease-out calc(var(--preloader-svg-exit-duration) * 0.7) forwards; }
 
-/* ================= 測驗頁面 specific (保持不變) ================= */
+/* ================= 測驗頁面 specific ================= */
 #test-container { background-color: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px 40px; perspective: 800px; position: relative; }
 #test-background { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; z-index: 5; opacity: 1; filter: blur(0px); will-change: background-image, opacity, filter; }
 #test-background.fade-out { animation: contentFadeOutBlur var(--content-fadeout-duration) forwards; }
@@ -164,12 +159,12 @@ body {
 #question-title { color: rgba(255, 255, 255, 0.9); font-size: 24px; font-weight: 500; line-height: 1.5; text-align: center; margin-bottom: 40px; position: relative; z-index: 20; width: 100%; max-width: 90%; opacity: 1; filter: blur(0px); transform: translateY(0); will-change: transform, opacity, filter; }
 #question-title.fade-in { animation: questionSlideDown var(--question-slidein-duration) forwards; }
 #question-title.fade-out { animation: contentFadeOutBlur var(--content-fadeout-duration) forwards; }
-#options-container { display: flex; flex-direction: column; gap: 12px; /* 稍微減少gap */ width: 100%; max-width: 400px; position: relative; z-index: 10; will-change: contents; }
+#options-container { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 400px; position: relative; z-index: 10; will-change: contents; }
 
 /* ================= 统一按钮系统 (ui-btn) ================= */
 .ui-btn {
     display: inline-flex;
-    align-items: center; /* 垂直居中單行文字 */
+    align-items: center;
     justify-content: center;
     cursor: pointer;
     position: relative;
@@ -182,63 +177,91 @@ body {
     font-size: 16px;
     font-weight: 500;
     text-align: center;
-    padding: 15px 25px;
+    padding: 15px 25px; /* 普通按鈕的 padding */
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
-    transition: transform 0.3s ease, color 0.3s ease;
+    transition: transform 0.3s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease; /* 添加背景和邊框過渡 */
     will-change: transform, opacity;
-    /* overflow: hidden; */ /* 對於普通按鈕，如果內容固定，可以 hidden */
     min-height: 48px;
+    box-sizing: border-box;
 }
 
 .ui-btn.option-style {
     width: 100%;
-    margin-bottom: 5px;
-    min-height: 50px; /* 確保按鈕有足夠高度 */
-    justify-content: flex-start; /* 選項文字左對齊 */
-    align-items: flex-start;  /* **讓內容從頂部開始，適應多行** */
-    padding: 10px 12px;      /* **調整 padding 以適應多行文本** */
+    margin-bottom: 8px;
+    min-height: 50px;
+    justify-content: flex-start;
+    align-items: flex-start;  /* 讓內容從頂部開始，適應多行 */
+    padding: 10px 12px;      /* 選項按鈕的 padding */
     text-align: left;
-    box-sizing: border-box;
-    line-height: 1.5;         /* **為多行文本設置合適的行高** */
-    overflow: hidden;         /* 按鈕本身可以 hidden，裡面的 TypeIt 文本會自己處理 */
+    line-height: 1.6;
+    /* 簡化後的按鈕樣式，確保初始可見 */
+    background-color: rgba(40, 48, 68, 0.4); /* 更深的半透明背景，增加對比度 */
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px; /* 給選項按鈕一點圓角 */
+    opacity: 1 !important; /* 確保初始完全可見 */
+    transform: none !important; /* 移除任何初始 transform */
+    animation: none !important; /* **移除按鈕容器的 fadeIn 動畫，讓 JS 控制 fadeIn ** (或者由 JS 添加 fadeIn 動畫類) */
+    /* JS 會為 optionElement 添加 fadeIn 動畫 */
 }
 
-.ui-btn:hover { transform: translateY(-2px) scale(1.05); color: var(--button-hover-color); }
-.ui-btn::after { content: ''; position: absolute; bottom: 0; left: 50%; width: 0; height: 1px; background-color: var(--primary-color); transform: translateX(-50%); transition: width 0.3s ease, opacity 0.3s ease; opacity: 0; }
-.ui-btn:hover::after { width: 70%; opacity: 0.8; }
+.ui-btn.option-style:hover {
+    background-color: rgba(60, 68, 88, 0.6);
+    border-color: rgba(255, 255, 255, 0.4);
+    /* 移除 hover transform，避免影響 TypeIt 佈局 */
+    /* transform: translateY(-2px) scale(1.05); */
+}
+
+/* 移除按鈕的 ::after 底線，因為選項按鈕不需要 */
+.ui-btn.option-style::after {
+    display: none;
+}
+/* 普通按鈕（如開始、複製、重試）可以保留 ::after */
+.ui-btn:not(.option-style)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 1px;
+    background-color: var(--primary-color);
+    transform: translateX(-50%);
+    transition: width 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+}
+.ui-btn:not(.option-style):hover::after {
+    width: 70%;
+    opacity: 0.8;
+}
+
 
 /* 用於標記正在進行字符爆炸的選項按鈕 */
 .ui-btn.option-is-exploding {
     pointer-events: none;
-    /* 可以讓按鈕背景也參與動畫，例如透明化 */
-    /* background-color: transparent !important; */
-    /* border-color: transparent !important; */
-}
-/* 清除原先的 .typing-effect 打字機動畫和固定光標樣式 */
-.typing-effect {
-    /* display: inline-block; */ /* TypeIt 通常會處理 display */
-    /* white-space: nowrap; */   /* TypeIt 需要 normal 或 pre-line 來自動換行 */
-    white-space: pre-line;   /* 保留換行符並允許自動換行 */
-    /* overflow: hidden; */    /* TypeIt 自己處理可見性 */
-    /* border-right: none; */   /* 移除 CSS 光標 */
-    /* animation: none; */     /* 移除 CSS 動畫 */
-    /* width: auto; */
-    vertical-align: top;      /* 與選項按鈕的 align-items: flex-start 配合 */
-    line-height: inherit;     /* 繼承父級按鈕的行高 */
-    word-wrap: break-word;    /* 允許長單詞斷開 */
-    /* color: inherit; */     /* 繼承按鈕文字顏色 */
+    /* 爆炸時，可以讓按鈕本身也快速淡出或縮小 */
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+    opacity: 0.3 !important; /* 讓它變淡，而不是完全消失 */
+    transform: scale(0.95) !important; /* 輕微縮小 */
 }
 
-/* 自訂 TypeIt 生成的光標樣式 (可選) */
-.ti-cursor {
-    display: inline-block; /* 確保光標能正確顯示和定位 */
-    color: var(--button-text-color); /* 使光標顏色與文本一致或自訂 */
-    /* TypeIt 默認光標是 '▋' */
-    /* 你可以改變它的字體、顏色、大小等 */
-    /* font-weight: bold; */
-    margin-left: 1px; /* 與打出文字稍微隔開 */
-    animation: blink 0.8s infinite; /* 使用我們自己的 blink 動畫，如果 TypeIt 的不滿意 */
+/* TypeIt 目標 span (原 .typing-effect) 的樣式 */
+.ui-btn.option-style span { /* 直接選擇選項按鈕內的 span */
+    white-space: pre-line;   /* 允許 TypeIt 控制換行並保留換行符 */
+    word-wrap: break-word;
+    line-height: inherit;
+    color: inherit;
+    /* TypeIt 會在這裡面打字 */
 }
+
+/* 自訂 TypeIt 生成的光標樣式 */
+.ti-cursor {
+    display: inline-block;
+    color: var(--text-color, white);
+    margin-left: 1px; /* 與打出文字稍微隔開 */
+    animation: blink 0.75s infinite; /* 使用 blink 動畫 */
+    /* TypeIt 預設光標是 '▋' */
+    /* font-weight: normal; */ /* 如果光標太粗，可以調整 */
+}
+
 
 /* 用於包裹單個字符的 span (用於爆炸動畫) */
 .exploding-char {
@@ -253,7 +276,7 @@ body {
 
 .screen-flash { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9990; pointer-events: none; animation: screenFlash 0.6s ease-out forwards; }
 
-/* ================= 結果頁面 specific (保持不變) ================= */
+/* ================= 結果頁面 specific ================= */
 #result-container .background-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; background-color: var(--background-color); opacity: 0; }
 #result-container .content-layer.result-content { position: relative; z-index: 2; width: 100%; height: 100%; overflow-y: auto; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; color: var(--text-color-dark); opacity: 0; }
 #result-container.active .background-layer, #result-container.active .content-layer.result-content { animation: fadeIn 0.8s ease-out forwards; }
@@ -272,16 +295,27 @@ h3 { color: var(--secondary-color); margin-bottom: 15px; font-size: 18px; }
 .share-text { background-color: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin: 15px 0; white-space: pre-wrap; text-align: left; }
 .action-buttons { display: flex; gap: 15px; margin-top: 20px; justify-content: center; }
 .action-buttons .ui-btn { flex: 1; max-width: 150px; }
-#result-container .ui-btn { color: var(--text-color-dark); }
+#result-container .ui-btn { color: var(--text-color-dark); } /* 結果頁按鈕文字顏色 */
 #result-container .ui-btn:hover { color: var(--primary-color); }
+/* 為結果頁的按鈕添加背景和邊框，使其更明顯 */
+#result-container .ui-btn {
+    background-color: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    padding: 10px 20px;
+}
+#result-container .ui-btn:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+    border-color: rgba(0, 0, 0, 0.2);
+}
 
 
 /* ================= 優化無障礙動畫設定 ================= */
 @media (prefers-reduced-motion: reduce) {
     .ui-btn.option-is-exploding .exploding-char { animation: none !important; opacity: 0 !important; }
-    .typing-effect { /* 在減少動畫模式下，直接顯示文本，TypeIt可能也需要配置 */ }
-    .ti-cursor { animation: none !important; display: none !important; } /* 隱藏TypeIt光標 */
-    #question-title.fade-in, #question-title.fade-out, #test-background.fade-in, #test-background.fade-out { animation-duration: 0.1s !important; }
+    .ti-cursor { animation: none !important; display: none !important; }
+    .ui-btn.option-style span { /* 直接顯示文本，無打字效果 */ }
+    #question-title.fade-in, #question-title.fade-out, #test-background.fade-in, #test-background.fade-out { animation-duration: 0.01ms !important; }
     .ui-btn::after { transition: none !important; }
     body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::after {
         animation-duration: 0.01ms !important;
@@ -292,11 +326,11 @@ h3 { color: var(--secondary-color); margin-bottom: 15px; font-size: 18px; }
 }
 
 
-/* ================= 響應式設計 (保持不變，但注意 padding 和字體大小可能影響打字機) ================= */
+/* ================= 響應式設計 ================= */
 @media (max-width: 768px) {
     #test-container { padding: 60px 15px 30px; }
     #question-title { font-size: 20px; margin-bottom: 30px; }
-    #options-container { gap: 10px; }
+    #options-container { gap: 8px; }
     .ui-btn.option-style { padding: 10px 12px; font-size: 14px; min-height: 44px; }
     #intro-container .content-layer { padding: 20px 20px; }
     #intro-container .card-body .description { font-size: 16px; }
@@ -304,19 +338,19 @@ h3 { color: var(--secondary-color); margin-bottom: 15px; font-size: 18px; }
     #intro-container .intro-title-placeholder { width: 90%; margin-top: 18%; }
     #result-container .content-layer.result-content { padding: 30px 15px; }
     .result-card { padding: calc(var(--card-padding) * 0.8); max-width: 95%; margin-bottom: 30px; }
-    .ui-btn { padding: 12px 24px; font-size: 15px; }
+    .ui-btn:not(.option-style) { padding: 12px 24px; font-size: 15px; } /* 普通按鈕 */
 }
 
 @media (max-width: 375px) and (max-height: 667px) {
     #question-title { font-size: 18px; margin-bottom: 25px; }
     .ui-btn.option-style { padding: 8px 10px; font-size: 13px; min-height: 40px; }
-    #options-container { gap: 8px; }
+    #options-container { gap: 6px; }
     #intro-container .content-layer { padding: 15px 15px; }
     #intro-container .intro-title-placeholder { width: 95%; margin-top: 15%; }
     #intro-container .card-body .description { font-size: 15px; }
     #result-container .content-layer.result-content { padding: 20px 10px; }
     .result-card { padding: calc(var(--card-padding) * 0.7); margin-bottom: 20px; }
-    .ui-btn { padding: 10px 20px; font-size: 14px; }
+    .ui-btn:not(.option-style) { padding: 10px 20px; font-size: 14px; } /* 普通按鈕 */
 }
 
 @media (max-width: 900px) and (orientation: landscape) {
@@ -324,10 +358,10 @@ h3 { color: var(--secondary-color); margin-bottom: 15px; font-size: 18px; }
     #test-container { padding: 20px; justify-content: center; }
     #question-title { margin-bottom: 20px; font-size: 20px; }
     #options-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 90%; }
-    .ui-btn.option-style { min-height: 50px; /* 橫屏時選項可能需要更多垂直空間 */ }
+    .ui-btn.option-style { min-height: 55px; /* 橫屏時選項可能需要更多垂直空間 */ padding: 8px 10px;}
     #intro-container .content-layer { padding: 10px 20px; }
     #intro-container .intro-title-placeholder { width: 70%; margin-top: 5%; }
     #result-container .content-layer.result-content { padding: 20px; }
     .result-card { margin: 20px 0; }
-    .ui-btn { padding: 10px 24px; font-size: 15px; }
+    .ui-btn:not(.option-style) { padding: 10px 24px; font-size: 15px; } /* 普通按鈕 */
 }

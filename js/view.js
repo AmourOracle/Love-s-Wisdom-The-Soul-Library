@@ -25,7 +25,7 @@ export function displayQuestion(index, questions, isInitialDisplay = false) {
     const questionData = questions[index];
     const questionNumber = index + 1;
 
-    console.log(`[view.js] displayQuestion: 正在顯示問題 ${questionNumber}`);
+    console.log(`[view.js] displayQuestion: 準備顯示問題 ${questionNumber}. isTransitioning: ${stateManager.isLocked('isTransitioning')}`);
 
     // 背景和問題標題的淡入動畫
     if (DOM.elements.testBackground) {
@@ -36,7 +36,7 @@ export function displayQuestion(index, questions, isInitialDisplay = false) {
             DOM.elements.testBackground.style.backgroundImage = `url('${imageUrl}')`;
             DOM.elements.testBackground.classList.add('fade-in');
             DOM.elements.testBackground.addEventListener('animationend', function onBgAnimationEnd() {
-                if (DOM.elements.testBackground) {
+                if (DOM.elements.testBackground) { // Defensively check if element still exists
                     DOM.elements.testBackground.style.willChange = 'auto';
                     DOM.elements.testBackground.classList.remove('fade-in');
                     DOM.elements.testBackground.removeEventListener('animationend', onBgAnimationEnd);
@@ -50,9 +50,9 @@ export function displayQuestion(index, questions, isInitialDisplay = false) {
         requestAnimationFrame(() => {
             DOM.elements.questionTitle.classList.remove('fade-out', 'fade-in');
             DOM.elements.questionTitle.innerText = questionData.question.replace(/^\d+\.\s*/, '');
-            DOM.elements.questionTitle.classList.add('fade-in');
+            DOM.elements.questionTitle.classList.add('fade-in'); // CSS should handle slide down if 'fade-in' includes it
             DOM.elements.questionTitle.addEventListener('animationend', function onTitleAnimationEnd() {
-                 if (DOM.elements.questionTitle) {
+                 if (DOM.elements.questionTitle) { // Defensively check
                     DOM.elements.questionTitle.style.willChange = 'auto';
                     DOM.elements.questionTitle.classList.remove('fade-in');
                     DOM.elements.questionTitle.removeEventListener('animationend', onTitleAnimationEnd);
@@ -63,7 +63,7 @@ export function displayQuestion(index, questions, isInitialDisplay = false) {
 
     if (DOM.containers.options) {
         createOptions(questionData, DOM.containers.options);
-        console.log(`[view.js] 問題 ${questionNumber} 和選項已調用 createOptions`);
+        // console.log(`[view.js] 問題 ${questionNumber} 和選項已調用 createOptions`); // Logged inside createOptions
     } else {
         console.error("[view.js] 找不到 options-container");
         if (stateManager.isLocked('isTransitioning')) {
@@ -76,140 +76,111 @@ export function displayQuestion(index, questions, isInitialDisplay = false) {
 function createOptions(questionData, container) {
     const fragment = document.createDocumentFragment();
     const optionElements = [];
-    container.innerHTML = '';
+    container.innerHTML = ''; // Clear previous options
 
-    const typeItPromises = [];
-    console.log(`[view.js] createOptions: 開始為 ${questionData.options.length} 個選項創建元素`);
+    const typeItPromises = []; // Array to hold promises for each TypeIt instance
+    console.log(`[view.js] createOptions: 開始為 ${questionData.options.length} 個選項創建元素和 TypeIt 實例`);
 
     questionData.options.forEach((optionData, optIndex) => {
         const optionElement = document.createElement('div');
-        optionElement.className = 'ui-btn option-style';
+        optionElement.className = 'ui-btn option-style'; // CSS will make this initially visible (no JS fadeIn)
         optionElement.dataset.index = optIndex;
         optionElement.setAttribute('role', 'button');
         optionElement.tabIndex = 0;
         optionElement.setAttribute('aria-label', `選項 ${optIndex + 1}: ${optionData.text}`);
 
-        const textSpan = document.createElement('span'); // TypeIt 的目標元素
+        const textSpan = document.createElement('span'); // Target for TypeIt
         optionElement.appendChild(textSpan);
 
-        const fadeInDurationMs = 500;
-        const baseDelayMs = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--typing-base-delay').replace('s', '')) || 0.15) * 1000; // 縮短一點基礎延遲
-        const optionFadeInStartDelayMs = baseDelayMs + optIndex * 200; // 每個選項的淡入錯開
+        // TypeIt Start Delay: Stagger the start of typing for each option
+        const baseTypeItDelayMs = 200; // Base delay before first option starts typing
+        const staggerTypeItDelayMs = optIndex * 400; // Each subsequent option delays a bit more
+        const typeItInitializationDelay = baseTypeItDelayMs + staggerTypeItDelayMs;
 
-        // TypeIt 的啟動延遲應該在元素淡入動畫開始之後，或者在元素完全可見後
-        // 我們讓 TypeIt 在 fadeIn 動畫即將完成時或剛完成時啟動
-        const typeItStartActualDelayMs = optionFadeInStartDelayMs + fadeInDurationMs * 0.8;
+        console.log(`[view.js] Option ${optIndex}: Text to type: "${optionData.text}". TypeIt will start in ${typeItInitializationDelay}ms.`);
 
-
-        optionElement.style.opacity = '0'; // 初始隱藏
-        // 監聽選項按鈕容器的 fadeIn 動畫結束事件
-        optionElement.addEventListener('animationend', function onOptionFadeInEnd(event) {
-            if (event.animationName === 'fadeIn' && event.target === optionElement) {
-                console.log(`[view.js] Option ${optIndex} FADE IN animation ended. Target:`, textSpan);
-                optionElement.removeEventListener('animationend', onOptionFadeInEnd); // 清理監聽器
-
-                // 在這裡初始化 TypeIt，確保元素已完全可見
+        const currentTypeItPromise = new Promise((resolveTypeIt, rejectTypeIt) => {
+            setTimeout(() => {
                 if (typeof TypeIt !== 'undefined') {
-                    console.log(`[view.js] Initializing TypeIt for Option ${optIndex} AFTER FADE IN. Text: "${optionData.text}"`);
-                    const currentTypeItPromise = new Promise((resolveTypeIt, rejectTypeIt) => {
-                        try {
-                            const instance = new TypeIt(textSpan, {
-                                strings: [optionData.text],
-                                speed: 70, // 調整一個適中的速度
-                                lifeLike: false, // 禁用 lifeLike 以簡化調試，成功後再開啟
-                                breakLines: true,
-                                cursor: true,
-                                cursorChar: "▋",
-                                waitUntilVisible: false, // 因為我們手動在 fadeIn 後啟動
-                                html: false,
-                                loop: false,
-                                afterComplete: async (completedInstance) => {
-                                    console.log(`[TypeIt] Option ${optIndex} COMPLETED. Content: "${textSpan.textContent}"`);
-                                    const cursorEl = textSpan.querySelector('.ti-cursor');
-                                    if (cursorEl) cursorEl.style.display = 'none';
-                                    resolveTypeIt(completedInstance);
-                                },
-                            });
+                    console.log(`[view.js] Initializing TypeIt for Option ${optIndex} NOW. Target element:`, textSpan);
+                    try {
+                        const instance = new TypeIt(textSpan, {
+                            strings: [optionData.text],
+                            speed: 65,       // Typing speed in ms per character
+                            lifeLike: false,  // Keep it false for simpler debugging first
+                            breakLines: true, // Allow TypeIt to handle line breaks
+                            cursor: true,
+                            cursorChar: "▋",
+                            html: false,     // Assuming option text is plain text
+                            loop: false,
+                            afterComplete: async (completedInstance) => {
+                                console.log(`[TypeIt] Option ${optIndex} COMPLETED. Final text content: "${textSpan.textContent}"`);
+                                const cursorEl = textSpan.querySelector('.ti-cursor');
+                                if (cursorEl) {
+                                    cursorEl.style.display = 'none'; // Hide cursor on complete
+                                }
+                                resolveTypeIt(completedInstance);
+                            },
+                        });
 
-                            instance.go().catch(err => { // 捕獲 .go() 可能的同步或異步錯誤
-                                console.error(`[TypeIt] .go() FAILED for Option ${optIndex}:`, err);
-                                textSpan.textContent = optionData.text; // Fallback
-                                rejectTypeIt(err);
-                            });
+                        instance.go().catch(err => { // Catch errors from .go() itself
+                            console.error(`[TypeIt] .go() method FAILED for Option ${optIndex}:`, err);
+                            textSpan.textContent = optionData.text; // Fallback display
+                            rejectTypeIt(err); // Reject the promise for this instance
+                        });
 
-                        } catch (e) {
-                            console.error(`[TypeIt] Error during new TypeIt() for Option ${optIndex}:`, e);
-                            textSpan.textContent = optionData.text; // Fallback
-                            rejectTypeIt(e);
-                        }
-                    });
-                    typeItPromises.push(currentTypeItPromise);
+                    } catch (e) {
+                        console.error(`[TypeIt] Error during new TypeIt() instantiation for Option ${optIndex}:`, e);
+                        textSpan.textContent = optionData.text; // Fallback display
+                        rejectTypeIt(e); // Reject the promise
+                    }
                 } else {
-                    console.error(`[view.js] CRITICAL: TypeIt IS UNDEFINED for Option ${optIndex} (at init time)`);
-                    textSpan.textContent = optionData.text;
-                    typeItPromises.push(Promise.resolve()); // 也 resolve，避免阻塞 Promise.all
+                    console.error(`[view.js] CRITICAL: TypeIt IS UNDEFINED for Option ${optIndex} during initialization.`);
+                    textSpan.textContent = optionData.text; // Fallback
+                    resolveTypeIt(); // Resolve to not block Promise.all, 실패했지만 다른 옵션은 계속 진행할 수 있도록
                 }
-            }
+            }, typeItInitializationDelay);
         });
-        // 觸發選項按鈕容器的淡入動畫
-        optionElement.style.animation = `fadeIn ${fadeInDurationMs / 1000}s forwards ${optionFadeInStartDelayMs / 1000}s`;
-
+        typeItPromises.push(currentTypeItPromise);
 
         fragment.appendChild(optionElement);
         optionElements.push(optionElement);
     });
 
     container.appendChild(fragment);
-    setOptions(optionElements);
+    setOptions(optionElements); // Update the global list of option DOM elements
 
-    // --- 解鎖 isTransitioning 的邏輯 ---
-    const contentFadeInDurationMs = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--content-fadein-duration').replace('s', '')) * 1000 || 800;
+    // --- Logic to unlock 'isTransitioning' state ---
+    const questionTitleFadeInDurationMs = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--content-fadein-duration').replace('s', '')) * 1000 || 800;
 
-    // 等待所有 TypeIt 實例完成
-    Promise.all(typeItPromises)
-        .then(() => {
-            console.log("[view.js] 所有 TypeIt 實例的 Promises 均已 resolve (可能成功或失敗後resolve)。");
-
-            // 計算所有選項容器 fadeIn 動畫的最晚結束時間
-            let maxContainerFadeInEndTime = 0;
-            optionElements.forEach(el => {
-                // 獲取實際應用的動畫延遲和持續時間
-                const style = window.getComputedStyle(el);
-                const animDelay = parseFloat(style.animationDelay || "0s") * 1000;
-                const animDur = parseFloat(style.animationDuration || "0s") * 1000; // 假設 fadeIn 持續 0.5s
-                if (style.animationName === 'fadeIn') { // 只計算 fadeIn 動畫
-                    maxContainerFadeInEndTime = Math.max(maxContainerFadeInEndTime, animDelay + animDur);
+    Promise.allSettled(typeItPromises) // Use allSettled to wait for all promises regardless of outcome
+        .then((results) => {
+            console.log("[view.js] All TypeIt Promises have settled (completed or failed).");
+            results.forEach((result, idx) => {
+                if (result.status === 'rejected') {
+                    console.warn(`[view.js] TypeIt Promise for option ${idx} was rejected:`, result.reason);
                 }
             });
 
-            // 解鎖時間點 = max(所有TypeIt完成的時間點, 所有fadeIn完成的時間點, 問題標題等內容fadeIn的時間點) + 緩衝
-            // 因為 Promise.all 在這裡，意味著所有 TypeIt 都已 "結束" (無論成功或失敗)
-            // 所以現在主要關心的是最後一個視覺動畫（如 fadeIn）的結束時間
-            const finalUnlockDelayPoint = Math.max(maxContainerFadeInEndTime, contentFadeInDurationMs) + 200; // 200ms 緩衝
+            // At this point, all TypeIt instances have run.
+            // We also need to consider the fadeIn time of the question title and background.
+            // Since option buttons are now initially visible (no JS-driven fadeIn for them),
+            // the main animation to wait for besides TypeIt is the question title/background.
+            const unlockDelayAfterPromises = questionTitleFadeInDurationMs + 200; // Add a buffer
 
-            console.log(`[view.js with TypeIt] isTransitioning 將在約 ${finalUnlockDelayPoint}ms (基於 Promise.all 和 fades) 後解鎖`);
+            console.log(`[view.js with TypeIt] 'isTransitioning' will be unlocked after approx. ${unlockDelayAfterPromises}ms (post Promise.allSettled).`);
 
-            // 這個 setTimeout 是從 Promise.all.then 執行後開始計時
-            // 如果 finalUnlockDelayPoint 是一個絕對時間點，計算會更複雜
-            // 這裡假設它是一個相對延遲
             setTimeout(() => {
                  if (stateManager.isLocked('isTransitioning')) {
                     stateManager.unlock('isTransitioning');
-                    console.log(`[view.js with TypeIt] isTransitioning 已解鎖 (All Promises & fades considered)`);
+                    console.log(`[view.js with TypeIt] 'isTransitioning' UNLOCKED.`);
                 } else {
-                    console.log(`[view.js with TypeIt] isTransitioning 在 Promise.all 後已是解鎖狀態。`);
+                    console.log(`[view.js with TypeIt] 'isTransitioning' was already unlocked when timeout fired.`);
                 }
-            }, finalUnlockDelayPoint); // 這個延遲是相對於 Promise.all 完成後的延遲
-
-        })
-        .catch(error => {
-            console.error("[view.js] Promise.all(typeItPromises) 被 rejected: ", error);
-            // 即使中途有 TypeIt 實例失敗，也要確保最終解鎖
-            if (stateManager.isLocked('isTransitioning')) {
-                stateManager.unlock('isTransitioning');
-                console.warn(`[view.js with TypeIt] isTransitioning 因 Promise.all 錯誤已解鎖`);
-            }
+            }, unlockDelayAfterPromises);
         });
+        // No .catch here for Promise.allSettled, as it always resolves.
+        // Individual errors are handled in the .then block by checking result.status.
 
     return optionElements;
 }
