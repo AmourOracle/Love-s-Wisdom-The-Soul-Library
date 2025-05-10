@@ -755,6 +755,62 @@ h3 {
 }
 
 /* ================= 響應式設計 ================= */
+/* 優化動畫性能的 CSS */
+.option, 
+#question-title,
+#test-background {
+    /* 添加 will-change 屬性，提示瀏覽器預先優化 */
+    will-change: transform, opacity, filter;
+    /* 使用 transform 而非 top/left 來移動元素 */
+    transform: translateZ(0);  /* 啟用 GPU 加速 */
+}
+
+/* 針對漸進增強的 CSS */
+@supports (backdrop-filter: blur(10px)) {
+    .progress-container {
+        background: rgba(18, 24, 36, 0.5);
+        backdrop-filter: blur(10px);
+    }
+}
+
+/* 優化媒體查詢與動畫控制 */
+@media (prefers-reduced-motion: reduce) {
+    /* 簡化所有動畫 */
+    .option.exploding,
+    #question-title.fade-in,
+    #question-title.fade-out,
+    #test-background.fade-in,
+    #test-background.fade-out,
+    #intro-container.active .intro-title-placeholder,
+    #intro-container.active .card-body,
+    #intro-container.active .card-footer {
+        animation-duration: 0.3s !important;
+        transition-duration: 0.3s !important;
+    }
+    
+    /* 完全禁用某些複雜動畫 */
+    #preloader-svg path {
+        animation: none !important;
+        stroke-dasharray: none !important;
+        stroke-dashoffset: 0 !important;
+        fill: white !important;
+        fill-opacity: 1 !important;
+        opacity: 1 !important;
+    }
+}
+
+/* 為低效能設備提供更輕量的樣式 */
+body.reduced-motion * {
+    transition-duration: 0.3s !important;
+    animation-duration: 0.3s !important;
+}
+
+body.reduced-motion .option.exploding {
+    animation: none !important;
+    opacity: 0 !important;
+    transition: opacity 0.3s ease-out !important;
+}
+
 @media (max-width: 768px) {
     #test-container { padding: 60px 15px 30px; }
     #question-title { font-size: 20px; margin-bottom: 30px; }
