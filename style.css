@@ -7,18 +7,22 @@
     --text-color-dark: #333333; /* 結果頁文字 */
     --shadow-color: rgba(0, 0, 0, 0.2);
     --card-padding: 24px;
-    --border-radius: 12px; /* 通用圓角，但按鈕不再使用 50% */
+    --border-radius: 12px; /* 通用圓角，但按鈕不再使用 */
     --transition-duration: 0.6s; /* 基礎屏幕切換時間 */
     --transition-timing: cubic-bezier(0.25, 0.1, 0.25, 1.0);
     --deep-blue-bg: #121824; /* 深藍背景 */
 
     /* --- 按鈕樣式變數 --- */
-    --button-bg-color: rgba(255, 255, 255, 0.1); /* 所有按鈕背景色 */
     --button-text-color: white; /* 按鈕文字顏色 */
-    --button-border-color: rgba(255, 255, 255, 0.2); /* 按鈕邊框顏色 */
-    --button-hover-bg-color: rgba(255, 255, 255, 0.2); /* 懸停時背景色 */
-    --button-glow-color: rgba(255, 255, 255, 0.15); /* 按鈕發光效果顏色 */
-    --button-line-color: #f64740; /* 懸停時底線顏色 */
+    --button-hover-color: rgba(255, 255, 255, 0.95); /* 懸停時文字顏色 */
+    --button-cursor-color: #f64740; /* 打字機光標顏色 */
+    
+    /* --- 選項樣式變數 --- */
+    --option-bg-color: rgba(255, 255, 255, 0.1); /* 選項背景色 */
+    --option-border-color: rgba(255, 255, 255, 0.2); /* 選項邊框顏色 */
+    --option-hover-bg-color: rgba(255, 255, 255, 0.2); /* 選項懸停背景色 */
+    --option-glow-color: rgba(255, 255, 255, 0.1); /* 選項發光效果 */
+    --option-line-color: #f64740; /* 選項底線顏色 */
 
     /* --- 動畫時間 --- */
     --preloader-svg-exit-duration: 1.2s;
@@ -39,6 +43,8 @@
     --content-fadeout-duration: 0.6s;
     --content-fadein-duration: 0.8s;
     --question-slidein-duration: 0.8s;
+    --typing-base-duration: 1s;
+    --typing-base-delay: 0.5s;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -87,7 +93,7 @@ body {
     to { opacity: 1; } 
 }
 
-/* --- 新增打字機效果動畫 --- */
+/* --- 打字機效果動畫 --- */
 @keyframes typewriter {
   from { width: 0; }
   to { width: 100%; }
@@ -104,7 +110,7 @@ body {
   to { width: 100%; left: 0; }
 }
 
-/* --- 新增爆炸噴濺效果 --- */
+/* --- 爆炸噴濺效果 --- */
 @keyframes explodeSplash {
   0% { transform: scale(1); opacity: 1; filter: blur(0); }
   30% { transform: scale(1.2); opacity: 0.9; filter: blur(1px); }
@@ -119,26 +125,26 @@ body {
   100% { background-color: rgba(255, 255, 255, 0); }
 }
 
-/* --- 新增選項爆炸動畫 --- */
+/* --- 選項爆炸動畫 --- */
 @keyframes optionExplode {
     0% { transform: scale(1); opacity: 1; filter: blur(0); }
     50% { transform: scale(1.2); opacity: 0.7; filter: blur(2px); }
     100% { transform: scale(1.5); opacity: 0; filter: blur(5px); }
 }
 
-/* --- 新增問題/背景淡出模糊 --- */
+/* --- 問題/背景淡出模糊 --- */
 @keyframes contentFadeOutBlur {
     0% { opacity: 1; filter: blur(0); }
     100% { opacity: 0; filter: blur(10px); }
 }
 
-/* --- 新增問題/背景淡入清晰 --- */
+/* --- 問題/背景淡入清晰 --- */
 @keyframes contentFadeInBlur {
     0% { opacity: 0; filter: blur(10px); }
     100% { opacity: 1; filter: blur(0); }
 }
 
-/* --- 新增問題自上而下淡入 --- */
+/* --- 問題自上而下淡入 --- */
 @keyframes questionSlideDown {
     0% { transform: translateY(-20px); opacity: 0; }
     100% { transform: translateY(0); opacity: 1; }
@@ -179,20 +185,17 @@ body {
 }
 
 #error-reset-btn {
-    background-color: var(--primary-color);
     color: white;
     border: none;
     padding: 10px 20px;
-    border-radius: 50px;
     cursor: pointer;
     font-family: inherit;
     font-weight: 600;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: transform 0.2s;
 }
 
 #error-reset-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* ================= 預加載畫面 ================= */
@@ -464,7 +467,7 @@ body {
     will-change: background-image, opacity, filter; /* 優化性能 */
 }
 
-/* 新增背景淡入淡出動畫樣式 */
+/* 背景淡入淡出動畫樣式 */
 #test-background.fade-out {
     animation: contentFadeOutBlur var(--content-fadeout-duration) forwards;
 }
@@ -515,7 +518,7 @@ body {
     will-change: transform, opacity, filter; /* 優化性能 */
 }
 
-/* 新增問題淡入淡出動畫樣式 */
+/* 問題淡入淡出動畫樣式 */
 #question-title.fade-in {
     animation: questionSlideDown var(--question-slidein-duration) forwards;
 }
@@ -535,9 +538,10 @@ body {
     will-change: contents;
 }
 
+/* ================= 選項樣式 (保持原有視覺風格) ================= */
 .option { 
-    background-color: var(--button-bg-color); 
-    border: 1px solid var(--button-border-color); 
+    background-color: var(--option-bg-color); 
+    border: 1px solid var(--option-border-color); 
     color: var(--button-text-color); 
     padding: 15px 25px; 
     border-radius: 10px; 
@@ -551,24 +555,24 @@ body {
     opacity: 1; 
     filter: blur(0px); 
     transform: translateY(0);
-    transition: background-color 0.2s ease;
+    transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
     will-change: transform, opacity, filter; /* 優化性能 */
-    box-shadow: 0 0 8px rgba(255, 255, 255, 0.1); /* 微弱光暈效果 */
+    box-shadow: 0 0 8px var(--option-glow-color); /* 微弱光暈效果 */
 }
 
 .option:hover { 
-    background-color: var(--button-hover-bg-color); 
+    background-color: var(--option-hover-bg-color); 
     box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
     transform: translateY(-2px);
 }
 
-/* 新增選項爆炸動畫樣式 */
+/* 選項爆炸動畫樣式 */
 .option.exploding {
-    animation: explodeSplash var(--option-explode-duration) forwards !important;
+    animation: explodeSplash var(--option-explode-duration) forwards;
     pointer-events: none; /* 防止動畫過程中再次點擊 */
 }
 
-/* 底線效果 */
+/* 選項底線效果 */
 .option::after {
     content: '';
     position: absolute;
@@ -576,7 +580,7 @@ body {
     left: 0;
     width: 0;
     height: 2px;
-    background-color: var(--button-line-color);
+    background-color: var(--option-line-color);
     transition: width 0.3s ease;
     opacity: 0;
 }
@@ -587,26 +591,66 @@ body {
     animation: lineSlideIn 0.4s ease-out forwards;
 }
 
-/* 打字機效果容器 */
+/* 選項打字機效果容器 */
 .option .option-text {
     position: relative;
     white-space: nowrap;
     overflow: hidden;
 }
 
-/* 打字機動畫類 - 由 JavaScript 動態添加不同的延遲 */
+/* ================= 按鈕樣式 (純文字實現) ================= */
+/* 按鈕基礎樣式 - 純文字設計 */
+.btn {
+    /* 基礎佈局 */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    
+    /* 純文字樣式 - 無背景、無邊框、無陰影 */
+    background: none;
+    border: none;
+    box-shadow: none;
+    
+    /* 文字樣式 */
+    color: var(--button-text-color);
+    font-family: 'Noto Serif TC', serif;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    padding: 12px 28px;
+    
+    /* 過渡效果 */
+    transition: transform 0.3s ease, color 0.3s ease;
+}
+
+/* 按鈕懸停效果 - 僅改變文字顏色與縮放 */
+.btn:hover {
+    transform: translateY(-2px) scale(1.05);
+    color: var(--button-hover-color);
+}
+
+/* 打字機效果容器 */
+.btn .btn-text {
+    position: relative;
+    white-space: nowrap;
+    overflow: visible;
+}
+
+/* 打字機動畫效果 */
 .typing-effect {
     display: inline-block;
-    overflow: hidden;
+    overflow: visible;
     white-space: nowrap;
-    border-right: 2px solid var(--button-line-color);
+    border-right: 2px solid var(--button-cursor-color);
     animation: 
-      typewriter var(--typing-duration, 1s) steps(40, end) forwards var(--typing-delay, 0s),
-      blink 0.75s step-end infinite;
+        typewriter var(--typing-duration, var(--typing-base-duration)) steps(40, end) forwards var(--typing-delay, var(--typing-base-delay)),
+        blink 0.75s step-end infinite;
     width: 0;
 }
 
-/* 螢幕閃光覆蓋層 - 由 JavaScript 動態添加 */
+/* 螢幕閃光覆蓋層 */
 .screen-flash {
     position: fixed;
     top: 0;
@@ -745,116 +789,37 @@ h3 {
     max-width: 150px; 
 }
 
-/* ================= 按鈕樣式 ================= */
-/* Base Button Style */
-.btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 8px;
-    border-radius: var(--border-radius);
-    border: none;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-family: 'Noto Serif TC', serif;
-    text-align: center;
-    margin: 0 auto;
-    position: relative;
-    will-change: transform;
-    overflow: hidden; /* 確保底線不會溢出 */
-    box-shadow: 0 0 8px rgba(255, 255, 255, 0.1); /* 微弱光暈效果 */
-    
-    /* 統一按鈕樣式 */
-    background-color: var(--button-bg-color) !important; /* 使用!important覆蓋特定樣式 */
-    color: var(--button-text-color) !important;
-    border: 1px solid var(--button-border-color) !important;
+/* 結果頁按鈕調整 */
+#result-container .btn {
+    color: var(--text-color-dark);
 }
 
-/* Style specific to the SVG icon button */
-.btn-svg-style {
-    background-color: transparent;
-    color: rgba(255, 255, 255, 0.9);
-}
-
-/* Restore styles for text buttons (primary/secondary) */
-.primary-btn, 
-.secondary-btn {
-    padding: 14px 28px;
-    border-radius: 50px;
-    width: auto;
-    height: auto;
-    font-size: 16px;
-    font-weight: 600;
-    /* 不再設置背景色和邊框，使用通用樣式 */
-}
-
-/* 按鈕懸停效果 */
-.btn:hover { 
-    background-color: var(--button-hover-bg-color) !important; 
-    transform: translateY(-2px); 
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.2) !important;
-}
-
-/* 按鈕底線效果 */
-.btn::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 0;
-    height: 2px;
-    background-color: var(--button-line-color);
-    transition: width 0.3s ease;
-    opacity: 0;
-}
-
-.btn:hover::after {
-    width: 100%;
-    opacity: 1;
-    animation: lineSlideIn 0.4s ease-out forwards;
-}
-
-/* 打字機效果容器 */
-.btn .btn-text {
-    position: relative;
-    white-space: nowrap;
-    overflow: hidden;
-}
-
-/* 結果頁按鈕樣式調整 */
-#result-container .btn { 
-    background-color: var(--button-bg-color) !important;
-    color: var(--text-color-dark) !important;
-    border: 1px solid rgba(0, 0, 0, 0.2) !important;
-}
-
-#result-container .btn:hover { 
-    background-color: rgba(0, 0, 0, 0.1) !important;
-    transform: translateY(-2px); 
+#result-container .btn:hover {
+    color: var(--primary-color);
 }
 
 /* ================= 優化無障礙動畫設定 ================= */
 @media (prefers-reduced-motion: reduce) {
     /* 為需要減少動畫的用戶提供簡化版本 */
     .option.exploding {
-        animation-duration: 0.3s !important;
+        animation-duration: 0.3s;
     }
     
     #question-title.fade-in,
     #question-title.fade-out,
     #test-background.fade-in,
     #test-background.fade-out {
-        animation-duration: 0.3s !important;
+        animation-duration: 0.3s;
     }
     
     .typing-effect {
-        animation: none !important;
-        width: auto !important;
-        border-right: none !important;
+        animation: none;
+        width: auto;
+        border-right: none;
     }
     
-    .btn::after, .option::after {
-        transition: none !important;
+    .option::after {
+        transition: none;
     }
 }
 
@@ -877,48 +842,22 @@ h3 {
     }
 }
 
-/* 優化媒體查詢與動畫控制 */
-@media (prefers-reduced-motion: reduce) {
-    /* 簡化所有動畫 */
-    .option.exploding,
-    #question-title.fade-in,
-    #question-title.fade-out,
-    #test-background.fade-in,
-    #test-background.fade-out,
-    #intro-container.active .intro-title-placeholder,
-    #intro-container.active .card-body,
-    #intro-container.active .card-footer {
-        animation-duration: 0.3s !important;
-        transition-duration: 0.3s !important;
-    }
-    
-    /* 完全禁用某些複雜動畫 */
-    #preloader-svg path {
-        animation: none !important;
-        stroke-dasharray: none !important;
-        stroke-dashoffset: 0 !important;
-        fill: white !important;
-        fill-opacity: 1 !important;
-        opacity: 1 !important;
-    }
-}
-
 /* 為低效能設備提供更輕量的樣式 */
 body.reduced-motion * {
-    transition-duration: 0.3s !important;
-    animation-duration: 0.3s !important;
+    transition-duration: 0.3s;
+    animation-duration: 0.3s;
 }
 
 body.reduced-motion .typing-effect {
-    animation: none !important;
-    width: auto !important;
-    border-right: none !important;
+    animation: none;
+    width: auto;
+    border-right: none;
 }
 
 body.reduced-motion .option.exploding {
-    animation: none !important;
-    opacity: 0 !important;
-    transition: opacity 0.3s ease-out !important;
+    animation: none;
+    opacity: 0;
+    transition: opacity 0.3s ease-out;
 }
 
 @media (max-width: 768px) {
@@ -932,8 +871,8 @@ body.reduced-motion .option.exploding {
     #intro-container .intro-title-placeholder { width: 90%; margin-top: 18%; }
     #result-container .content-layer.result-content { padding: 30px 15px; }
     .result-card { padding: calc(var(--card-padding) * 0.8); max-width: 95%; margin-bottom: 30px; }
-    /* 修改後: 文字按鈕調整 */
-    .btn#start-test { 
+    /* 文字按鈕調整 */
+    .btn { 
         padding: 12px 24px; 
         font-size: 15px;
     }
@@ -948,12 +887,12 @@ body.reduced-motion .option.exploding {
     #intro-container .card-body .description { font-size: 15px; }
     #result-container .content-layer.result-content { padding: 20px 10px; }
     .result-card { padding: calc(var(--card-padding) * 0.7); margin-bottom: 20px; }
-     /* 修改後: 文字按鈕小尺寸設備調整 */
-    .btn#start-test { 
+    /* 文字按鈕小尺寸設備調整 */
+    .btn { 
         padding: 10px 20px; 
         font-size: 14px;
     }
-    }
+}
 
 @media (max-width: 900px) and (orientation: landscape) {
     .container { max-width: 100vw; max-height: 100vh; }
@@ -970,7 +909,7 @@ body.reduced-motion .option.exploding {
     #result-container .content-layer.result-content { padding: 20px; }
     .result-card { margin: 20px 0; }
     /* 文字按鈕橫屏調整 */
-    .btn#start-test { 
+    .btn { 
         padding: 10px 24px; 
         font-size: 15px;
     }
