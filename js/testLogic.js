@@ -23,42 +23,61 @@ export function initializeTestScreen(questions) {
     updateProgressBar(1, questions.length);
 }
 
-// 綁定開始測驗按鈕
+// 綁定開始測驗按鈕 - 修复版
 export function bindStartButton(questions) { 
     if (DOM.buttons.start) { 
+        // 先移除现有的事件监听器
         DOM.buttons.start.removeEventListener('click', handleStartTestClick); 
-        DOM.buttons.start.addEventListener('click', () => handleStartTestClick(questions)); 
-        console.log("Start button event bound."); 
         
-        // 添加打字機效果
-        setupStartButtonTypingEffect();
+        // 保存原始的点击处理函数
+        const originalClickHandler = () => handleStartTestClick(questions);
+        
+        // 在应用打字机效果前先绑定事件
+        DOM.buttons.start.addEventListener('click', originalClickHandler); 
+        
+        // 获取按钮的原始文本并保存
+        const originalText = DOM.buttons.start.textContent.trim() || '親啟';
+        
+        // 应用打字机效果，但不删除原始内容
+        setupStartButtonTypingEffect(originalText);
+        
+        console.log("Start button event bound successfully."); 
     } else { 
-        console.error("Failed to bind start button event."); 
+        console.error("Failed to bind start button event: button not found."); 
     } 
 }
 
-// 設置開始按鈕打字機效果 (新增)
-function setupStartButtonTypingEffect() {
+// 设置开始按钮打字机效果的修复版本
+function setupStartButtonTypingEffect(originalText) {
     const startButton = DOM.buttons.start;
     if (!startButton) return;
     
-    // 保存原始文字
-    const originalText = startButton.textContent.trim() || '親啟';
-    startButton.innerHTML = '';
+    // 创建新的内容容器，但不清空原始按钮
+    // 这样就不会破坏事件监听器
+    const existingSpan = startButton.querySelector('.btn-text');
+    if (existingSpan) {
+        // 已经应用了打字机效果，不需要重复应用
+        return;
+    }
     
-    // 創建打字機效果元素
+    // 清除按钮内容前，暂存其中的事件监听器
+    const oldButton = startButton.cloneNode(true);
+    const oldHTML = startButton.innerHTML;
+    
+    // 创建打字机效果元素
     const typingSpan = document.createElement('span');
     typingSpan.className = 'btn-text typing-effect';
     typingSpan.textContent = originalText;
     
-    // 設置打字機效果延遲和持續時間
+    // 设置打字机效果延迟和持续时间
     typingSpan.style.setProperty('--typing-delay', '0.5s');
     typingSpan.style.setProperty('--typing-duration', '1s');
     
-    // 添加到按鈕
+    // 清空按钮内容并添加新的打字效果
+    startButton.innerHTML = '';
     startButton.appendChild(typingSpan);
     
-    console.log("Start button typing effect applied.");
+    console.log("Start button typing effect applied safely.");
 }
 
 // 綁定其他按鈕
@@ -67,8 +86,9 @@ export function bindOtherButtons() {
         DOM.buttons.restart.removeEventListener('click', handleRestartClick); 
         DOM.buttons.restart.addEventListener('click', handleRestartClick); 
         
-        // 添加重新開始按鈕打字效果
-        setupButtonTypingEffect(DOM.buttons.restart);
+        // 安全应用打字效果
+        const originalText = DOM.buttons.restart.textContent.trim();
+        setupButtonTypingEffect(DOM.buttons.restart, originalText);
         
         console.log("Restart button event bound."); 
     } else { 
@@ -79,8 +99,9 @@ export function bindOtherButtons() {
         DOM.buttons.copy.removeEventListener('click', copyShareText); 
         DOM.buttons.copy.addEventListener('click', copyShareText); 
         
-        // 添加複製按鈕打字效果
-        setupButtonTypingEffect(DOM.buttons.copy);
+        // 安全应用打字效果
+        const originalText = DOM.buttons.copy.textContent.trim();
+        setupButtonTypingEffect(DOM.buttons.copy, originalText);
         
         console.log("Copy button event bound."); 
     } else { 
@@ -88,26 +109,30 @@ export function bindOtherButtons() {
     } 
 }
 
-// 通用按鈕打字效果設置 (新增)
-function setupButtonTypingEffect(button) {
-    if (!button) return;
+// 通用按鈕打字效果設置 - 安全版
+function setupButtonTypingEffect(button, originalText) {
+    if (!button || !originalText) return;
     
-    const originalText = button.textContent.trim();
-    if (!originalText) return;
+    // 检查是否已经应用了打字效果
+    const existingSpan = button.querySelector('.btn-text');
+    if (existingSpan) {
+        return;
+    }
     
-    button.innerHTML = '';
-    
+    // 创建打字机效果元素
     const typingSpan = document.createElement('span');
     typingSpan.className = 'btn-text typing-effect';
     typingSpan.textContent = originalText;
     
-    // 為每個按鈕設置稍微不同的延遲和速度，增加隨機性
+    // 为每个按钮设置稍微不同的延迟和速度，增加随机性
     const randomDelay = (Math.random() * 0.3 + 0.2) + 's';
     const typingDuration = (originalText.length * 30 / 1000 + 0.5) + 's';
     
     typingSpan.style.setProperty('--typing-delay', randomDelay);
     typingSpan.style.setProperty('--typing-duration', typingDuration);
     
+    // 清空按钮内容并添加新的打字效果
+    button.innerHTML = '';
     button.appendChild(typingSpan);
 }
 
@@ -221,8 +246,13 @@ function handleRestartClick() {
     switchScreen('result', 'intro')
         .then(() => {
             console.log("測驗重新開始");
-            // 重新應用按鈕打字效果
-            setupStartButtonTypingEffect();
+            
+            // 确保事件被正确绑定
+            if (window.testData && window.testData.questions) {
+                bindStartButton(window.testData.questions);
+            } else {
+                console.error("testData not found, cannot bind start button correctly");
+            }
         })
         .catch(err => console.error("重新開始測驗失敗:", err));
 }
@@ -237,11 +267,13 @@ function copyShareText() {
         if (navigator.clipboard && window.isSecureContext) { 
             navigator.clipboard.writeText(textToCopy)
                 .then(() => { 
+                    // 使用textContent而非innerHTML，保留事件监听器
+                    const originalText = DOM.buttons.copy.textContent;
                     DOM.buttons.copy.textContent = '已複製!'; 
                     setTimeout(() => { 
                         DOM.buttons.copy.textContent = '複製'; 
-                        // 重新應用按鈕打字效果
-                        setupButtonTypingEffect(DOM.buttons.copy);
+                        // 使用安全的方式重新应用打字效果
+                        setupButtonTypingEffect(DOM.buttons.copy, '複製');
                     }, 2000); 
                 })
                 .catch(err => { 
@@ -255,8 +287,8 @@ function copyShareText() {
         console.error("Copy operation error:", error); 
         alert('複製失敗，請手動複製。'); 
         DOM.buttons.copy.textContent = '複製'; 
-        // 重新應用按鈕打字效果
-        setupButtonTypingEffect(DOM.buttons.copy);
+        // 使用安全的方式重新应用打字效果
+        setupButtonTypingEffect(DOM.buttons.copy, '複製');
     } 
 }
 
@@ -276,11 +308,12 @@ function fallbackCopyText(text) {
     try { 
         success = document.execCommand('copy'); 
         if (success) { 
+            // 使用textContent保留事件监听器
             DOM.buttons.copy.textContent = '已複製!'; 
             setTimeout(() => { 
                 DOM.buttons.copy.textContent = '複製'; 
-                // 重新應用按鈕打字效果
-                setupButtonTypingEffect(DOM.buttons.copy);
+                // 使用安全的方式重新应用打字效果
+                setupButtonTypingEffect(DOM.buttons.copy, '複製');
             }, 2000); 
         } else { 
             console.error('Fallback copy (execCommand) failed'); 
