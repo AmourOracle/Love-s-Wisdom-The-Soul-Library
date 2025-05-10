@@ -73,83 +73,71 @@ export function displayQuestion(index, questions, isInitialDisplay = false) {
     }
 }
 
+// js/view.js - createOptions 函數 (極簡化 TypeIt 調用)
+
 function createOptions(questionData, container) {
     const fragment = document.createDocumentFragment();
     const optionElements = [];
-    container.innerHTML = ''; // Clear previous options
+    container.innerHTML = '';
 
-    const typeItPromises = []; // Array to hold promises for each TypeIt instance
-    console.log(`[view.js] createOptions: 開始為 ${questionData.options.length} 個選項創建元素和 TypeIt 實例`);
+    const typeItPromises = [];
+    console.log(`[view.js ULTRA_SIMPLE] createOptions for ${questionData.options.length} options`);
 
     questionData.options.forEach((optionData, optIndex) => {
         const optionElement = document.createElement('div');
-        optionElement.className = 'ui-btn option-style'; // CSS will make this initially visible (no JS fadeIn)
+        optionElement.className = 'ui-btn option-style';
         optionElement.dataset.index = optIndex;
         optionElement.setAttribute('role', 'button');
         optionElement.tabIndex = 0;
         optionElement.setAttribute('aria-label', `選項 ${optIndex + 1}: ${optionData.text}`);
 
-        const textSpan = document.createElement('span'); // Target for TypeIt
+        const textSpan = document.createElement('span');
         optionElement.appendChild(textSpan);
 
-        // TypeIt Start Delay: Stagger the start of typing for each option
-        const baseTypeItDelayMs = 200; // Base delay before first option starts typing
-        const staggerTypeItDelayMs = optIndex * 400; // Each subsequent option delays a bit more
+        const baseTypeItDelayMs = 150; // 基礎延遲
+        const staggerTypeItDelayMs = optIndex * 250; // 錯開延遲
         const typeItInitializationDelay = baseTypeItDelayMs + staggerTypeItDelayMs;
 
-        console.log(`[view.js] Option ${optIndex}: Text to type: "${optionData.text}". TypeIt will start in ${typeItInitializationDelay}ms.`);
+        console.log(`[view.js ULTRA_SIMPLE] Option ${optIndex}: Text: "${optionData.text}". Starting TypeIt in ${typeItInitializationDelay}ms.`);
 
         const currentTypeItPromise = new Promise((resolveTypeIt, rejectTypeIt) => {
-                        setTimeout(() => {
+            setTimeout(() => {
                 if (typeof TypeIt !== 'undefined') {
-                    console.log(`[view.js] Initializing TypeIt for Option ${optIndex} NOW. Target element:`, textSpan);
+                    console.log(`[view.js ULTRA_SIMPLE] Initializing TypeIt for Option ${optIndex} NOW. Target:`, textSpan);
                     try {
                         const instance = new TypeIt(textSpan, {
                             strings: [optionData.text],
-                            speed: 65,
-                            lifeLike: false,
+                            speed: 70,
+                            lifeLike: false, // 保持 false 進行調試
                             breakLines: true,
                             cursor: true,
                             cursorChar: "▋",
                             html: false,
                             loop: false,
                             afterComplete: async (completedInstance) => {
-                                console.log(`[TypeIt] Option ${optIndex} COMPLETED. Final text content: "${textSpan.textContent}"`);
+                                console.log(`[TypeIt ULTRA_SIMPLE] Option ${optIndex} COMPLETED. Content: "${textSpan.textContent}"`);
                                 const cursorEl = textSpan.querySelector('.ti-cursor');
                                 if (cursorEl) {
                                     cursorEl.style.display = 'none';
                                 }
-                                resolveTypeIt(completedInstance); // *** resolveTypeIt 在這裡 ***
+                                resolveTypeIt(completedInstance); // 主要依賴這個 resolve
                             },
                         });
 
-                        instance.go(); // *** 修正：直接調用 .go()，不鏈接 .catch() ***
+                        instance.go(); // << --- 確保這一行後面絕對沒有 .catch()
 
-                        // 可選：如果需要捕獲 TypeIt 內部異步錯誤 (需要 TypeIt v8.1.0+)
-                        if (instance.finished && typeof instance.finished.then === 'function') {
-                            instance.finished.catch(err => {
-                                console.error(`[TypeIt] instance.finished REJECTED for Option ${optIndex}:`, err);
-                                // 如果 instance.finished 出錯，也嘗試 reject 外層 Promise
-                                // 但要注意，如果 afterComplete 已經 resolve 了，這個 reject 會被忽略
-                                // Fallback 顯示文本
-                                if (textSpan.textContent.length < optionData.text.length) { // 避免覆蓋已完成的文本
-                                    textSpan.textContent = optionData.text;
-                                }
-                                rejectTypeIt(err); // *** rejectTypeIt 在這裡 (針對 instance.finished 的錯誤) ***
-                            });
-                        } else {
-                             console.warn(`[TypeIt] Instance for option ${optIndex} does not have a 'finished' promise. Relying on afterComplete.`);
-                        }
+                        // 由於持續報錯，我們暫時完全移除對 instance.finished 的依賴
+                        // 主要依賴 afterComplete 來 resolve，和 try...catch 捕獲同步錯誤
 
-                    } catch (e) { // 這個 catch 捕獲 new TypeIt() 或 instance.go() 的同步錯誤
-                        console.error(`[TypeIt] Error during TypeIt instantiation or SYNC .go() for Option ${optIndex}:`, e);
-                        textSpan.textContent = optionData.text;
-                        rejectTypeIt(e); // *** rejectTypeIt 在這裡 (針對同步初始化錯誤) ***
+                    } catch (e) {
+                        console.error(`[TypeIt ULTRA_SIMPLE] Error during TypeIt instantiation or SYNC .go() for Option ${optIndex}:`, e);
+                        textSpan.textContent = optionData.text; // Fallback
+                        rejectTypeIt(e);
                     }
                 } else {
-                    console.error(`[view.js] CRITICAL: TypeIt IS UNDEFINED for Option ${optIndex} during initialization.`);
+                    console.error(`[view.js ULTRA_SIMPLE] CRITICAL: TypeIt IS UNDEFINED for Option ${optIndex}.`);
                     textSpan.textContent = optionData.text;
-                    resolveTypeIt(); // 讓 Promise.allSettled 繼續
+                    resolveTypeIt(); // Resolve 以讓 Promise.allSettled 繼續
                 }
             }, typeItInitializationDelay);
         });
@@ -160,39 +148,31 @@ function createOptions(questionData, container) {
     });
 
     container.appendChild(fragment);
-    setOptions(optionElements); // Update the global list of option DOM elements
+    setOptions(optionElements);
 
-    // --- Logic to unlock 'isTransitioning' state ---
+    // --- 解鎖 isTransitioning 的邏輯 (與之前版本類似) ---
     const questionTitleFadeInDurationMs = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--content-fadein-duration').replace('s', '')) * 1000 || 800;
 
-    Promise.allSettled(typeItPromises) // Use allSettled to wait for all promises regardless of outcome
+    Promise.allSettled(typeItPromises)
         .then((results) => {
-            console.log("[view.js] All TypeIt Promises have settled (completed or failed).");
+            console.log("[view.js ULTRA_SIMPLE] All TypeIt Promises have settled.");
             results.forEach((result, idx) => {
                 if (result.status === 'rejected') {
-                    console.warn(`[view.js] TypeIt Promise for option ${idx} was rejected:`, result.reason);
+                    console.warn(`[view.js ULTRA_SIMPLE] TypeIt Promise for option ${idx} was rejected:`, result.reason);
                 }
             });
 
-            // At this point, all TypeIt instances have run.
-            // We also need to consider the fadeIn time of the question title and background.
-            // Since option buttons are now initially visible (no JS-driven fadeIn for them),
-            // the main animation to wait for besides TypeIt is the question title/background.
-            const unlockDelayAfterPromises = questionTitleFadeInDurationMs + 200; // Add a buffer
-
-            console.log(`[view.js with TypeIt] 'isTransitioning' will be unlocked after approx. ${unlockDelayAfterPromises}ms (post Promise.allSettled).`);
-
+            const unlockDelayAfterPromises = questionTitleFadeInDurationMs + 250; // 緩衝
+            console.log(`[view.js ULTRA_SIMPLE] 'isTransitioning' will unlock in approx. ${unlockDelayAfterPromises}ms.`);
             setTimeout(() => {
                  if (stateManager.isLocked('isTransitioning')) {
                     stateManager.unlock('isTransitioning');
-                    console.log(`[view.js with TypeIt] 'isTransitioning' UNLOCKED.`);
+                    console.log(`[view.js ULTRA_SIMPLE] 'isTransitioning' UNLOCKED.`);
                 } else {
-                    console.log(`[view.js with TypeIt] 'isTransitioning' was already unlocked when timeout fired.`);
+                    console.log(`[view.js ULTRA_SIMPLE] 'isTransitioning' was already unlocked.`);
                 }
             }, unlockDelayAfterPromises);
         });
-        // No .catch here for Promise.allSettled, as it always resolves.
-        // Individual errors are handled in the .then block by checking result.status.
 
     return optionElements;
 }
