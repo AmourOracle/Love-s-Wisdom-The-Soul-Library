@@ -100,44 +100,56 @@ function createOptions(questionData, container) {
         console.log(`[view.js] Option ${optIndex}: Text to type: "${optionData.text}". TypeIt will start in ${typeItInitializationDelay}ms.`);
 
         const currentTypeItPromise = new Promise((resolveTypeIt, rejectTypeIt) => {
-            setTimeout(() => {
+                        setTimeout(() => {
                 if (typeof TypeIt !== 'undefined') {
                     console.log(`[view.js] Initializing TypeIt for Option ${optIndex} NOW. Target element:`, textSpan);
                     try {
                         const instance = new TypeIt(textSpan, {
                             strings: [optionData.text],
-                            speed: 65,       // Typing speed in ms per character
-                            lifeLike: false,  // Keep it false for simpler debugging first
-                            breakLines: true, // Allow TypeIt to handle line breaks
+                            speed: 65,
+                            lifeLike: false,
+                            breakLines: true,
                             cursor: true,
                             cursorChar: "▋",
-                            html: false,     // Assuming option text is plain text
+                            html: false,
                             loop: false,
                             afterComplete: async (completedInstance) => {
                                 console.log(`[TypeIt] Option ${optIndex} COMPLETED. Final text content: "${textSpan.textContent}"`);
                                 const cursorEl = textSpan.querySelector('.ti-cursor');
                                 if (cursorEl) {
-                                    cursorEl.style.display = 'none'; // Hide cursor on complete
+                                    cursorEl.style.display = 'none';
                                 }
-                                resolveTypeIt(completedInstance);
+                                resolveTypeIt(completedInstance); // *** resolveTypeIt 在這裡 ***
                             },
                         });
 
-                        instance.go().catch(err => { // Catch errors from .go() itself
-                            console.error(`[TypeIt] .go() method FAILED for Option ${optIndex}:`, err);
-                            textSpan.textContent = optionData.text; // Fallback display
-                            rejectTypeIt(err); // Reject the promise for this instance
-                        });
+                        instance.go(); // *** 修正：直接調用 .go()，不鏈接 .catch() ***
 
-                    } catch (e) {
-                        console.error(`[TypeIt] Error during new TypeIt() instantiation for Option ${optIndex}:`, e);
-                        textSpan.textContent = optionData.text; // Fallback display
-                        rejectTypeIt(e); // Reject the promise
+                        // 可選：如果需要捕獲 TypeIt 內部異步錯誤 (需要 TypeIt v8.1.0+)
+                        if (instance.finished && typeof instance.finished.then === 'function') {
+                            instance.finished.catch(err => {
+                                console.error(`[TypeIt] instance.finished REJECTED for Option ${optIndex}:`, err);
+                                // 如果 instance.finished 出錯，也嘗試 reject 外層 Promise
+                                // 但要注意，如果 afterComplete 已經 resolve 了，這個 reject 會被忽略
+                                // Fallback 顯示文本
+                                if (textSpan.textContent.length < optionData.text.length) { // 避免覆蓋已完成的文本
+                                    textSpan.textContent = optionData.text;
+                                }
+                                rejectTypeIt(err); // *** rejectTypeIt 在這裡 (針對 instance.finished 的錯誤) ***
+                            });
+                        } else {
+                             console.warn(`[TypeIt] Instance for option ${optIndex} does not have a 'finished' promise. Relying on afterComplete.`);
+                        }
+
+                    } catch (e) { // 這個 catch 捕獲 new TypeIt() 或 instance.go() 的同步錯誤
+                        console.error(`[TypeIt] Error during TypeIt instantiation or SYNC .go() for Option ${optIndex}:`, e);
+                        textSpan.textContent = optionData.text;
+                        rejectTypeIt(e); // *** rejectTypeIt 在這裡 (針對同步初始化錯誤) ***
                     }
                 } else {
                     console.error(`[view.js] CRITICAL: TypeIt IS UNDEFINED for Option ${optIndex} during initialization.`);
-                    textSpan.textContent = optionData.text; // Fallback
-                    resolveTypeIt(); // Resolve to not block Promise.all, 실패했지만 다른 옵션은 계속 진행할 수 있도록
+                    textSpan.textContent = optionData.text;
+                    resolveTypeIt(); // 讓 Promise.allSettled 繼續
                 }
             }, typeItInitializationDelay);
         });
