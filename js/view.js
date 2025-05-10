@@ -92,7 +92,8 @@ function createOptions(questionData, container) {
     // 創建新選項
     questionData.options.forEach((optionData, optIndex) => {
         const optionElement = document.createElement('div'); 
-        optionElement.className = 'option';
+        // 修改：使用新的統一按鈕類名
+        optionElement.className = 'ui-btn option-style';
         optionElement.dataset.text = optionData.text; 
         optionElement.dataset.index = optIndex; 
         optionElement.setAttribute('role', 'button');
@@ -106,7 +107,8 @@ function createOptions(questionData, container) {
         
         // 新增：創建打字機效果的包裝容器
         const textSpan = document.createElement('span');
-        textSpan.className = 'option-text typing-effect';
+        // 修改：使用新的打字效果類名
+        textSpan.className = 'typing-effect';
         textSpan.textContent = optionData.text;
         
         // 設置隨機延遲的打字機效果 (0.2s 到 1.2s 之間的隨機值)

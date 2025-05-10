@@ -81,7 +81,8 @@ export function bindStartButton(questions) {
     
     // 創建打字機效果元素
     const typingSpan = document.createElement('span');
-    typingSpan.className = 'btn-text typing-effect';
+    // 修改：使用新的打字效果類名
+    typingSpan.className = 'typing-effect';
     typingSpan.textContent = originalText;
     
     // 設置動畫參數 - 從CSS變數獲取
@@ -189,7 +190,7 @@ function bindOptionEvents() {
     });
     
     // 重新獲取更新後的選項列表
-    const updatedOptions = document.querySelectorAll('#options-container .option');
+    const updatedOptions = document.querySelectorAll('#options-container .ui-btn.option-style');
     console.log(`更新後選項數量: ${updatedOptions.length}`);
     
     // 重新填充 allOptions 數組
@@ -479,12 +480,13 @@ function setupButtonTypingEffect(button, text) {
     if (!button || !text) return;
     
     // 檢查是否已經應用了打字效果
-    const existingSpan = button.querySelector('.btn-text');
+    const existingSpan = button.querySelector('.typing-effect');
     if (existingSpan) return;
     
     // 創建打字機效果元素
     const typingSpan = document.createElement('span');
-    typingSpan.className = 'btn-text typing-effect';
+    // 修改：使用新的打字效果類名
+    typingSpan.className = 'typing-effect';
     typingSpan.textContent = text;
     
     // 為每個按鈕設置稍微不同的延遲和速度
