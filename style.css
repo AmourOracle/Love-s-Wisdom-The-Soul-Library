@@ -17,13 +17,6 @@
     --button-hover-color: rgba(255, 255, 255, 0.95); /* 懸停時文字顏色 */
     --button-cursor-color: #f64740; /* 打字機光標顏色 */
     
-    /* --- 選項樣式變數 --- */
-    --option-bg-color: rgba(255, 255, 255, 0.1); /* 選項背景色 */
-    --option-border-color: rgba(255, 255, 255, 0.2); /* 選項邊框顏色 */
-    --option-hover-bg-color: rgba(255, 255, 255, 0.2); /* 選項懸停背景色 */
-    --option-glow-color: rgba(255, 255, 255, 0.1); /* 選項發光效果 */
-    --option-line-color: #f64740; /* 選項底線顏色 */
-
     /* --- 動畫時間 --- */
     --preloader-svg-exit-duration: 1.2s;
     --preloader-exit-duration: var(--preloader-svg-exit-duration);
@@ -104,12 +97,6 @@ body {
   50% { border-color: transparent; }
 }
 
-/* --- 底線滑出動畫 --- */
-@keyframes lineSlideIn {
-  from { width: 0; left: 0; }
-  to { width: 100%; left: 0; }
-}
-
 /* --- 爆炸噴濺效果 --- */
 @keyframes explodeSplash {
   0% { transform: scale(1); opacity: 1; filter: blur(0); }
@@ -125,11 +112,17 @@ body {
   100% { background-color: rgba(255, 255, 255, 0); }
 }
 
-/* --- 選項爆炸動畫 --- */
-@keyframes optionExplode {
-    0% { transform: scale(1); opacity: 1; filter: blur(0); }
-    50% { transform: scale(1.2); opacity: 0.7; filter: blur(2px); }
-    100% { transform: scale(1.5); opacity: 0; filter: blur(5px); }
+/* --- 字符散開效果 --- */
+@keyframes characterScatter {
+    0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+    100% { 
+        transform: translate(
+            calc(var(--random-x, 0) * 100px), 
+            calc(var(--random-y, 0) * 100px)
+        ) 
+        rotate(calc(var(--random-rotate, 0) * 360deg)); 
+        opacity: 0; 
+    }
 }
 
 /* --- 問題/背景淡出模糊 --- */
@@ -538,107 +531,81 @@ body {
     will-change: contents;
 }
 
-/* ================= 選項樣式 (保持原有視覺風格) ================= */
-.option { 
-    background-color: var(--option-bg-color); 
-    border: 1px solid var(--option-border-color); 
-    color: var(--button-text-color); 
-    padding: 15px 25px; 
-    border-radius: 10px; 
-    cursor: pointer; 
-    text-align: center; 
-    font-size: 16px; 
-    position: relative; 
-    overflow: hidden; 
-    min-height: 50px; 
-    transform-style: preserve-3d; 
-    opacity: 1; 
-    filter: blur(0px); 
-    transform: translateY(0);
-    transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-    will-change: transform, opacity, filter; /* 優化性能 */
-    box-shadow: 0 0 8px var(--option-glow-color); /* 微弱光暈效果 */
-}
-
-.option:hover { 
-    background-color: var(--option-hover-bg-color); 
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
-}
-
-/* 選項爆炸動畫樣式 */
-.option.exploding {
-    animation: explodeSplash var(--option-explode-duration) forwards;
-    pointer-events: none; /* 防止動畫過程中再次點擊 */
-}
-
-/* 選項底線效果 */
-.option::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 0;
-    height: 2px;
-    background-color: var(--option-line-color);
-    transition: width 0.3s ease;
-    opacity: 0;
-}
-
-.option:hover::after {
-    width: 100%;
-    opacity: 1;
-    animation: lineSlideIn 0.4s ease-out forwards;
-}
-
-/* 選項打字機效果容器 */
-.option .option-text {
-    position: relative;
-    white-space: nowrap;
-    overflow: hidden;
-}
-
-/* ================= 按鈕樣式 (純文字實現) ================= */
-/* 按鈕基礎樣式 - 純文字設計 */
-.btn {
-    /* 基礎佈局 */
+/* ================= 统一按钮系统 (ui-btn) ================= */
+.ui-btn {
+    /* 基础布局 */
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     position: relative;
     
-    /* 純文字樣式 - 無背景、無邊框、無陰影 */
-    background: none;
+    /* 纯文本样式 - 无背景、无边框、无阴影 */
+    background: transparent;
     border: none;
     box-shadow: none;
+    outline: none;
     
-    /* 文字樣式 */
+    /* 文字样式 */
     color: var(--button-text-color);
     font-family: 'Noto Serif TC', serif;
     font-size: 16px;
-    font-weight: 600;
+    font-weight: 500;
     text-align: center;
-    padding: 12px 28px;
+    padding: 15px 25px;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
     
-    /* 過渡效果 */
+    /* 过渡效果 */
     transition: transform 0.3s ease, color 0.3s ease;
+    will-change: transform, opacity;
 }
 
-/* 按鈕懸停效果 - 僅改變文字顏色與縮放 */
-.btn:hover {
+/* 测验选项专用样式 */
+.ui-btn.option-style {
+    width: 100%;
+    margin-bottom: 5px;
+    min-height: 50px;
+}
+
+/* 悬停效果 */
+.ui-btn:hover {
     transform: translateY(-2px) scale(1.05);
     color: var(--button-hover-color);
 }
 
-/* 打字機效果容器 */
-.btn .btn-text {
+/* 底线效果 */
+.ui-btn::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 1px;
+    background-color: var(--primary-color);
+    transform: translateX(-50%);
+    transition: width 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+}
+
+.ui-btn:hover::after {
+    width: 70%;
+    opacity: 0.8;
+}
+
+/* 爆炸动画效果 */
+.ui-btn.exploding {
+    animation: explodeSplash var(--option-explode-duration) forwards;
+    pointer-events: none;
+}
+
+/* 文本容器 */
+.ui-btn .ui-text {
     position: relative;
     white-space: nowrap;
     overflow: visible;
 }
 
-/* 打字機動畫效果 */
+/* 打字机效果 */
 .typing-effect {
     display: inline-block;
     overflow: visible;
@@ -650,7 +617,13 @@ body {
     width: 0;
 }
 
-/* 螢幕閃光覆蓋層 */
+/* 字符爆炸元素 */
+.exploding-char {
+    display: inline-block;
+    position: relative;
+}
+
+/* 屏幕闪光效果 */
 .screen-flash {
     position: fixed;
     top: 0;
@@ -784,24 +757,24 @@ h3 {
     justify-content: center; 
 }
 
-.action-buttons .btn { 
+.action-buttons .ui-btn { 
     flex: 1; 
     max-width: 150px; 
 }
 
 /* 結果頁按鈕調整 */
-#result-container .btn {
+#result-container .ui-btn {
     color: var(--text-color-dark);
 }
 
-#result-container .btn:hover {
+#result-container .ui-btn:hover {
     color: var(--primary-color);
 }
 
 /* ================= 優化無障礙動畫設定 ================= */
 @media (prefers-reduced-motion: reduce) {
     /* 為需要減少動畫的用戶提供簡化版本 */
-    .option.exploding {
+    .ui-btn.exploding {
         animation-duration: 0.3s;
     }
     
@@ -818,14 +791,14 @@ h3 {
         border-right: none;
     }
     
-    .option::after {
+    .ui-btn::after {
         transition: none;
     }
 }
 
 /* ================= 響應式設計 ================= */
 /* 優化動畫性能的 CSS */
-.option, 
+.ui-btn, 
 #question-title,
 #test-background {
     /* 添加 will-change 屬性，提示瀏覽器預先優化 */
@@ -854,7 +827,7 @@ body.reduced-motion .typing-effect {
     border-right: none;
 }
 
-body.reduced-motion .option.exploding {
+body.reduced-motion .ui-btn.exploding {
     animation: none;
     opacity: 0;
     transition: opacity 0.3s ease-out;
@@ -864,7 +837,7 @@ body.reduced-motion .option.exploding {
     #test-container { padding: 60px 15px 30px; }
     #question-title { font-size: 20px; margin-bottom: 30px; }
     #options-container { gap: 10px; }
-    .option { padding: 12px 20px; font-size: 14px; min-height: 44px;}
+    .ui-btn.option-style { padding: 12px 20px; font-size: 14px; min-height: 44px;}
     #intro-container .content-layer { padding: 20px 20px; }
     #intro-container .card-body .description { font-size: 16px; }
     .progress-container { padding: 8px 15px 2px; }
@@ -872,7 +845,7 @@ body.reduced-motion .option.exploding {
     #result-container .content-layer.result-content { padding: 30px 15px; }
     .result-card { padding: calc(var(--card-padding) * 0.8); max-width: 95%; margin-bottom: 30px; }
     /* 文字按鈕調整 */
-    .btn { 
+    .ui-btn { 
         padding: 12px 24px; 
         font-size: 15px;
     }
@@ -880,7 +853,7 @@ body.reduced-motion .option.exploding {
 
 @media (max-width: 375px) and (max-height: 667px) {
     #question-title { font-size: 18px; margin-bottom: 25px; }
-    .option { padding: 10px 15px; font-size: 13px; min-height: 40px; }
+    .ui-btn.option-style { padding: 10px 15px; font-size: 13px; min-height: 40px; }
     #options-container { gap: 8px; }
     #intro-container .content-layer { padding: 15px 15px; }
     #intro-container .intro-title-placeholder { width: 95%; margin-top: 15%; }
@@ -888,7 +861,7 @@ body.reduced-motion .option.exploding {
     #result-container .content-layer.result-content { padding: 20px 10px; }
     .result-card { padding: calc(var(--card-padding) * 0.7); margin-bottom: 20px; }
     /* 文字按鈕小尺寸設備調整 */
-    .btn { 
+    .ui-btn { 
         padding: 10px 20px; 
         font-size: 14px;
     }
@@ -909,7 +882,7 @@ body.reduced-motion .option.exploding {
     #result-container .content-layer.result-content { padding: 20px; }
     .result-card { margin: 20px 0; }
     /* 文字按鈕橫屏調整 */
-    .btn { 
+    .ui-btn { 
         padding: 10px 24px; 
         font-size: 15px;
     }
