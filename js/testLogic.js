@@ -7,6 +7,9 @@ import { displayQuestion, updateProgressBar } from './view.js';
 import { animateOptionExplode } from './animation.js';
 import { showResults } from './resultLogic.js';
 
+// 全域變數儲存當前的問題資料，確保事件監聽器能夠訪問
+let currentQuestions = null;
+
 // 初始化測驗屏幕
 export function initializeTestScreen(questions) {
     if (!DOM.elements.questionTitle || !DOM.containers.options || !DOM.elements.testBackground) { 
@@ -21,6 +24,9 @@ export function initializeTestScreen(questions) {
         return;
     }
     
+    // 儲存問題資料到全域變數
+    currentQuestions = questions;
+    
     console.log("初始化測驗屏幕..."); 
     stateManager.set('currentQuestionIndex', 0); 
     legacyState.userAnswers = []; 
@@ -28,6 +34,14 @@ export function initializeTestScreen(questions) {
     updateProgressBar(0, questions.length); 
     displayQuestion(stateManager.get('currentQuestionIndex'), questions, true); 
     updateProgressBar(1, questions.length);
+    
+    // 確保解鎖狀態
+    setTimeout(() => {
+        if (stateManager.isLocked('isTransitioning')) {
+            console.log("強制解鎖 isTransitioning 狀態");
+            stateManager.unlock('isTransitioning');
+        }
+    }, 1000);
 }
 
 /**
@@ -113,6 +127,9 @@ export function bindStartButton(questions) {
         
         console.log("開始切換到測驗畫面");
         
+        // 儲存問題資料到全域變數
+        currentQuestions = questions;
+        
         // 調用處理函數啟動測驗
         handleStartTestClick(questions);
     });
@@ -126,77 +143,84 @@ export function bindStartButton(questions) {
 function handleStartTestClick(questions) {
     console.log("啟動測驗流程，切換到測驗屏幕");
     
+    // 儲存問題資料到全域變數
+    currentQuestions = questions;
+    
     switchScreen('intro', 'test')
         .then(() => {
             console.log("測驗屏幕載入完成");
             initializeTestScreen(questions);
             
-            // 為所有選項添加事件監聽
-            allOptions.forEach(option => {
-                option.addEventListener('click', e => handleOptionClick(e, questions)); 
-                option.addEventListener('keydown', e => { 
-                    if (e.key === 'Enter' || e.key === ' ') { 
-                        e.preventDefault(); 
-                        handleOptionClick(e, questions); 
-                    } 
-                });
-            });
+            // 修復：延遲一點時間再綁定事件，確保選項已經完全渲染
+            setTimeout(() => {
+                bindOptionEvents();
+            }, 300);
         })
         .catch(err => console.error("切換至測驗屏幕失敗:", err));
 }
 
-// 綁定其他按鈕
-export function bindOtherButtons() { 
-    if (DOM.buttons.restart) { 
-        DOM.buttons.restart.removeEventListener('click', handleRestartClick); 
-        DOM.buttons.restart.addEventListener('click', handleRestartClick); 
-        
-        // 應用打字效果
-        setupButtonTypingEffect(DOM.buttons.restart, DOM.buttons.restart.textContent.trim());
-        
-        console.log("Restart button event bound."); 
-    } else { 
-        console.error("Cannot bind restart button."); 
-    } 
-    
-    if (DOM.buttons.copy) { 
-        DOM.buttons.copy.removeEventListener('click', copyShareText); 
-        DOM.buttons.copy.addEventListener('click', copyShareText); 
-        
-        // 應用打字效果
-        setupButtonTypingEffect(DOM.buttons.copy, DOM.buttons.copy.textContent.trim());
-        
-        console.log("Copy button event bound."); 
-    } else { 
-        console.error("Cannot bind copy button."); 
-    } 
-}
-
 /**
- * 為按鈕應用打字機效果
+ * 選項事件綁定函數 - 修復：獨立出來便於多處調用
  */
-function setupButtonTypingEffect(button, text) {
-    if (!button || !text) return;
+function bindOptionEvents() {
+    console.log("開始綁定選項事件...", `選項數量: ${allOptions.length}`);
     
-    // 檢查是否已經應用了打字效果
-    const existingSpan = button.querySelector('.btn-text');
-    if (existingSpan) return;
+    // 檢查選項和問題資料
+    if (!allOptions || allOptions.length === 0) {
+        console.error("沒有找到選項元素，無法綁定事件");
+        return;
+    }
     
-    // 創建打字機效果元素
-    const typingSpan = document.createElement('span');
-    typingSpan.className = 'btn-text typing-effect';
-    typingSpan.textContent = text;
+    if (!currentQuestions) {
+        console.error("沒有找到問題資料，將嘗試從全域獲取");
+        if (window.testData && window.testData.questions) {
+            currentQuestions = window.testData.questions;
+        } else {
+            console.error("無法獲取問題資料，事件綁定失敗");
+            return;
+        }
+    }
     
-    // 為每個按鈕設置稍微不同的延遲和速度
-    const randomDelay = (Math.random() * 0.3 + 0.2) + 's';
-    const typingDuration = (text.length * 30 / 1000 + 0.5) + 's';
+    // 先移除現有事件，防止重複綁定
+    allOptions.forEach(option => {
+        // 使用 cloneNode 移除所有事件
+        const clone = option.cloneNode(true);
+        option.parentNode.replaceChild(clone, option);
+    });
     
-    typingSpan.style.setProperty('--typing-delay', randomDelay);
-    typingSpan.style.setProperty('--typing-duration', typingDuration);
+    // 重新獲取更新後的選項列表
+    const updatedOptions = document.querySelectorAll('#options-container .option');
+    console.log(`更新後選項數量: ${updatedOptions.length}`);
     
-    // 清空按鈕內容並添加新的打字效果
-    button.innerHTML = '';
-    button.appendChild(typingSpan);
+    // 重新填充 allOptions 數組
+    setOptions([...updatedOptions]);
+    
+    // 綁定事件到新的選項
+    allOptions.forEach((option, index) => {
+        console.log(`綁定選項 ${index + 1} 的事件...`);
+        
+        // 使用具名函數而非匿名函數，避免閉包問題
+        function handleClick(e) {
+            console.log(`選項 ${index + 1} 被點擊`);
+            // 直接使用全域變數 currentQuestions 代替閉包捕獲的 questions
+            handleOptionClick(e, currentQuestions);
+        }
+        
+        function handleKeydown(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleClick(e);
+            }
+        }
+        
+        option.addEventListener('click', handleClick);
+        option.addEventListener('keydown', handleKeydown);
+        
+        // 添加標記表示已綁定事件
+        option.dataset.eventBound = 'true';
+    });
+    
+    console.log("選項事件綁定完成");
 }
 
 /**
@@ -213,6 +237,24 @@ export function handleOptionClick(event, questions) {
     if (isNaN(optionIndex) || isNaN(questionIndex)) { 
         console.error("無效的選項或問題索引"); 
         return; 
+    }
+    
+    // 修復：如果沒有傳入 questions，使用全域變數
+    if (!questions && currentQuestions) {
+        questions = currentQuestions;
+        console.log("使用全域儲存的問題資料");
+    }
+    
+    // 修復：再次檢查問題資料
+    if (!questions || !Array.isArray(questions)) {
+        console.error("處理選項點擊失敗：問題資料無效");
+        // 最後嘗試從全域獲取
+        if (window.testData && window.testData.questions) {
+            questions = window.testData.questions;
+            console.log("從 window.testData 獲取問題資料");
+        } else {
+            return;
+        }
     }
     
     if (stateManager.isLocked('isTransitioning')) { 
@@ -236,7 +278,19 @@ export function handleOptionClick(event, questions) {
             console.log("最後一題完成，準備顯示結果...");
             showResults(questions, legacyState.userAnswers);
         }
+    }).catch(err => {
+        console.error("選項爆炸動畫失敗:", err);
+        // 出錯時也要解鎖狀態
+        stateManager.unlock('isTransitioning');
     });
+    
+    // 添加安全機制：如果超過 3 秒仍然鎖定狀態，強制解鎖
+    setTimeout(() => {
+        if (stateManager.isLocked('isTransitioning')) {
+            console.log("安全機制：強制解鎖 isTransitioning 狀態");
+            stateManager.unlock('isTransitioning');
+        }
+    }, 3000);
 }
 
 /**
@@ -261,6 +315,11 @@ function prepareNextQuestion(questions) {
     console.log(`準備顯示問題 ${stateManager.get('currentQuestionIndex') + 1}`); 
     updateProgressBar(stateManager.get('currentQuestionIndex') + 1, questions.length); 
     displayQuestion(stateManager.get('currentQuestionIndex'), questions, false);
+    
+    // 修復：在顯示新問題後重新綁定選項事件
+    setTimeout(() => {
+        bindOptionEvents();
+    }, 300);
 }
 
 // 重新開始測驗
@@ -384,4 +443,58 @@ export function forceInitializeButtons() {
         console.error("強制初始化按鈕時發生錯誤:", error);
         return false;
     }
+}
+
+// 綁定其他按鈕
+export function bindOtherButtons() { 
+    if (DOM.buttons.restart) { 
+        DOM.buttons.restart.removeEventListener('click', handleRestartClick); 
+        DOM.buttons.restart.addEventListener('click', handleRestartClick); 
+        
+        // 應用打字效果
+        setupButtonTypingEffect(DOM.buttons.restart, DOM.buttons.restart.textContent.trim());
+        
+        console.log("Restart button event bound."); 
+    } else { 
+        console.error("Cannot bind restart button."); 
+    } 
+    
+    if (DOM.buttons.copy) { 
+        DOM.buttons.copy.removeEventListener('click', copyShareText); 
+        DOM.buttons.copy.addEventListener('click', copyShareText); 
+        
+        // 應用打字效果
+        setupButtonTypingEffect(DOM.buttons.copy, DOM.buttons.copy.textContent.trim());
+        
+        console.log("Copy button event bound."); 
+    } else { 
+        console.error("Cannot bind copy button."); 
+    } 
+}
+
+/**
+ * 為按鈕應用打字機效果
+ */
+function setupButtonTypingEffect(button, text) {
+    if (!button || !text) return;
+    
+    // 檢查是否已經應用了打字效果
+    const existingSpan = button.querySelector('.btn-text');
+    if (existingSpan) return;
+    
+    // 創建打字機效果元素
+    const typingSpan = document.createElement('span');
+    typingSpan.className = 'btn-text typing-effect';
+    typingSpan.textContent = text;
+    
+    // 為每個按鈕設置稍微不同的延遲和速度
+    const randomDelay = (Math.random() * 0.3 + 0.2) + 's';
+    const typingDuration = (text.length * 30 / 1000 + 0.5) + 's';
+    
+    typingSpan.style.setProperty('--typing-delay', randomDelay);
+    typingSpan.style.setProperty('--typing-duration', typingDuration);
+    
+    // 清空按鈕內容並添加新的打字效果
+    button.innerHTML = '';
+    button.appendChild(typingSpan);
 }
