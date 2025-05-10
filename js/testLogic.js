@@ -1,7 +1,7 @@
 // testLogic.js - 測驗邏輯處理模組
 
 import { stateManager, legacyState } from './state.js';
-import { DOM, allOptions, setOptions } from './dom.js';
+import { DOM, allOptions, setOptions } from './dom.js'; // allOptions 可能需要從 DOM.containers.options 動態獲取
 import { switchScreen } from './animation.js';
 import { displayQuestion, updateProgressBar } from './view.js';
 import { animateOptionExplode } from './animation.js';
@@ -227,71 +227,75 @@ function bindOptionEvents() {
 /**
  * 處理測驗選項點擊 - 優化版本
  */
-export function handleOptionClick(event, questions) {
-    const clickedOption = event.currentTarget; 
-    const optionIndex = parseInt(clickedOption.dataset.index); 
+export function handleOptionClick(event, questionsArg) {
+    const clickedOption = event.currentTarget;
+    if (!(clickedOption instanceof HTMLElement)) {
+        console.error("Clicked target is not an HTMLElement", clickedOption);
+        return;
+    }
+    const optionIndex = parseInt(clickedOption.dataset.index);
     const questionIndex = stateManager.get('currentQuestionIndex');
-    
+
     console.log(`選項點擊: Q${questionIndex + 1}, Option ${optionIndex + 1}`);
-    
-    // 基本檢查
-    if (isNaN(optionIndex) || isNaN(questionIndex)) { 
-        console.error("無效的選項或問題索引"); 
-        return; 
+
+    if (isNaN(optionIndex) || isNaN(questionIndex)) {
+        console.error("無效的選項或問題索引");
+        return;
     }
-    
-    // 修復：如果沒有傳入 questions，使用全域變數
-    if (!questions && currentQuestions) {
-        questions = currentQuestions;
-        console.log("使用全域儲存的問題資料");
+
+    let questionsToUse = questionsArg || currentQuestions;
+
+    if (!questionsToUse && window.testData && window.testData.questions) {
+        questionsToUse = window.testData.questions;
+        currentQuestions = questionsToUse;
+        console.log("使用全域儲存的問題資料 (handleOptionClick)");
     }
-    
-    // 修復：再次檢查問題資料
-    if (!questions || !Array.isArray(questions)) {
+
+    if (!questionsToUse || !Array.isArray(questionsToUse) || questionsToUse.length === 0) {
         console.error("處理選項點擊失敗：問題資料無效");
-        // 最後嘗試從全域獲取
-        if (window.testData && window.testData.questions) {
-            questions = window.testData.questions;
-            console.log("從 window.testData 獲取問題資料");
-        } else {
-            return;
-        }
+        if (stateManager.isLocked('isTransitioning')) stateManager.unlock('isTransitioning');
+        return;
     }
-    
-    if (stateManager.isLocked('isTransitioning')) { 
-        console.log("正在處理上一個點擊或問題轉換..."); 
-        return; 
+
+    if (stateManager.isLocked('isTransitioning')) {
+        console.log("正在處理上一個點擊或問題轉換...");
+        return;
     }
-    
-    // 鎖定狀態，記錄用戶答案
+
     stateManager.lock('isTransitioning');
+    console.log("isTransitioning 已鎖定 (handleOptionClick start)");
     legacyState.userAnswers[questionIndex] = optionIndex;
-    
-    // 添加螢幕閃光效果
-    addScreenFlashEffect();
-    
-    // 執行爆炸動畫，完成後顯示下一題或結果
-    animateOptionExplode(clickedOption, allOptions).then(() => {
-        if (stateManager.get('currentQuestionIndex') < questions.length - 1) {
-            console.log("準備顯示下一個問題...");
-            prepareNextQuestion(questions);
-        } else {
-            console.log("最後一題完成，準備顯示結果...");
-            showResults(questions, legacyState.userAnswers);
-        }
-    }).catch(err => {
-        console.error("選項爆炸動畫失敗:", err);
-        // 出錯時也要解鎖狀態
-        stateManager.unlock('isTransitioning');
-    });
-    
-    // 添加安全機制：如果超過 3 秒仍然鎖定狀態，強制解鎖
-    setTimeout(() => {
-        if (stateManager.isLocked('isTransitioning')) {
-            console.log("安全機制：強制解鎖 isTransitioning 狀態");
-            stateManager.unlock('isTransitioning');
-        }
-    }, 3000);
+
+    // 動態獲取當前所有可見的選項元素
+    // allOptions 可能不是最新的，或者不是一個純粹的 HTMLElement 數組
+    const currentOptionDOMElements = DOM.containers.options ? Array.from(DOM.containers.options.querySelectorAll('.ui-btn.option-style')) : [];
+    if (currentOptionDOMElements.length === 0) {
+        console.warn("在 handleOptionClick 中未能獲取到任何選項 DOM 元素。");
+    }
+
+
+    animateOptionExplode(clickedOption, currentOptionDOMElements)
+        .then(() => {
+            if (stateManager.get('currentQuestionIndex') < questionsToUse.length - 1) {
+                console.log("準備顯示下一個問題...");
+                prepareNextQuestion(questionsToUse); // displayQuestion 內部會處理 isTransitioning 的解鎖
+            } else {
+                console.log("最後一題完成，準備顯示結果...");
+                // showResults 之前需要解鎖 isTransitioning，因為 switchScreen 需要它
+                // stateManager.unlock('isTransitioning'); // 移到 showResults 或 switchScreen 之前
+                // console.log("isTransitioning 已解鎖 (before showResults)");
+                showResults(questionsToUse, legacyState.userAnswers);
+            }
+        })
+        .catch(err => {
+            console.error("選項爆炸動畫執行失敗:", err);
+            if (stateManager.isLocked('isTransitioning')) {
+                stateManager.unlock('isTransitioning');
+                console.warn("isTransitioning 因動畫錯誤已解鎖 (handleOptionClick catch)");
+            }
+            // 考慮是否需要回退到某個安全狀態，例如重新顯示當前問題
+            // displayQuestion(stateManager.get('currentQuestionIndex'), questionsToUse, false);
+        });
 }
 
 /**
@@ -312,15 +316,11 @@ function addScreenFlashEffect() {
 
 // 準備下一個問題
 function prepareNextQuestion(questions) {
-    stateManager.set('currentQuestionIndex', stateManager.get('currentQuestionIndex') + 1); 
-    console.log(`準備顯示問題 ${stateManager.get('currentQuestionIndex') + 1}`); 
-    updateProgressBar(stateManager.get('currentQuestionIndex') + 1, questions.length); 
+    stateManager.set('currentQuestionIndex', stateManager.get('currentQuestionIndex') + 1);
+    console.log(`準備顯示問題 ${stateManager.get('currentQuestionIndex') + 1}`);
+    updateProgressBar(stateManager.get('currentQuestionIndex') + 1, questions.length);
+    // isTransitioning 的鎖定由 displayQuestion 內部管理，並在選項動畫完成後解鎖
     displayQuestion(stateManager.get('currentQuestionIndex'), questions, false);
-    
-    // 修復：在顯示新問題後重新綁定選項事件
-    setTimeout(() => {
-        bindOptionEvents();
-    }, 300);
 }
 
 // 重新開始測驗

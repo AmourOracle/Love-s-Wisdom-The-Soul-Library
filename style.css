@@ -533,20 +533,15 @@ body {
 
 /* ================= 统一按钮系统 (ui-btn) ================= */
 .ui-btn {
-    /* 基础布局 */
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     position: relative;
-    
-    /* 纯文本样式 - 无背景、无边框、无阴影 */
     background: transparent;
     border: none;
     box-shadow: none;
     outline: none;
-    
-    /* 文字样式 */
     color: var(--button-text-color);
     font-family: 'Noto Serif TC', serif;
     font-size: 16px;
@@ -554,26 +549,26 @@ body {
     text-align: center;
     padding: 15px 25px;
     text-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
-    
-    /* 过渡效果 */
     transition: transform 0.3s ease, color 0.3s ease;
     will-change: transform, opacity;
+    overflow: hidden; /* 新增/確認 */
+    vertical-align: middle; /* 調整對齊 */
 }
 
-/* 测验选项专用样式 */
 .ui-btn.option-style {
     width: 100%;
     margin-bottom: 5px;
-    min-height: 50px;
+    min-height: 50px; /* 確保按鈕有足夠高度容納文字 */
+    justify-content: flex-start; /* 選項文字通常左對齊 */
+    padding: 12px 20px; /* 調整選項的 padding */
 }
 
-/* 悬停效果 */
+
 .ui-btn:hover {
     transform: translateY(-2px) scale(1.05);
     color: var(--button-hover-color);
 }
 
-/* 底线效果 */
 .ui-btn::after {
     content: '';
     position: absolute;
@@ -592,7 +587,6 @@ body {
     opacity: 0.8;
 }
 
-/* 爆炸动画效果 */
 .ui-btn.exploding {
     animation: explodeSplash var(--option-explode-duration) forwards;
     pointer-events: none;
@@ -607,14 +601,23 @@ body {
 
 /* 打字机效果 */
 .typing-effect {
-    display: inline-block;
-    overflow: visible;
-    white-space: nowrap;
-    border-right: 2px solid var(--button-cursor-color);
-    animation: 
-        typewriter var(--typing-duration, var(--typing-base-duration)) steps(40, end) forwards var(--typing-delay, var(--typing-base-delay)),
+    display: inline-block;    /* 使 span 能夠擁有寬度 */
+    white-space: nowrap;      /* 防止文字在動畫中換行 */
+    overflow: hidden;         /* **關鍵：隱藏當前寬度之外的文字** */
+    border-right: 2px solid var(--button-cursor-color); /* 光標 */
+    animation:
+        typewriter var(--typing-duration, var(--typing-base-duration)) steps(40, end) var(--typing-delay, var(--typing-base-delay)) forwards,
+        /* 注意 animation-delay 是 animation-shorthand 的一部分 */
         blink 0.75s step-end infinite;
-    width: 0;
+    width: 0;                 /* 動畫起始寬度為0 */
+    vertical-align: middle;   /* 嘗試確保垂直對齊 */
+    line-height: normal;      /* 重置行高 */
+    max-width: 100%;          /* 確保不會超出父容器 */
+}
+
+.ui-btn.option-style .typing-effect {
+    /* 如果选项按钮内的文本特别长，可能需要微调 */
+    text-align: left; /* 通常打字效果是从左到右 */
 }
 
 /* 字符爆炸元素 */
