@@ -15,7 +15,7 @@ export function preloadImages(questions) {
     if (!DOM.containers?.preloader || !DOM.elements.preloaderSvg) { 
         console.warn("找不到 preloader 或 preloader SVG..."); 
         stateManager.set('preloadComplete', true); 
-        bindStartButton(); 
+        bindStartButton(questions); // 修正：傳遞 questions 參數
         return; 
     }
     
@@ -23,7 +23,7 @@ export function preloadImages(questions) {
         console.warn("無法預載入圖片：缺少 questions..."); 
         stateManager.set('preloadComplete', true); 
         if(DOM.containers.preloader) DOM.containers.preloader.classList.remove('active'); 
-        bindStartButton(); 
+        bindStartButton(questions); // 修正：仍然傳遞 questions 參數（即使可能是 undefined）
         return; 
     }
     
@@ -37,7 +37,7 @@ export function preloadImages(questions) {
     triggerEarlyGlowEffect();
     
     // 優化的載入狀態檢查
-    checkPreloadStatus(questions.length);
+    checkPreloadStatus(questions.length, questions); // 修正：傳遞 questions 參數
 }
 
 // 準備 Preloader 顯示
@@ -108,7 +108,7 @@ function triggerEarlyGlowEffect() {
 }
 
 // 優化的預加載狀態檢查
-function checkPreloadStatus(questionCount) {
+function checkPreloadStatus(questionCount, questions) { // 修正：添加 questions 參數
     // 獲取預加載的前三題圖片
     const highPriorityImages = [];
     for(let i = 1; i <= Math.min(3, questionCount); i++) {
@@ -119,7 +119,7 @@ function checkPreloadStatus(questionCount) {
     // 設置圖片載入超時
     const loadTimeout = setTimeout(() => {
         console.warn("圖片載入超時，強制完成預加載");
-        completePreloading(false);
+        completePreloading(false, questions); // 修正：傳遞 questions 參數
     }, IMAGE_LOADING_TIMEOUT);
     
     // 使用 Promise.all 檢查高優先級圖片載入狀態
@@ -141,20 +141,20 @@ function checkPreloadStatus(questionCount) {
         
         // 模擬延遲讓 SVG 動畫有足夠時間顯示
         setTimeout(() => {
-            completePreloading(hasErrors);
+            completePreloading(hasErrors, questions); // 修正：傳遞 questions 參數
         }, hasErrors ? 500 : PRELOADER_EXTRA_DELAY);
     });
 }
 
 // 完成預加載處理
-function completePreloading(hasErrors) {
+function completePreloading(hasErrors, questions) { // 修正：添加 questions 參數
     if (DOM.containers.preloader && DOM.containers.preloader.classList.contains('active')) {
         triggerIntroTransition()
-            .then(() => bindStartButton())
+            .then(() => bindStartButton(questions)) // 修正：傳遞 questions 參數
             .catch(err => console.error("轉場錯誤:", err));
     } else {
         console.log("Preloader 不再活躍，跳過轉場。");
-        bindStartButton();
+        bindStartButton(questions); // 修正：傳遞 questions 參數
     }
     
     // 實作懶加載，使用 Intersection Observer

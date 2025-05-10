@@ -14,6 +14,13 @@ export function initializeTestScreen(questions) {
         return; 
     }
     
+    // 新增檢查：確保 questions 存在
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+        console.error("初始化測驗屏幕失敗：缺少問題資料。");
+        alert("測驗初始化失敗：無法載入問題。請重新整理頁面。");
+        return;
+    }
+    
     console.log("初始化測驗屏幕..."); 
     stateManager.set('currentQuestionIndex', 0); 
     legacyState.userAnswers = []; 
@@ -28,7 +35,13 @@ export function initializeTestScreen(questions) {
  * 確保純文字按鈕效果與功能正常運作
  */
 export function bindStartButton(questions) { 
-    console.log("綁定測驗開始按鈕..."); 
+    console.log("綁定測驗開始按鈕...", questions ? "問題資料已提供" : "問題資料未提供"); 
+    
+    // 新增：如果沒有傳入 questions，嘗試從 window.testData 獲取
+    if (!questions && window.testData && window.testData.questions) {
+        questions = window.testData.questions;
+        console.log("從全域 testData 獲取問題資料");
+    }
     
     // 獲取按鈕元素
     if (!DOM.buttons.start) { 
@@ -82,6 +95,20 @@ export function bindStartButton(questions) {
         if (!stateManager.get('preloadComplete') || !stateManager.get('introVisible')) {
             console.warn("內容未準備好或Intro未顯示"); 
             return; 
+        }
+        
+        // 新增檢查：確保問題資料存在
+        if (!questions) {
+            console.error("無法啟動測驗：缺少問題資料");
+            
+            // 嘗試從全域變數取得問題資料
+            if (window.testData && window.testData.questions) {
+                questions = window.testData.questions;
+                console.log("成功從全域 testData 獲取問題資料");
+            } else {
+                alert("無法啟動測驗：問題資料載入失敗");
+                return;
+            }
         }
         
         console.log("開始切換到測驗畫面");
