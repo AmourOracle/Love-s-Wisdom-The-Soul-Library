@@ -1,193 +1,220 @@
-// preloader.js - 優化的資源預加載模組
+// js/preloader.js - 資源預加載模組 (重構版)
 
 import { stateManager } from './state.js';
 import { DOM } from './dom.js';
-import { triggerIntroTransition } from './animation.js';
-import { bindStartButton } from './testLogic.js';
+// triggerIntroTransition 和 bindStartButton 的調用將移至 main.js
 
 // 常數定義
-const PRELOADER_EXTRA_DELAY = 2000;
-const EARLY_GLOW_TRIGGER_DELAY = 100;
-const IMAGE_LOADING_TIMEOUT = 10000;  // 圖片載入超時時間
+const PRELOADER_MIN_DISPLAY_TIME = 1500; // Preloader 至少顯示的時間 (ms)，避免閃爍
+const IMAGE_LOADING_TIMEOUT = 8000;      // 單張重要圖片載入的超時時間 (ms)
+const TOTAL_PRELOAD_TIMEOUT = 15000;     // 總預加載過程的超時時間 (ms)
 
-// 優化的預加載函數
-export function preloadImages(questions) {
-    if (!DOM.containers?.preloader || !DOM.elements.preloaderSvg) { 
-        console.warn("找不到 preloader 或 preloader SVG..."); 
-        stateManager.set('preloadComplete', true); 
-        bindStartButton(questions); // 修正：傳遞 questions 參數
-        return; 
-    }
-    
-    if (!questions || questions.length === 0) { 
-        console.warn("無法預載入圖片：缺少 questions..."); 
-        stateManager.set('preloadComplete', true); 
-        if(DOM.containers.preloader) DOM.containers.preloader.classList.remove('active'); 
-        bindStartButton(questions); // 修正：仍然傳遞 questions 參數（即使可能是 undefined）
-        return; 
-    }
-    
-    console.log("顯示 Preloader...");
-    preparePreloader();
-    
-    // 添加優先級分組的預加載策略
-    addPrioritizedPreloadTags(questions.length);
-    
-    // 提前添加 SVG 發光效果
-    triggerEarlyGlowEffect();
-    
-    // 優化的載入狀態檢查
-    checkPreloadStatus(questions.length, questions); // 修正：傳遞 questions 參數
-}
+let onPreloadFinishCallback = null; // 儲存預加載完成後的回調函數
+let preloadStartTime = 0;           // 記錄預加載開始時間
 
-// 準備 Preloader 顯示
-function preparePreloader() {
-    if(DOM.containers.preloader) {
-        DOM.containers.preloader.classList.remove('transitioning-out');
-        DOM.containers.preloader.classList.add('active');
+/**
+ * 準備 Preloader 的顯示狀態。
+ * @private
+ */
+function _preparePreloaderVisuals() {
+    if (DOM.screens.preloader) {
+        DOM.screens.preloader.classList.remove('transitioning-out'); // 確保移除退場類
+        DOM.screens.preloader.classList.add('active');           // 確保 Preloader 可見
+        console.log("[Preloader] Preloader screen visuals prepared and activated.");
+    } else {
+        console.error("[Preloader ERR] Preloader screen element not found in DOM.");
+        return false;
     }
-    
+
     if (DOM.elements.preloaderSvg) {
-        DOM.elements.preloaderSvg.classList.remove('glow-active', 'svg-exiting');
+        DOM.elements.preloaderSvg.classList.remove('glow-active', 'svg-exiting'); // 重置 SVG 動畫類
+        // 可以考慮在這裡觸發 SVG 的初始繪製動畫 (如果有的話)
+        // 例如，如果 SVG path 有 'animate-draw' class:
+        // DOM.elements.preloaderSvg.querySelectorAll('path').forEach(p => p.classList.add('animate-draw'));
+        console.log("[Preloader] Preloader SVG visuals reset.");
+    } else {
+        console.warn("[Preloader WARN] Preloader SVG element not found in DOM.");
     }
-    
-    if (DOM.containers.intro) DOM.containers.intro.classList.remove('active'); 
-    if (DOM.containers.test) DOM.containers.test.classList.remove('active'); 
-    if (DOM.containers.result) DOM.containers.result.classList.remove('active');
+
+    // 確保其他屏幕是隱藏的
+    if (DOM.screens.intro) DOM.screens.intro.classList.remove('active');
+    if (DOM.screens.test) DOM.screens.test.classList.remove('active');
+    if (DOM.screens.result) DOM.screens.result.classList.remove('active');
+    return true;
 }
 
-// 優化預加載實現：按優先級分組加載
-function addPrioritizedPreloadTags(questionCount) {
-    // 第一階段：必須立即加載的資源(前3題)
-    for(let i = 2; i <= Math.min(3, questionCount); i++) {
-        addPreloadTag(`./images/Q${i}.webp`, 'high');
+/**
+ * 添加 <link rel="preload"> 標籤到文檔頭部以預加載圖片。
+ * @param {string} url - 要預加載的圖片 URL。
+ * @param {string} fetchPriority - 圖片的抓取優先級 ('high', 'auto', 'low')。
+ * @private
+ */
+function _addPreloadLink(url, fetchPriority = 'auto') {
+    // 檢查是否已存在相同的 preload link，避免重複添加
+    if (document.querySelector(`link[rel="preload"][href="${url}"]`)) {
+        // console.log(`[Preloader] Preload link for ${url} already exists.`);
+        return;
     }
-    
-    // 第二階段：重要但可延遲加載的資源(4-7題)
-    setTimeout(() => {
-        for(let i = 4; i <= Math.min(7, questionCount); i++) {
-            addPreloadTag(`./images/Q${i}.webp`, 'medium');
-        }
-    }, 500);
-    
-    // 第三階段：剩餘資源延遲加載(8題及之後)
-    setTimeout(() => {
-        for(let i = 8; i <= questionCount; i++) {
-            addPreloadTag(`./images/Q${i}.webp`, 'low');
-        }
-    }, 1000);
-}
-
-// 添加優化的預加載標籤
-function addPreloadTag(url, priority) {
     const preloadLink = document.createElement('link');
     preloadLink.rel = 'preload';
     preloadLink.href = url;
     preloadLink.as = 'image';
-    
-    // 為不同優先級資源設置不同屬性
-    if (priority === 'high') {
-        preloadLink.setAttribute('fetchpriority', 'high');
-    } else if (priority === 'low') {
-        preloadLink.setAttribute('fetchpriority', 'low');
+    if (fetchPriority && ['high', 'low', 'auto'].includes(fetchPriority)) {
+        preloadLink.setAttribute('fetchpriority', fetchPriority);
     }
-    
     document.head.appendChild(preloadLink);
+    // console.log(`[Preloader] Added preload link for: ${url} with priority: ${fetchPriority}`);
 }
 
-// 提前觸發 SVG 發光效果
-function triggerEarlyGlowEffect() {
-    setTimeout(() => { 
-        if (DOM.containers.preloader && 
-            DOM.containers.preloader.classList.contains('active') && 
-            DOM.elements.preloaderSvg) { 
-            console.log(`在 ${EARLY_GLOW_TRIGGER_DELAY}ms 後提早觸發 SVG 放大`); 
-            DOM.elements.preloaderSvg.classList.add('glow-active'); 
-        } 
-    }, EARLY_GLOW_TRIGGER_DELAY);
-}
+/**
+ * 決定哪些圖片需要被預加載。
+ * @param {object[]} questions - 測驗問題數據陣列。
+ * @returns {object[]} 包含 {url, priority} 的圖片對象陣列。
+ * @private
+ */
+function _getImagesToPreload(questions) {
+    const images = [];
+    // 1. Intro 背景圖 (最高優先級)
+    images.push({ url: './images/Intro.webp', priority: 'high' });
 
-// 優化的預加載狀態檢查
-function checkPreloadStatus(questionCount, questions) { // 修正：添加 questions 參數
-    // 獲取預加載的前三題圖片
-    const highPriorityImages = [];
-    for(let i = 1; i <= Math.min(3, questionCount); i++) {
-        highPriorityImages.push(`./images/Q${i}.webp`);
+    // 2. 前幾個問題的背景圖 (高優先級)
+    if (questions && questions.length > 0) {
+        for (let i = 0; i < Math.min(questions.length, 3); i++) { // 例如預加載前3個問題的圖
+            images.push({ url: `./images/Q${i + 1}.webp`, priority: 'high' });
+        }
+        // 3. （可選）後續問題的背景圖 (普通或低優先級)
+        // for (let i = 3; i < questions.length; i++) {
+        //     images.push({ url: `./images/Q${i + 1}.webp`, priority: 'auto' });
+        // }
     }
-    highPriorityImages.push('./images/Intro.webp');
-    
-    // 設置圖片載入超時
-    const loadTimeout = setTimeout(() => {
-        console.warn("圖片載入超時，強制完成預加載");
-        completePreloading(false, questions); // 修正：傳遞 questions 參數
-    }, IMAGE_LOADING_TIMEOUT);
-    
-    // 使用 Promise.all 檢查高優先級圖片載入狀態
-    const imagePromises = highPriorityImages.map(url => {
-        return new Promise((resolve) => {
+    return images;
+}
+
+/**
+ * 預加載指定的圖片資源。
+ * @param {object[]} imagesToLoad - 包含 {url, priority} 的圖片對象陣列。
+ * @returns {Promise<void>} 當所有圖片都嘗試加載後 resolve (不論成功或失敗)。
+ * @private
+ */
+async function _loadImages(imagesToLoad) {
+    if (!imagesToLoad || imagesToLoad.length === 0) {
+        console.log("[Preloader] No images specified for preloading.");
+        return Promise.resolve();
+    }
+
+    const imagePromises = imagesToLoad.map(({ url, priority }) => {
+        _addPreloadLink(url, priority); // 添加 <link rel="preload">
+
+        // 同時使用 Image 對象來監聽加載完成或錯誤，並設置超時
+        return new Promise((resolve, reject) => {
             const img = new Image();
-            img.onload = () => resolve(true);
-            img.onerror = () => resolve(false);
+            let loaded = false;
+            let timer = setTimeout(() => {
+                if (!loaded) {
+                    console.warn(`[Preloader WARN] Image loading timed out (>${IMAGE_LOADING_TIMEOUT}ms): ${url}`);
+                    img.onload = img.onerror = null; // 清除事件處理器
+                    resolve({ url, status: 'timeout' }); // 超時也視為 resolve，但不標記為成功
+                }
+            }, IMAGE_LOADING_TIMEOUT);
+
+            img.onload = () => {
+                loaded = true;
+                clearTimeout(timer);
+                // console.log(`[Preloader] Image loaded successfully: ${url}`);
+                resolve({ url, status: 'loaded' });
+            };
+            img.onerror = () => {
+                loaded = true;
+                clearTimeout(timer);
+                console.error(`[Preloader ERR] Failed to load image: ${url}`);
+                resolve({ url, status: 'error' }); // 錯誤也 resolve，避免 Promise.all 卡住
+            };
             img.src = url;
         });
     });
-    
-    // 當高優先級圖片加載完成後，繼續處理
-    Promise.all(imagePromises).then(results => {
-        clearTimeout(loadTimeout);
-        const hasErrors = results.includes(false);
-        stateManager.set('preloadComplete', true);
-        console.log(`關鍵圖片預載入完成: ${hasErrors ? '(有錯誤)' : '(成功)'}`);
-        
-        // 模擬延遲讓 SVG 動畫有足夠時間顯示
-        setTimeout(() => {
-            completePreloading(hasErrors, questions); // 修正：傳遞 questions 參數
-        }, hasErrors ? 500 : PRELOADER_EXTRA_DELAY);
-    });
-}
 
-// 完成預加載處理
-function completePreloading(hasErrors, questions) { // 修正：添加 questions 參數
-    if (DOM.containers.preloader && DOM.containers.preloader.classList.contains('active')) {
-        triggerIntroTransition()
-            .then(() => bindStartButton(questions)) // 修正：傳遞 questions 參數
-            .catch(err => console.error("轉場錯誤:", err));
-    } else {
-        console.log("Preloader 不再活躍，跳過轉場。");
-        bindStartButton(questions); // 修正：傳遞 questions 參數
+    // 等待所有圖片的加載嘗試完成 (Promise.allSettled 更適合，但 Promise.all 配合 resolve on error 也可)
+    try {
+        const results = await Promise.all(imagePromises);
+        const successfullyLoaded = results.filter(r => r.status === 'loaded').length;
+        const erroredOrTimedOut = results.length - successfullyLoaded;
+        console.log(`[Preloader] Image loading attempts finished. Successful: ${successfullyLoaded}, Errored/TimedOut: ${erroredOrTimedOut}`);
+    } catch (error) {
+        // Promise.all 在有 reject 時會進入 catch，但我們上面讓所有都 resolve 了
+        console.error("[Preloader ERR] Unexpected error during Promise.all for image loading:", error);
     }
-    
-    // 實作懶加載，使用 Intersection Observer
-    setupLazyLoading();
 }
 
-// 設置圖片懶加載
-function setupLazyLoading() {
-    // 檢查瀏覽器支援
-    if ('IntersectionObserver' in window) {
-        const imgObserver = new IntersectionObserver((entries, observer) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    const lazyImage = entry.target;
-                    const src = lazyImage.getAttribute('data-src');
-                    if (src) {
-                        lazyImage.src = src;
-                        lazyImage.removeAttribute('data-src');
-                        observer.unobserve(lazyImage);
-                    }
-                }
-            });
-        });
-        
-        // 觀察所有標記為懶加載的圖片
-        document.querySelectorAll('img[data-src]').forEach(img => {
-            imgObserver.observe(img);
-        });
+/**
+ * 完成預加載流程，並執行回調。
+ * @private
+ */
+function _finishPreloading() {
+    stateManager.set('isPreloading', false);
+    console.log("[Preloader] Preloading state set to false.");
+
+    const elapsedTime = Date.now() - preloadStartTime;
+    const remainingMinTime = PRELOADER_MIN_DISPLAY_TIME - elapsedTime;
+
+    if (remainingMinTime > 0) {
+        console.log(`[Preloader] Waiting for minimum display time: ${remainingMinTime}ms`);
+        setTimeout(() => {
+            if (typeof onPreloadFinishCallback === 'function') {
+                onPreloadFinishCallback();
+            }
+        }, remainingMinTime);
     } else {
-        // 若不支援 Intersection Observer，則直接載入圖片
-        document.querySelectorAll('img[data-src]').forEach(img => {
-            img.src = img.getAttribute('data-src');
-            img.removeAttribute('data-src');
-        });
+        if (typeof onPreloadFinishCallback === 'function') {
+            onPreloadFinishCallback();
+        }
+    }
+}
+
+/**
+ * 啟動資源預加載流程。
+ * @param {object[]} questionsData - 測驗問題數據陣列，用於決定預加載哪些圖片。
+ * @param {function} onFinishCallback - 預加載完成後要執行的回調函數。
+ */
+export async function preloadImages(questionsData, onFinishCallback) {
+    console.log("[Preloader] preloadImages called.");
+    if (typeof onFinishCallback !== 'function') {
+        console.error("[Preloader ERR] onFinishCallback is not a function. Preloading aborted.");
+        return;
+    }
+    onPreloadFinishCallback = onFinishCallback;
+    preloadStartTime = Date.now();
+
+    stateManager.set('isPreloading', true); // 確保狀態正確
+    stateManager.set('activeScreen', 'preloader'); // 確保屏幕狀態正確
+
+    if (!_preparePreloaderVisuals()) {
+        // 如果 Preloader 自身都無法顯示，直接結束
+        _finishPreloading(); // 會將 isPreloading 設為 false 並調用回調
+        return;
+    }
+
+    const imagesToPreload = _getImagesToPreload(questionsData);
+    if (imagesToPreload.length === 0) {
+        console.log("[Preloader] No images to preload based on questions data.");
+        _finishPreloading();
+        return;
+    }
+
+    console.log(`[Preloader] Starting to load ${imagesToPreload.length} prioritized images.`);
+
+    // 設置總預加載超時
+    const totalTimeout = setTimeout(() => {
+        console.warn(`[Preloader WARN] Total preloading process timed out (>${TOTAL_PRELOAD_TIMEOUT}ms). Finishing up.`);
+        _finishPreloading();
+    }, TOTAL_PRELOAD_TIMEOUT);
+
+    try {
+        await _loadImages(imagesToPreload);
+        // 不論圖片加載結果如何，都認為 "預加載流程" 執行完畢了
+    } catch (error) {
+        console.error("[Preloader ERR] Error during _loadImages:", error);
+    } finally {
+        clearTimeout(totalTimeout); // 清除總超時
+        _finishPreloading(); // 總是在 _loadImages 嘗試完成後結束預加載流程
     }
 }

@@ -1,502 +1,220 @@
-// testLogic.js - 測驗邏輯處理模組
+// js/testLogic.js - 測驗核心邏輯 (重構版)
 
 import { stateManager, legacyState } from './state.js';
-import { DOM, allOptions, setOptions } from './dom.js'; // allOptions 可能需要從 DOM.containers.options 動態獲取
-import { switchScreen } from './animation.js';
-import { displayQuestion, updateProgressBar } from './view.js';
-import { animateOptionExplode } from './animation.js';
-import { showResults } from './resultLogic.js';
+import { DOM } from './dom.js';
+import { displayQuestion } from './view.js'; // 用於顯示問題和選項
+import { switchScreen, animateOptionExplode } from './animation.js'; // 導入屏幕切換和爆炸動畫
+import { calculateAndShowResults } from './resultLogic.js'; // 導入結果處理邏輯 (稍後實現)
 
-// 全域變數儲存當前的問題資料，確保事件監聽器能夠訪問
-let currentQuestions = null;
+let currentQuestionsData = null; // 模組內部儲存當前測驗的問題數據
 
-// 初始化測驗屏幕
+/**
+ * 初始化測驗屏幕，並顯示第一個問題。
+ * 此函數應在從 Intro 頁切換到 Test 頁完成後被調用。
+ * @param {object[]} questions - 測驗的問題數據陣列。
+ */
 export function initializeTestScreen(questions) {
-    if (!DOM.elements.questionTitle || !DOM.containers.options || !DOM.elements.testBackground) { 
-        console.error("初始化測驗屏幕失敗：缺少必要元素。"); 
-        return; 
-    }
-    
-    // 新增檢查：確保 questions 存在
-    if (!questions || !Array.isArray(questions) || questions.length === 0) {
-        console.error("初始化測驗屏幕失敗：缺少問題資料。");
-        alert("測驗初始化失敗：無法載入問題。請重新整理頁面。");
+    console.log("[TestLogic LOG] initializeTestScreen called.");
+    if (!questions || questions.length === 0) {
+        console.error("[TestLogic ERR] initializeTestScreen: 無效的問題數據。");
+        // 考慮是否需要切換回 Intro 頁或顯示錯誤
+        // switchScreen('test', 'intro').catch(e => console.error(e));
         return;
     }
-    
-    // 儲存問題資料到全域變數
-    currentQuestions = questions;
-    
-    console.log("初始化測驗屏幕..."); 
-    stateManager.set('currentQuestionIndex', 0); 
-    legacyState.userAnswers = []; 
-    stateManager.unlock('isTransitioning'); 
-    updateProgressBar(0, questions.length); 
-    displayQuestion(stateManager.get('currentQuestionIndex'), questions, true); 
-    updateProgressBar(1, questions.length);
-    
-    // 確保解鎖狀態
-    setTimeout(() => {
-        if (stateManager.isLocked('isTransitioning')) {
-            console.log("強制解鎖 isTransitioning 狀態");
-            stateManager.unlock('isTransitioning');
-        }
-    }, 1000);
+    currentQuestionsData = questions; // 儲存問題數據
+
+    stateManager.set('currentQuestionIndex', 0);
+    legacyState.userAnswers = []; // 使用 legacyState 保持與 resultLogic 的兼容性，將來可統一
+
+    // 確保在顯示第一個問題前，相關的流程鎖是解開的
+    // isScreenSwitching 應由調用者（例如 main.js 中的開始按鈕邏輯）在 switchScreen 完成後解鎖
+    // isOptionProcessing 在這裡應該是初始的 false 狀態
+    if (stateManager.isLocked('isOptionProcessing')) {
+        console.warn("[TestLogic WARN] isOptionProcessing was locked at the start of initializeTestScreen. Unlocking.");
+        stateManager.unlock('isOptionProcessing');
+    }
+
+    console.log(`[TestLogic LOG] currentQuestionIndex set to 0. Total questions: ${currentQuestionsData.length}`);
+    displayQuestion(0, currentQuestionsData); // 顯示第一個問題
 }
 
 /**
- * 綁定開始測驗按鈕 - 優化版本
- * 確保純文字按鈕效果與功能正常運作
+ * 處理用戶點擊測驗選項的核心函數。
+ * 此函數由 view.js 中的選項按鈕事件監聽器調用。
+ * @param {Event} event - 點擊事件對象。
+ * @param {object[]} allQuestionsData - 完整的測驗問題數據陣列。
  */
-export function bindStartButton(questions) { 
-    console.log("綁定測驗開始按鈕...", questions ? "問題資料已提供" : "問題資料未提供"); 
-    
-    // 新增：如果沒有傳入 questions，嘗試從 window.testData 獲取
-    if (!questions && window.testData && window.testData.questions) {
-        questions = window.testData.questions;
-        console.log("從全域 testData 獲取問題資料");
-    }
-    
-    // 獲取按鈕元素
-    if (!DOM.buttons.start) { 
-        console.error("找不到開始按鈕元素"); 
-        return; 
-    }
-    
-    // === 關鍵修復 1: 先移除舊事件並複製元素 ===
-    // 使用克隆替換原始元素，確保移除現有事件監聽器
-    const originalButton = DOM.buttons.start;
-    const clonedButton = originalButton.cloneNode(false); // 淺拷貝，不帶子元素
-    
-    if (originalButton.parentNode) {
-        originalButton.parentNode.replaceChild(clonedButton, originalButton);
-    }
-    
-    // 更新DOM引用
-    DOM.buttons.start = clonedButton;
-    
-    // === 關鍵修復 2: 應用純文字打字機效果 ===
-    // 保存原始文字內容
-    const originalText = "親啟"; // 固定使用此文字，避免從DOM讀取可能的空值
-    
-    // 創建打字機效果元素
-    const typingSpan = document.createElement('span');
-    // 修改：使用新的打字效果類名
-    typingSpan.className = 'typing-effect';
-    typingSpan.textContent = originalText;
-    
-    // 設置動畫參數 - 從CSS變數獲取
-    const styles = getComputedStyle(document.documentElement);
-    const typingDelay = styles.getPropertyValue('--typing-base-delay') || '0.5s';
-    const typingDuration = styles.getPropertyValue('--typing-base-duration') || '1s';
-    
-    typingSpan.style.setProperty('--typing-delay', typingDelay);
-    typingSpan.style.setProperty('--typing-duration', typingDuration);
-    
-    // 添加到按鈕
-    clonedButton.appendChild(typingSpan);
-    
-    // === 關鍵修復 3: 重新綁定事件處理函數 ===
-    // 直接使用内联函數，避免引用問題
-    clonedButton.addEventListener('click', function(event) {
-        console.log("開始按鈕被點擊");
-        
-        // 檢查內容是否已加載完成及動畫狀態
-        if (stateManager.isLocked('isAnimating') || stateManager.isLocked('isTransitioning')) {
-            console.log("動畫或轉場進行中，忽略點擊"); 
-            return; 
-        }
-        
-        if (!stateManager.get('preloadComplete') || !stateManager.get('introVisible')) {
-            console.warn("內容未準備好或Intro未顯示"); 
-            return; 
-        }
-        
-        // 新增檢查：確保問題資料存在
-        if (!questions) {
-            console.error("無法啟動測驗：缺少問題資料");
-            
-            // 嘗試從全域變數取得問題資料
-            if (window.testData && window.testData.questions) {
-                questions = window.testData.questions;
-                console.log("成功從全域 testData 獲取問題資料");
-            } else {
-                alert("無法啟動測驗：問題資料載入失敗");
-                return;
-            }
-        }
-        
-        console.log("開始切換到測驗畫面");
-        
-        // 儲存問題資料到全域變數
-        currentQuestions = questions;
-        
-        // 調用處理函數啟動測驗
-        handleStartTestClick(questions);
-    });
-    
-    console.log("開始按鈕綁定完成"); 
-}
+export async function handleOptionClick(event, allQuestionsData) {
+    const clickedOptionElement = event.currentTarget;
+    const optionIndex = parseInt(clickedOptionElement.dataset.index);
+    const currentQuestionIdx = stateManager.get('currentQuestionIndex');
 
-/**
- * 開始測驗按鈕點擊處理函數 - 獨立出來便於除錯
- */
-function handleStartTestClick(questions) {
-    console.log("啟動測驗流程，切換到測驗屏幕");
-    
-    // 儲存問題資料到全域變數
-    currentQuestions = questions;
-    
-    switchScreen('intro', 'test')
-        .then(() => {
-            console.log("測驗屏幕載入完成");
-            initializeTestScreen(questions);
-            
-            // 修復：延遲一點時間再綁定事件，確保選項已經完全渲染
-            setTimeout(() => {
-                bindOptionEvents();
-            }, 300);
-        })
-        .catch(err => console.error("切換至測驗屏幕失敗:", err));
-}
+    console.log(`[TestLogic LOG] handleOptionClick: Question ${currentQuestionIdx + 1}, Option ${optionIndex + 1} clicked.`);
 
-/**
- * 選項事件綁定函數 - 修復：獨立出來便於多處調用
- */
-function bindOptionEvents() {
-    console.log("開始綁定選項事件...", `選項數量: ${allOptions.length}`);
-    
-    // 檢查選項和問題資料
-    if (!allOptions || allOptions.length === 0) {
-        console.error("沒有找到選項元素，無法綁定事件");
+    if (stateManager.isLocked('isScreenSwitching')) {
+        console.warn("[TestLogic WARN] Option click ignored: Screen is currently switching.");
         return;
     }
-    
-    if (!currentQuestions) {
-        console.error("沒有找到問題資料，將嘗試從全域獲取");
-        if (window.testData && window.testData.questions) {
-            currentQuestions = window.testData.questions;
-        } else {
-            console.error("無法獲取問題資料，事件綁定失敗");
-            return;
-        }
-    }
-    
-    // 先移除現有事件，防止重複綁定
-    allOptions.forEach(option => {
-        // 使用 cloneNode 移除所有事件
-        const clone = option.cloneNode(true);
-        option.parentNode.replaceChild(clone, option);
-    });
-    
-    // 重新獲取更新後的選項列表
-    const updatedOptions = document.querySelectorAll('#options-container .ui-btn.option-style');
-    console.log(`更新後選項數量: ${updatedOptions.length}`);
-    
-    // 重新填充 allOptions 數組
-    setOptions([...updatedOptions]);
-    
-    // 綁定事件到新的選項
-    allOptions.forEach((option, index) => {
-        console.log(`綁定選項 ${index + 1} 的事件...`);
-        
-        // 使用具名函數而非匿名函數，避免閉包問題
-        function handleClick(e) {
-            console.log(`選項 ${index + 1} 被點擊`);
-            // 直接使用全域變數 currentQuestions 代替閉包捕獲的 questions
-            handleOptionClick(e, currentQuestions);
-        }
-        
-        function handleKeydown(e) {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleClick(e);
-            }
-        }
-        
-        option.addEventListener('click', handleClick);
-        option.addEventListener('keydown', handleKeydown);
-        
-        // 添加標記表示已綁定事件
-        option.dataset.eventBound = 'true';
-    });
-    
-    console.log("選項事件綁定完成");
-}
-
-/**
- * 處理測驗選項點擊 - 優化版本
- */
-export function handleOptionClick(event, questionsArg) {
-    const clickedOption = event.currentTarget;
-    if (!(clickedOption instanceof HTMLElement)) {
-        console.error("Clicked target is not an HTMLElement", clickedOption);
-        return;
-    }
-    const optionIndex = parseInt(clickedOption.dataset.index);
-    const questionIndex = stateManager.get('currentQuestionIndex');
-
-    console.log(`選項點擊: Q${questionIndex + 1}, Option ${optionIndex + 1}`);
-
-    if (isNaN(optionIndex) || isNaN(questionIndex)) {
-        console.error("無效的選項或問題索引");
+    if (stateManager.isLocked('isOptionProcessing')) {
+        console.warn("[TestLogic WARN] Option click ignored: Another option is already being processed.");
         return;
     }
 
-    let questionsToUse = questionsArg || currentQuestions;
+    stateManager.lock('isOptionProcessing');
+    console.log("[State LOG] Locked: isOptionProcessing (handleOptionClick start)");
 
-    if (!questionsToUse && window.testData && window.testData.questions) {
-        questionsToUse = window.testData.questions;
-        currentQuestions = questionsToUse;
-        console.log("使用全域儲存的問題資料 (handleOptionClick)");
-    }
-
-    if (!questionsToUse || !Array.isArray(questionsToUse) || questionsToUse.length === 0) {
-        console.error("處理選項點擊失敗：問題資料無效");
-        if (stateManager.isLocked('isTransitioning')) stateManager.unlock('isTransitioning');
+    if (isNaN(optionIndex) || currentQuestionIdx < 0 || currentQuestionIdx >= allQuestionsData.length) {
+        console.error("[TestLogic ERR] Invalid option index or question index.", { optionIndex, currentQuestionIdx });
+        stateManager.unlock('isOptionProcessing');
+        console.log("[State LOG] Unlocked: isOptionProcessing (handleOptionClick - invalid index)");
         return;
     }
 
-    if (stateManager.isLocked('isTransitioning')) {
-        console.log("正在處理上一個點擊或問題轉換...");
-        return;
-    }
+    // 1. 記錄用戶答案
+    legacyState.userAnswers[currentQuestionIdx] = optionIndex; // 假設答案是選項的索引
+    console.log(`[TestLogic LOG] User answer for Q${currentQuestionIdx + 1}: ${optionIndex + 1}. Answers so far:`, legacyState.userAnswers);
 
-    stateManager.lock('isTransitioning');
-    console.log("isTransitioning 已鎖定 (handleOptionClick start)");
-    legacyState.userAnswers[questionIndex] = optionIndex;
-
-    // 動態獲取當前所有可見的選項元素
-    // allOptions 可能不是最新的，或者不是一個純粹的 HTMLElement 數組
-    const currentOptionDOMElements = DOM.containers.options ? Array.from(DOM.containers.options.querySelectorAll('.ui-btn.option-style')) : [];
-    if (currentOptionDOMElements.length === 0) {
-        console.warn("在 handleOptionClick 中未能獲取到任何選項 DOM 元素。");
-    }
-
-
-    animateOptionExplode(clickedOption, currentOptionDOMElements)
-        .then(() => {
-            if (stateManager.get('currentQuestionIndex') < questionsToUse.length - 1) {
-                console.log("準備顯示下一個問題...");
-                prepareNextQuestion(questionsToUse); // displayQuestion 內部會處理 isTransitioning 的解鎖
-            } else {
-                console.log("最後一題完成，準備顯示結果...");
-                // showResults 之前需要解鎖 isTransitioning，因為 switchScreen 需要它
-                // stateManager.unlock('isTransitioning'); // 移到 showResults 或 switchScreen 之前
-                // console.log("isTransitioning 已解鎖 (before showResults)");
-                showResults(questionsToUse, legacyState.userAnswers);
-            }
-        })
-        .catch(err => {
-            console.error("選項爆炸動畫執行失敗:", err);
-            if (stateManager.isLocked('isTransitioning')) {
-                stateManager.unlock('isTransitioning');
-                console.warn("isTransitioning 因動畫錯誤已解鎖 (handleOptionClick catch)");
-            }
-            // 考慮是否需要回退到某個安全狀態，例如重新顯示當前問題
-            // displayQuestion(stateManager.get('currentQuestionIndex'), questionsToUse, false);
-        });
-}
-
-/**
- * 添加螢幕閃光效果
- */
-function addScreenFlashEffect() {
-    const flashElement = document.createElement('div');
-    flashElement.className = 'screen-flash';
-    document.body.appendChild(flashElement);
-    
-    // 動畫結束後自動移除元素
-    flashElement.addEventListener('animationend', () => {
-        if (flashElement.parentNode) {
-            flashElement.parentNode.removeChild(flashElement);
-        }
-    });
-}
-
-// 準備下一個問題
-function prepareNextQuestion(questions) {
-    stateManager.set('currentQuestionIndex', stateManager.get('currentQuestionIndex') + 1);
-    console.log(`準備顯示問題 ${stateManager.get('currentQuestionIndex') + 1}`);
-    updateProgressBar(stateManager.get('currentQuestionIndex') + 1, questions.length);
-    // isTransitioning 的鎖定由 displayQuestion 內部管理，並在選項動畫完成後解鎖
-    displayQuestion(stateManager.get('currentQuestionIndex'), questions, false);
-}
-
-// 重新開始測驗
-function handleRestartClick() { 
-    if (stateManager.isLocked('isAnimating')) { 
-        console.log("Animation in progress, cannot restart yet."); 
-        return; 
-    } 
-    
-    switchScreen('result', 'intro')
-        .then(() => {
-            console.log("測驗重新開始");
-            
-            // 確保事件被正確綁定
-            if (window.testData && window.testData.questions) {
-                bindStartButton(window.testData.questions);
-            } else {
-                console.error("testData not found, cannot bind start button correctly");
-            }
-        })
-        .catch(err => console.error("重新開始測驗失敗:", err));
-}
-
-// 複製分享文本
-function copyShareText() { 
-    if (!DOM.elements.shareText || !DOM.buttons.copy) return; 
-    
-    try { 
-        const textToCopy = DOM.elements.shareText.textContent; 
-        
-        if (navigator.clipboard && window.isSecureContext) { 
-            navigator.clipboard.writeText(textToCopy)
-                .then(() => { 
-                    // 安全更新按鈕文字
-                    const originalText = DOM.buttons.copy.textContent;
-                    DOM.buttons.copy.textContent = '已複製!'; 
-                    setTimeout(() => { 
-                        DOM.buttons.copy.textContent = '複製'; 
-                        // 重新應用打字效果
-                        setupButtonTypingEffect(DOM.buttons.copy, '複製');
-                    }, 2000); 
-                })
-                .catch(err => { 
-                    console.warn('Clipboard API copy failed:', err); 
-                    fallbackCopyText(textToCopy); 
-                }); 
-        } else { 
-            fallbackCopyText(textToCopy); 
-        } 
-    } catch (error) { 
-        console.error("Copy operation error:", error); 
-        alert('複製失敗，請手動複製。'); 
-        DOM.buttons.copy.textContent = '複製'; 
-        // 重新應用打字效果
-        setupButtonTypingEffect(DOM.buttons.copy, '複製');
-    } 
-}
-
-// 複製文本的備用方法
-function fallbackCopyText(text) { 
-    const textArea = document.createElement("textarea"); 
-    textArea.value = text; 
-    textArea.style.position = 'fixed'; 
-    textArea.style.left = '-9999px'; 
-    textArea.style.opacity = '0'; 
-    textArea.setAttribute('readonly', ''); 
-    document.body.appendChild(textArea); 
-    textArea.select(); 
-    textArea.setSelectionRange(0, 99999); 
-    
-    let success = false; 
-    try { 
-        success = document.execCommand('copy'); 
-        if (success) { 
-            DOM.buttons.copy.textContent = '已複製!'; 
-            setTimeout(() => { 
-                DOM.buttons.copy.textContent = '複製'; 
-                // 重新應用打字效果
-                setupButtonTypingEffect(DOM.buttons.copy, '複製');
-            }, 2000); 
-        } else { 
-            console.error('Fallback copy (execCommand) failed'); 
-            alert('複製失敗，瀏覽器不支援此操作。'); 
-        } 
-    } catch (err) { 
-        console.error('Fallback copy error:', err); 
-        alert('複製失敗，請手動複製。'); 
-    } 
-    
-    document.body.removeChild(textArea); 
-}
-
-/**
- * 應急初始化函數 - 用於手動強制初始化按鈕功能
- * 可從主模塊調用此函數確保按鈕功能正常
- */
-export function forceInitializeButtons() {
-    console.log("強制初始化按鈕功能...");
-    
     try {
-        // 1. 查找按鈕元素
-        const startButton = document.getElementById('start-test');
-        if (!startButton) {
-            console.error("無法找到開始按鈕元素!");
-            return false;
-        }
-        
-        // 2. 更新DOM引用
-        DOM.buttons.start = startButton;
-        
-        // 3. 重新綁定按鈕事件
-        if (window.testData && window.testData.questions) {
-            bindStartButton(window.testData.questions);
-            console.log("強制初始化按鈕完成");
-            return true;
+        // 2. 執行選項爆炸動畫 (或其他點擊反饋動畫)
+        // animateOptionExplode 需要被點擊的選項按鈕元素
+        // 它返回一個 Promise，以便我們在其完成後繼續
+        if (typeof animateOptionExplode === 'function') {
+            console.log("[TestLogic LOG] Starting option explosion animation...");
+            await animateOptionExplode(clickedOptionElement);
+            console.log("[TestLogic LOG] Option explosion animation completed.");
         } else {
-            console.error("無法找到測驗數據，按鈕初始化失敗");
-            return false;
+            console.warn("[TestLogic WARN] animateOptionExplode function not found. Skipping animation.");
+            // 如果沒有爆炸動畫，也模擬一個短延遲，讓用戶有反應時間
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
+        // 3. 判斷是進入下一題還是顯示結果
+        if (currentQuestionIdx < allQuestionsData.length - 1) {
+            console.log("[TestLogic LOG] Preparing next question...");
+            prepareNextQuestion(allQuestionsData);
+            // isOptionProcessing 將在 prepareNextQuestion -> displayQuestion -> createOptions (TypeIt 完成) 後，
+            // 或者更準確地說，在 handleOptionClick 的 finally 塊中解鎖。
+            // 此處 prepareNextQuestion 是同步的，真正的異步在 view.js 的 TypeIt。
+            // 因此，解鎖操作應該放在整個異步鏈的末尾。
+        } else {
+            console.log("[TestLogic LOG] Last question answered. Triggering show results...");
+            await triggerShowResults(allQuestionsData, legacyState.userAnswers);
         }
     } catch (error) {
-        console.error("強制初始化按鈕時發生錯誤:", error);
-        return false;
+        console.error("[TestLogic ERR] Error during option processing or animation:", error);
+        // 即使出錯，也要確保解鎖
+    } finally {
+        // 確保 isOptionProcessing 在所有異步操作後解鎖
+        // 這個 finally 塊會在 try 中的 await 完成後（無論成功或失敗）或 catch 執行後執行。
+        // 如果 prepareNextQuestion 或 triggerShowResults 內部有更長的異步操作（例如屏幕切換），
+        // 那麼 isOptionProcessing 的解鎖應該由那些更深層的 Promise鏈的最終完成點來控制。
+        // 目前的設計：prepareNextQuestion 是同步的，它調用 displayQuestion，後者內部的 TypeIt 是異步的。
+        // triggerShowResults 內部的 switchScreen 也是異步的。
+        // 因此，這裡的 finally 解鎖可能太早。
+        // **正確的做法是：isOptionProcessing 的解鎖應該在下一題的 TypeIt 動畫完成後，或者結果頁顯示完成後。**
+        // 我們暫時將解鎖推遲到 `prepareNextQuestion` 和 `triggerShowResults` 的異步操作完成後。
+        // 為了簡化，我們暫時假設爆炸動畫是主要耗時操作，下一題的準備是相對快的。
+        // stateManager.unlock('isOptionProcessing');
+        // console.log("[State LOG] Unlocked: isOptionProcessing (handleOptionClick end - THIS MIGHT BE TOO EARLY)");
+        // **正確的解鎖時機將在 prepareNextQuestion 和 triggerShowResults 的 Promise 完成後。**
+        // 為了確保解鎖，我們可以在這裡先註釋掉，然後在各自的流程終點解鎖。
+        // 或者，handleOptionClick 本身返回一個 Promise，由調用棧更高層處理。
+        // 目前：讓 prepareNextQuestion 和 triggerShowResults 返回 Promise，然後在這裡 await 它們。
     }
 }
 
-// 綁定其他按鈕
-export function bindOtherButtons() { 
-    if (DOM.buttons.restart) { 
-        DOM.buttons.restart.removeEventListener('click', handleRestartClick); 
-        DOM.buttons.restart.addEventListener('click', handleRestartClick); 
-        
-        // 應用打字效果
-        setupButtonTypingEffect(DOM.buttons.restart, DOM.buttons.restart.textContent.trim());
-        
-        console.log("Restart button event bound."); 
-    } else { 
-        console.error("Cannot bind restart button."); 
-    } 
-    
-    if (DOM.buttons.copy) { 
-        DOM.buttons.copy.removeEventListener('click', copyShareText); 
-        DOM.buttons.copy.addEventListener('click', copyShareText); 
-        
-        // 應用打字效果
-        setupButtonTypingEffect(DOM.buttons.copy, DOM.buttons.copy.textContent.trim());
-        
-        console.log("Copy button event bound."); 
-    } else { 
-        console.error("Cannot bind copy button."); 
-    } 
+/**
+ * 準備並顯示下一個問題。
+ * @param {object[]} allQuestionsData - 完整的測驗問題數據陣列。
+ * @returns {Promise<void>} 當下一個問題的視圖（包括TypeIt）準備好時 resolve。
+ */
+async function prepareNextQuestion(allQuestionsData) {
+    const newQuestionIndex = stateManager.get('currentQuestionIndex') + 1;
+    stateManager.set('currentQuestionIndex', newQuestionIndex);
+
+    console.log(`[TestLogic LOG] prepareNextQuestion: Advancing to question ${newQuestionIndex + 1}`);
+
+    // displayQuestion 會觸發 TypeIt 動畫，這是異步的。
+    // 我們需要一種方法來知道 displayQuestion (包括其內部的 TypeIt) 何時完成。
+    // 目前 view.js 中的 createOptionsUI 使用 Promise.allSettled(typeItPromises)
+    // 並在其 .then() 中解鎖 isTransitioning (現在是 isOptionProcessing)。
+    // 這裡我們直接調用 displayQuestion，並相信 view.js 會在其異步操作完成後處理好狀態。
+    // TODO: 考慮讓 displayQuestion 或 createOptionsUI 返回一個 Promise 以便更精確控制。
+    displayQuestion(newQuestionIndex, allQuestionsData);
+
+    // 由於 displayQuestion 內部包含異步的 TypeIt，
+    // isOptionProcessing 的解鎖不應該在這裡立即發生。
+    // 它應該在 TypeIt 動畫完成後。目前 view.js 的 Promise.allSettled
+    // 的 .then() 內部會解鎖 isTransitioning (我們之前的 isOptionProcessing)。
+    // 我們需要確保 state.js 中的狀態名稱一致。
+    // 假設 view.js 會在所有 TypeIt 打完後解鎖 isOptionProcessing (或者一個類似的信號)
+    // 這裡我們暫時不返回 Promise，依賴 view.js 的解鎖。
+    // 但更好的做法是讓 displayQuestion 返回 Promise。
+
+    // 為了讓 handleOptionClick 的 finally 能正確解鎖，這裡我們模擬一個延遲
+    // 代表 view.js 完成異步操作的時間。
+    // 實際中，應該由 view.js 返回 Promise。
+    const estimatedViewRenderTime = (allQuestionsData[newQuestionIndex].options.length * 400) + 1000; // 粗略估算
+    await new Promise(resolve => setTimeout(resolve, estimatedViewRenderTime));
+    console.log("[TestLogic LOG] prepareNextQuestion: Assumed view rendering complete.");
+    stateManager.unlock('isOptionProcessing');
+    console.log("[State LOG] Unlocked: isOptionProcessing (after prepareNextQuestion's estimated delay)");
 }
 
 /**
- * 為按鈕應用打字機效果
+ * 觸發結果的計算和顯示流程。
+ * @param {object[]} allQuestionsData - 完整的測驗問題數據陣列。
+ * @param {number[]} userAnswers - 用戶的答案陣列。
+ * @returns {Promise<void>} 當結果頁顯示完成時 resolve。
  */
-function setupButtonTypingEffect(button, text) {
-    if (!button || !text) return;
-    
-    // 檢查是否已經應用了打字效果
-    const existingSpan = button.querySelector('.typing-effect');
-    if (existingSpan) return;
-    
-    // 創建打字機效果元素
-    const typingSpan = document.createElement('span');
-    // 修改：使用新的打字效果類名
-    typingSpan.className = 'typing-effect';
-    typingSpan.textContent = text;
-    
-    // 為每個按鈕設置稍微不同的延遲和速度
-    const randomDelay = (Math.random() * 0.3 + 0.2) + 's';
-    const typingDuration = (text.length * 30 / 1000 + 0.5) + 's';
-    
-    typingSpan.style.setProperty('--typing-delay', randomDelay);
-    typingSpan.style.setProperty('--typing-duration', typingDuration);
-    
-    // 清空按鈕內容並添加新的打字效果
-    button.innerHTML = '';
-    button.appendChild(typingSpan);
+async function triggerShowResults(allQuestionsData, userAnswers) {
+    console.log("[TestLogic LOG] triggerShowResults called.");
+    stateManager.lock('isScreenSwitching'); // 鎖定屏幕切換狀態，因為我們要切換到結果頁
+
+    try {
+        // 1. 計算結果 (假設 resultLogic.js 有一個 calculateAndPrepareResults 函數)
+        // 這部分邏輯我們會在 resultLogic.js 中實現
+        // const resultData = calculateResult(allQuestionsData, userAnswers);
+        // DOM.elements.resultTitle.textContent = resultData.title; // 等
+        console.log("[TestLogic LOG] (Skipping result calculation for now) User answers:", userAnswers);
+
+
+        // 2. 切換到結果屏幕
+        await switchScreen('test', 'result'); // animation.js 中的 switchScreen 返回 Promise
+        console.log("[TestLogic LOG] Switched to result screen.");
+
+        // 3. （可選）在結果頁上顯示結果內容
+        // 這一部分會在重構 resultLogic.js 和相關 view 時完成
+        if (typeof calculateAndShowResults === 'function') {
+            calculateAndShowResults(allQuestionsData, userAnswers);
+        } else {
+            console.warn_log("[TestLogic WARN] calculateAndShowResults is not yet implemented/imported.");
+            // 臨時在結果頁顯示一些東西
+            if(DOM.elements.resultTitle) DOM.elements.resultTitle.textContent = "測驗完成！";
+            if(DOM.elements.resultDescription) DOM.elements.resultDescription.textContent = "結果正在生成中...（功能待實現）";
+        }
+
+
+    } catch (error) {
+        console.error("[TestLogic ERR] Error in triggerShowResults:", error);
+        // 即使出錯，也嘗試解鎖屏幕切換
+        if(stateManager.isLocked('isScreenSwitching')) stateManager.unlock('isScreenSwitching');
+    } finally {
+        // isScreenSwitching 應由 switchScreen 內部在其 Promise resolve 時解鎖
+        // isOptionProcessing 在這裡應該解鎖，因為選項處理流程到此結束
+        if(stateManager.isLocked('isOptionProcessing')) {
+            stateManager.unlock('isOptionProcessing');
+            console.log("[State LOG] Unlocked: isOptionProcessing (after triggerShowResults)");
+        }
+        if(stateManager.isLocked('isScreenSwitching')) { // 再次確認，以防 switchScreen 內部出錯未解鎖
+            stateManager.unlock('isScreenSwitching');
+            console.warn("[State WARN] isScreenSwitching was still locked at the end of triggerShowResults, unlocking.");
+        }
+    }
 }
+
+// 移除舊的、不再需要的函數
+// export function bindStartButton(...) {}
+// export function bindOptionEvents(...) {}
+// export function forceInitializeButtons(...) {}
+// export function bindOtherButtons(...) {}
